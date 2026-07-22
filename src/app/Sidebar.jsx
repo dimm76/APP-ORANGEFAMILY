@@ -25,7 +25,7 @@ const NAV_ITEMS = [
   { label: "Finanzas", href: "/app/finanzas", icon: walletOutline },
   { label: "Documentos", href: "/app/documentos", icon: folderOutline },
   { label: "Wiki", href: "/app/wiki", icon: bookOutline },
-  { label: "OrangePhotos", href: "/app/orange-photos", icon: imagesOutline },
+  { label: "OrangePhotos", href: "/app/orangephotos", icon: imagesOutline },
   { label: "Notas", href: "/app/notas", icon: documentTextOutline },
   { label: "Attachments", href: "/app/settings/attachments", icon: attachOutline },
 ];

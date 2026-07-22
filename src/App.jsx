@@ -3,6 +3,7 @@ import AuthGate from "./app/AuthGate.jsx";
 import AppLayout from "./app/AppLayout.jsx";
 import AttachmentsLibraryPage from "./app/AttachmentsLibraryPage.jsx";
 import WikiPage, { WikiPublicPage } from "./features/wiki/WikiPage.jsx";
+import OrangePhotosPage from "./features/orange-photos/OrangePhotosPage.jsx";
 import "./App.css";
 
 const OD_NAV_EVENT = "od-spa-navigate";
@@ -32,7 +33,7 @@ const ROUTES = {
     title: "Wiki",
     description: "El módulo Wiki está pendiente de desarrollo.",
   },
-  "/app/orange-photos": {
+  "/app/orangephotos": {
     title: "OrangePhotos",
     description: "El módulo OrangePhotos está pendiente de desarrollo.",
   },
@@ -78,6 +79,8 @@ function AppContent() {
         <AttachmentsLibraryPage />
       ) : pathname === "/app/wiki" || pathname.startsWith("/app/wiki/") ? (
         <WikiPage />
+      ) : pathname === "/app/orangephotos" || pathname === "/app/orange-photos" ? (
+        <OrangePhotosPage />
       ) : (
         <ModulePlaceholder title={route.title} description={route.description} />
       )}

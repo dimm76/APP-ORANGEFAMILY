@@ -10,6 +10,7 @@ const {
 } = require("./src/auth");
 const { handleAttachmentsRoutes } = require("./src/attachmentsHttp");
 const { handleWikiRoutes } = require("./src/wikiHttp");
+const { handleOrangePhotosRoutes } = require("./src/orangePhotosHttp");
 
 const app = express();
 const port = Number(process.env.PORT || 3001);
@@ -36,6 +37,7 @@ app.get("/api/auth/me", async (req, res) => {
 
 handleAttachmentsRoutes(app);
 handleWikiRoutes(app);
+handleOrangePhotosRoutes(app);
 
 app.get("/api/health", async (_req, res) => {
   try {
