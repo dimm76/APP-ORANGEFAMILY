@@ -453,3 +453,32 @@ ion-app.od-app-root {
     display: none !important;
   }
 }
+
+/* Workspace wiki: sin sidebar principal, contenido a ancho completo */
+.od-app-root--wiki-workspace .od-sidebar,
+.od-app-root--wiki-workspace .od-sidebar-backdrop {
+  display: none !important;
+}
+
+.od-app-root--wiki-workspace .od-main {
+  width: 100%;
+}
+
+.od-app-root--wiki-workspace .od-main-ion-content {
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --background: #ffffff;
+}
+
+.od-app-root--wiki-workspace ion-content.od-main-ion-content::part(scroll) {
+  padding: 0;
+  overflow: hidden;
+  height: 100%;
+}
+
+.od-app-root--wiki-workspace .od-main-ion-content {
+  height: calc(100vh - var(--od-header-height));
+  height: calc(100dvh - var(--od-header-height));
+}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { IonApp, IonContent, IonIcon } from "@ionic/react";
 import { menuOutline } from "ionicons/icons";
 import GlobalSearch from "../shared/components/GlobalSearch.jsx";
@@ -13,15 +13,42 @@ function navigateToDashboard(event) {
   window.dispatchEvent(new Event(OD_NAV_EVENT));
 }
 
+function normalizePathname(pathname) {
+  return String((pathname || "").split("?")[0] || "").replace(/\/$/, "") || "/";
+}
+
+function isWikiDocumentWorkspacePath(pathname) {
+  const path = normalizePathname(pathname);
+  if (path === "/app/wiki") return false;
+  if (!path.startsWith("/app/wiki/")) return false;
+  const rest = decodeURIComponent(path.slice("/app/wiki/".length)).trim();
+  return rest !== "" && !rest.includes("/");
+}
+
 export default function AppLayout({ children }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [routeTick, setRouteTick] = useState(0);
+  void routeTick;
+  const pathname =
+    typeof window !== "undefined" ? window.location.pathname : "/";
+  const wikiWorkspaceMode = isWikiDocumentWorkspacePath(pathname);
+
+  useEffect(() => {
+    const sync = () => setRouteTick((value) => value + 1);
+    window.addEventListener("popstate", sync);
+    window.addEventListener(OD_NAV_EVENT, sync);
+    return () => {
+      window.removeEventListener("popstate", sync);
+      window.removeEventListener(OD_NAV_EVENT, sync);
+    };
+  }, []);
 
   return (
     <IonApp
       className={`od-app-root ${collapsed ? "od-app-root--collapsed" : ""} ${
         mobileNavOpen ? "od-app-root--mobile-nav-open" : ""
-      }`}
+      } ${wikiWorkspaceMode ? "od-app-root--wiki-workspace" : ""}`}
     >
       <div className="od-app-shell">
         <header className="od-app-header">
@@ -52,7 +79,15 @@ export default function AppLayout({ children }) {
             <GlobalSearch />
           </div>
 
-          <div className="od-app-header-actions" aria-hidden="true" />
+          <div className="od-app-header-actions">
+            {wikiWorkspaceMode ? (
+              <span
+                id="od-wiki-add-block-host"
+                className="od-wiki-add-block-host"
+                aria-hidden="false"
+              />
+            ) : null}
+          </div>
         </header>
 
         <div className="od-app-body">
