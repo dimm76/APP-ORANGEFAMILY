@@ -1,0 +1,1582 @@
+/* Layout específico Wiki: el resto usa utilidades globales (tabla, filtros, editor enriquecido). */
+
+.od-wiki-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.od-wiki-editor-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--od-color-text-muted, #64748b);
+}
+
+.od-wiki-filters__archived-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  cursor: pointer;
+}
+
+.od-wiki-body {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+
+.od-wiki-tree-panel {
+  width: 260px;
+  flex-shrink: 0;
+  align-self: stretch;
+  border: 1px solid var(--od-color-border-muted, #dce3f5);
+  border-radius: 8px;
+  background: var(--od-color-surface, #fff);
+  padding: 0.5rem 0.35rem;
+  max-height: calc(100vh - 220px);
+  overflow: auto;
+}
+
+.od-wiki-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.od-wiki-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.od-wiki-tree .od-wiki-tree {
+  padding-left: 0;
+  margin-left: 0;
+  border-left: none;
+}
+
+.od-wiki-tree__item {
+  margin: 0;
+}
+
+.od-wiki-tree__row {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  min-height: 30px;
+  border-radius: 4px;
+}
+
+.od-wiki-tree__row.is-active-row {
+  background: var(--od-color-primary-soft, rgba(252, 66, 0, 0.08));
+}
+
+.od-wiki-tree__drag-handle {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 26px;
+  border: 0;
+  padding: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+
+.od-wiki-tree__drag-handle ion-icon {
+  width: 15px;
+  height: 15px;
+  font-size: 15px;
+}
+
+.od-wiki-tree__row:hover .od-wiki-tree__drag-handle,
+.od-wiki-tree__row:focus-within .od-wiki-tree__drag-handle,
+.od-wiki-tree__row.is-dragging .od-wiki-tree__drag-handle {
+  opacity: 1;
+}
+
+.od-wiki-tree__drag-handle:hover {
+  background: rgba(252, 66, 0, 0.08);
+  color: #fc4200;
+}
+
+.od-wiki-tree__drag-handle:active {
+  cursor: grabbing;
+}
+
+.od-wiki-tree__row.is-dragging {
+  opacity: 0.55;
+}
+
+.od-wiki-tree__row.is-drop-before,
+.od-wiki-tree__row.is-drop-after,
+.od-wiki-tree__row.is-drop-inside {
+  position: relative;
+}
+
+.od-wiki-tree__row.is-drop-before::before,
+.od-wiki-tree__row.is-drop-after::after {
+  content: "";
+  position: absolute;
+  left: 22px;
+  right: 6px;
+  height: 2px;
+  border-radius: 999px;
+  background: #fc4200;
+}
+
+.od-wiki-tree__row.is-drop-before::before {
+  top: -1px;
+}
+
+.od-wiki-tree__row.is-drop-after::after {
+  bottom: -1px;
+}
+
+.od-wiki-tree__row.is-drop-inside {
+  background: rgba(252, 66, 0, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(252, 66, 0, 0.22);
+}
+
+.od-wiki-tree__menu-btn {
+  flex-shrink: 0;
+  opacity: 0;
+  margin: 0;
+  --padding-start: 2px;
+  --padding-end: 2px;
+  transition: opacity 0.12s ease;
+}
+
+.od-wiki-tree__row:hover .od-wiki-tree__menu-btn,
+.od-wiki-tree__row:focus-within .od-wiki-tree__menu-btn {
+  opacity: 1;
+}
+
+.od-wiki-tree__btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 0.35rem 0.45rem;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--od-color-text, #37374b);
+  cursor: pointer;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.od-wiki-tree__btn--depth-0 {
+  padding-left: 0.45rem;
+}
+
+.od-wiki-tree__btn--depth-1 {
+  padding-left: 0.45rem;
+}
+
+.od-wiki-tree__btn--depth-2 {
+  padding-left: 0.45rem;
+  font-size: 12px;
+}
+
+.od-wiki-tree__btn--depth-3,
+.od-wiki-tree__btn--depth-4,
+.od-wiki-tree__btn--depth-5,
+.od-wiki-tree__btn--depth-6 {
+  padding-left: 0.45rem;
+  font-size: 12px;
+}
+
+.od-wiki-tree__btn:hover {
+  color: var(--od-color-text, #37374b);
+}
+
+.od-wiki-tree__btn.is-active {
+  color: var(--od-color-primary, #fc4200);
+  font-weight: 600;
+}
+
+.od-wiki-tree__btn.is-muted {
+  opacity: 1;
+  color: #64748b;
+}
+
+.od-wiki-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: flex-end;
+}
+
+.od-wiki-detail-meta .od-filter-field {
+  min-width: 140px;
+}
+
+.od-wiki-title-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--od-color-border-muted, #dce3f5);
+  font: inherit;
+  font-weight: 600;
+  font-size: 1.15rem;
+}
+
+.od-wiki-tiptap.od-rich-text-editor {
+  min-height: 280px;
+}
+
+.od-rich-text-editor.od-wiki-tiptap.is-wiki-readonly {
+  opacity: 0.96;
+}
+
+.od-rich-text-editor.od-wiki-tiptap.is-wiki-readonly .ProseMirror {
+  cursor: default;
+}
+
+/* —— Biblioteca (/app/wiki) —— */
+
+/* —— Workspace documental (/app/wiki/:id) —— */
+
+.od-wiki-workspace {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  max-height: calc(100dvh - var(--od-app-header-h, 52px));
+  min-height: 0;
+  overflow: hidden;
+  background: #ffffff;
+  color: #37374b;
+  color-scheme: light;
+  /* Workspace documental siempre en superficie clara: no heredar tokens oscuros del SO */
+  --od-color-text: #37374b;
+  --od-color-text-muted: #64748b;
+  --od-table-text: #0f2744;
+  --od-nav-fg: #37374b;
+  box-sizing: border-box;
+}
+
+.od-wiki-workspace__body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  align-items: stretch;
+  width: 100%;
+  background: #ffffff;
+  position: relative;
+}
+
+.od-wiki-workspace__sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  flex-shrink: 0;
+  align-self: stretch;
+  height: 100%;
+  min-height: 0;
+  border-right: 1px solid var(--od-color-border-muted, #dce3f5);
+  background: #ffffff;
+  padding: 0;
+  overflow: hidden;
+  --od-wiki-tree-indent: 0.85rem;
+  --od-wiki-tree-step: 1.125rem;
+}
+
+.od-wiki-workspace__sidebar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 0.85rem 0.75rem 0.65rem;
+  background: #ffffff;
+  border-bottom: 1px solid #e8edf7;
+}
+
+.od-wiki-workspace__sidebar-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0.65rem 0.75rem 1rem;
+}
+
+.od-wiki-workspace__sidebar-ctl,
+.od-wiki-workspace__sidebar-expand-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #dce3f5;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0f2744;
+  cursor: pointer;
+  box-shadow: 0 1px 6px rgba(15, 39, 68, 0.08);
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.od-wiki-workspace__sidebar-ctl:hover,
+.od-wiki-workspace__sidebar-expand-tab:hover {
+  color: #fc4200;
+  border-color: rgba(252, 66, 0, 0.35);
+  background: #fff8f5;
+  box-shadow: 0 2px 10px rgba(252, 66, 0, 0.12);
+}
+
+.od-wiki-workspace__sidebar-ctl:focus-visible,
+.od-wiki-workspace__sidebar-expand-tab:focus-visible {
+  outline: 2px solid rgba(252, 66, 0, 0.45);
+  outline-offset: 2px;
+}
+
+.od-wiki-workspace__sidebar-ctl ion-icon,
+.od-wiki-workspace__sidebar-expand-tab ion-icon {
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}
+
+.od-wiki-workspace__sidebar-expand-tab {
+  position: fixed;
+  top: calc(var(--od-app-header-h, 52px) + 0.85rem);
+  left: 0;
+  z-index: 5;
+  transform: translateX(-30%);
+  box-shadow: 0 2px 10px rgba(15, 39, 68, 0.12);
+}
+
+.od-wiki-workspace__mobile-drawer-backdrop {
+  position: fixed;
+  top: var(--od-app-header-h, 52px);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  border: none;
+  margin: 0;
+  padding: 0;
+  background: rgba(15, 23, 42, 0.35);
+  cursor: pointer;
+}
+
+.od-wiki-workspace__mobile-drawer {
+  position: fixed;
+  top: var(--od-app-header-h, 52px);
+  left: 0;
+  bottom: 0;
+  width: min(320px, 88vw);
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-right: 1px solid #dce3f5;
+  box-shadow: 4px 0 20px rgba(15, 39, 68, 0.12);
+  padding: 0 0.75rem 1rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  transform: translateX(-105%);
+  transition: transform 0.15s ease-out;
+  pointer-events: none;
+  --od-wiki-tree-indent: 0.85rem;
+  --od-wiki-tree-step: 1.125rem;
+}
+
+.od-wiki-workspace__mobile-drawer.is-open {
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.od-wiki-workspace__mobile-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0 -0.75rem;
+  padding: 0.75rem 0.75rem 0.5rem;
+  background: #ffffff;
+  border-bottom: 1px solid #e8edf7;
+}
+
+.od-wiki-workspace__mobile-drawer-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f2744;
+}
+
+.od-wiki-workspace__mobile-drawer-close {
+  border: none;
+  background: transparent;
+  padding: 2px 6px;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: #64748b;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.od-wiki-workspace__mobile-drawer-close:hover {
+  color: #37374b;
+  background: rgba(15, 39, 68, 0.05);
+}
+
+@media (max-width: 767px) {
+  .od-wiki-workspace__canvas {
+    padding: 1rem 1rem 1.5rem;
+  }
+}
+
+.od-wiki-workspace__back {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  margin: 0;
+  padding: 0.2rem 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--od-color-primary, #fc4200);
+  cursor: pointer;
+}
+
+.od-wiki-workspace__back:hover {
+  text-decoration: underline;
+}
+
+.od-wiki-workspace__sidebar-hint {
+  margin: -0.35rem 0 0.65rem;
+  font-size: 12px;
+  color: var(--od-color-text-muted, #64748b);
+}
+
+.od-wiki-workspace__sidebar-doc {
+  margin-bottom: 0.85rem;
+}
+
+.od-wiki-workspace__sidebar-doc-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+
+.od-wiki-workspace__sidebar-doc-row .od-wiki-tree__menu-btn {
+  opacity: 1;
+  margin-top: -0.1rem;
+}
+
+.od-wiki-workspace__sidebar-doc-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #0f2744;
+  word-break: break-word;
+}
+
+.od-wiki-sidebar-popover.od-action-popover-content ion-list {
+  padding: 6px 0;
+  margin: 0;
+}
+
+.od-wiki-sidebar-popover.od-action-popover-content ion-item {
+  --min-height: 30px;
+  --padding-start: 14px;
+  --inner-padding-end: 14px;
+  --background: transparent;
+  --color: #334155;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.od-wiki-sidebar-popover .od-popover-menu-label {
+  gap: 8px;
+  font-size: 13px;
+}
+
+.od-wiki-sidebar-popover .od-popover-menu-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.od-wiki-workspace__menu-btn {
+  flex-shrink: 0;
+  margin: -0.15rem -0.35rem 0 0;
+  --padding-start: 4px;
+  --padding-end: 4px;
+}
+
+.od-wiki-workspace__sidebar-divider {
+  height: 1px;
+  margin: 0 0 0.85rem;
+  background: var(--od-color-border-muted, #e8edf7);
+  border: none;
+}
+
+/* Árbol de páginas en workspace: indentación por padding, sin barra vertical */
+.od-wiki-workspace .od-wiki-tree--root {
+  margin: 0.15rem 0 0;
+  padding: 0;
+}
+
+.od-wiki-workspace .od-wiki-tree .od-wiki-tree {
+  padding-left: var(--od-wiki-tree-step, 1.125rem);
+  margin-left: 0;
+}
+
+.od-wiki-workspace .od-wiki-tree__row {
+  min-height: 32px;
+  border-radius: 6px;
+}
+
+.od-wiki-workspace .od-wiki-tree__row:hover:not(.is-active-row) {
+  background: rgba(15, 39, 68, 0.04);
+}
+
+.od-wiki-workspace .od-wiki-tree__row.is-active-row {
+  background: rgba(252, 66, 0, 0.08);
+}
+
+.od-wiki-workspace .od-wiki-tree__btn {
+  padding: 0.4rem 0.5rem 0.4rem var(--od-wiki-tree-indent, 0.85rem);
+  font-size: 13px;
+  font-weight: 400;
+  color: #37374b;
+  opacity: 1;
+  -webkit-text-fill-color: #37374b;
+}
+
+.od-wiki-workspace .od-wiki-tree__btn:hover:not(.is-active):not(.is-muted) {
+  color: #fc4200;
+  -webkit-text-fill-color: #fc4200;
+}
+
+.od-wiki-workspace .od-wiki-tree__btn.is-active {
+  color: #fc4200;
+  font-weight: 600;
+  -webkit-text-fill-color: #fc4200;
+}
+
+.od-wiki-workspace .od-wiki-tree__btn.is-muted {
+  opacity: 1;
+  color: #64748b;
+  -webkit-text-fill-color: #64748b;
+}
+
+.od-wiki-workspace__sidebar-section {
+  margin: 0 0 0.35rem;
+  padding: 0 0 0 var(--od-wiki-tree-indent, 0.85rem);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.od-wiki-workspace__sidebar-status {
+  margin: 0;
+  font-size: 12px;
+  color: var(--od-color-text-muted, #64748b);
+}
+
+.od-wiki-workspace__empty-pages {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--od-color-text-muted, #64748b);
+}
+
+.od-wiki-workspace__empty-pages p {
+  margin: 0 0 0.5rem;
+}
+
+.od-wiki-workspace__link-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--od-color-primary, #fc4200);
+  cursor: pointer;
+  text-align: left;
+}
+
+.od-wiki-workspace__link-btn:hover {
+  text-decoration: underline;
+}
+
+.od-wiki-workspace__canvas-status {
+  margin: 2rem auto 0;
+  max-width: 760px;
+  padding: 0 1.5rem;
+  font-size: 13px;
+  color: var(--od-color-text-muted, #64748b);
+}
+
+.od-wiki-workspace__error {
+  max-width: 760px;
+  margin: 2rem auto 0;
+  padding: 0 1.5rem;
+}
+
+.od-wiki-workspace__canvas {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem 1.5rem 2.5rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: #ffffff;
+}
+
+.od-wiki-workspace__canvas-inner {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.od-wiki-workspace__page-title {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0 0 1rem;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+  line-height: 1.2;
+  color: #0f2744;
+  -webkit-text-fill-color: #0f2744;
+}
+
+.od-wiki-workspace__page-title:focus {
+  outline: none;
+}
+
+.od-wiki-workspace__page-title:disabled {
+  opacity: 1;
+  color: #0f2744;
+  -webkit-text-fill-color: #0f2744;
+  cursor: default;
+}
+
+.od-wiki-workspace__editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Anular apariencia de textarea del editor global en workspace */
+.od-wiki-workspace__editor .od-wiki-tiptap.od-rich-text-editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  color: #37374b;
+  opacity: 1;
+}
+
+.od-wiki-workspace .od-rich-text-editor.od-wiki-tiptap.is-wiki-readonly {
+  opacity: 1;
+}
+
+.od-wiki-workspace__editor .od-rich-text-editor__content-wrap {
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+  resize: none;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+.od-wiki-workspace__editor .od-rich-text-editor__content-wrap:focus,
+.od-wiki-workspace__editor .od-rich-text-editor__content-wrap:focus-visible,
+.od-wiki-workspace__editor .od-rich-text-editor__content-wrap:focus-within {
+  border: none;
+  box-shadow: none;
+  outline: none;
+}
+
+.od-wiki-workspace__editor .od-rich-text-editor__content {
+  min-height: 0;
+  background: transparent;
+}
+
+.od-wiki-workspace__editor .ProseMirror {
+  min-height: 8rem;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1.75;
+  color: #37374b !important;
+  background: transparent;
+  opacity: 1 !important;
+}
+
+.od-wiki-workspace__editor .ProseMirror p {
+  margin: 0 0 0.65rem;
+}
+
+/* Jerarquía tipográfica clara en workspace Wiki (anula estilos compactos y tokens oscuros del SO) */
+.od-wiki-workspace__editor .od-wiki-tiptap.od-rich-text-editor .ProseMirror h1 {
+  margin: 1.5rem 0 0.6rem !important;
+  font-size: 2rem !important;
+  line-height: 1.15 !important;
+  font-weight: 700 !important;
+  color: #0f2744 !important;
+  opacity: 1 !important;
+}
+
+.od-wiki-workspace__editor .od-wiki-tiptap.od-rich-text-editor .ProseMirror h2 {
+  margin: 1.25rem 0 0.5rem !important;
+  font-size: 1.5rem !important;
+  line-height: 1.22 !important;
+  font-weight: 700 !important;
+  color: #0f2744 !important;
+  opacity: 1 !important;
+}
+
+.od-wiki-workspace__editor .od-wiki-tiptap.od-rich-text-editor .ProseMirror h3 {
+  margin: 1.05rem 0 0.45rem !important;
+  font-size: 1.3125rem !important;
+  line-height: 1.28 !important;
+  font-weight: 700 !important;
+  color: #0f2744 !important;
+  opacity: 1 !important;
+}
+
+.od-wiki-workspace__editor .od-wiki-tiptap.od-rich-text-editor .ProseMirror h4 {
+  margin: 0.95rem 0 0.4rem !important;
+  font-size: 1.125rem !important;
+  line-height: 1.32 !important;
+  font-weight: 650 !important;
+  letter-spacing: 0.01em;
+  color: #37374b !important;
+  opacity: 1 !important;
+}
+
+.od-wiki-workspace__editor .od-wiki-tiptap.od-rich-text-editor .ProseMirror p {
+  margin: 0 0 0.75rem !important;
+  font-size: 1rem !important;
+  font-weight: 400 !important;
+  line-height: 1.75 !important;
+  opacity: 1 !important;
+}
+
+.od-wiki-workspace__editor .od-wiki-tiptap.od-rich-text-editor .ProseMirror p:not([style*="color"]) {
+  color: #37374b !important;
+}
+
+.od-wiki-workspace__editor .od-wiki-tiptap.od-rich-text-editor .ProseMirror strong,
+.od-wiki-workspace__editor .od-wiki-tiptap.od-rich-text-editor .ProseMirror b {
+  font-weight: 600 !important;
+  color: #37374b !important;
+  opacity: 1 !important;
+}
+
+.od-wiki-workspace__editor .od-wiki-tiptap.od-rich-text-editor .ProseMirror a {
+  color: #fc4200 !important;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.od-wiki-workspace__editor .od-wiki-tiptap.od-rich-text-editor .ProseMirror a:hover {
+  color: #e03a00 !important;
+  text-decoration: underline;
+  text-decoration-color: rgba(252, 66, 0, 0.55);
+  text-underline-offset: 2px;
+}
+
+.od-wiki-workspace__editor .od-wiki-tiptap.od-rich-text-editor .ProseMirror a:focus-visible {
+  outline: 2px solid rgba(252, 66, 0, 0.45);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Columnas: limpias en lectura; separadores sutiles solo al editar */
+.od-wiki-workspace__editor .ProseMirror .od-rich-columns {
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.od-wiki-workspace__editor
+  .od-wiki-tiptap.od-rich-text-editor:not(.is-wiki-readonly)
+  .ProseMirror
+  .od-rich-columns:hover
+  .od-rich-column:not(:first-child),
+.od-wiki-workspace__editor
+  .od-wiki-tiptap.od-rich-text-editor:not(.is-wiki-readonly)
+  .ProseMirror
+  .od-rich-columns:focus-within
+  .od-rich-column:not(:first-child),
+.od-wiki-workspace__editor
+  .od-wiki-tiptap.od-rich-text-editor:not(.is-wiki-readonly)
+  .ProseMirror
+  .od-rich-columns.ProseMirror-selectednode
+  .od-rich-column:not(:first-child) {
+  border-left: 1px solid rgba(197, 208, 230, 0.9);
+  padding-left: 15px;
+}
+
+.od-wiki-workspace__editor .od-wiki-tiptap.od-rich-text-editor .ProseMirror div[data-youtube-video] {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  margin: 1rem 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f1f5f9;
+}
+
+.od-wiki-workspace__editor .od-wiki-tiptap.od-rich-text-editor .ProseMirror div[data-youtube-video] iframe,
+.od-wiki-workspace__editor .od-wiki-tiptap.od-rich-text-editor .ProseMirror div[data-youtube-video] .od-youtube-iframe {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100%;
+  border: 0;
+  display: block;
+}
+
+.od-wiki-workspace__editor
+  .od-wiki-tiptap.od-rich-text-editor:not(.is-wiki-readonly)
+  .ProseMirror
+  div[data-youtube-video]:hover,
+.od-wiki-workspace__editor
+  .od-wiki-tiptap.od-rich-text-editor:not(.is-wiki-readonly)
+  .ProseMirror
+  div[data-youtube-video].ProseMirror-selectednode {
+  outline: 2px solid rgba(252, 66, 0, 0.28);
+  outline-offset: 2px;
+}
+
+.od-wiki-workspace__editor .od-wiki-tiptap.od-rich-text-editor .ProseMirror div[data-od-video-embed] {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  margin: 1rem 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f1f5f9;
+}
+
+.od-wiki-workspace__editor
+  .od-wiki-tiptap.od-rich-text-editor
+  .ProseMirror
+  div[data-od-video-embed]
+  iframe,
+.od-wiki-workspace__editor
+  .od-wiki-tiptap.od-rich-text-editor
+  .ProseMirror
+  div[data-od-video-embed]
+  .od-video-embed__iframe {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100%;
+  border: 0;
+  display: block;
+}
+
+.od-wiki-workspace__editor
+  .od-wiki-tiptap.od-rich-text-editor:not(.is-wiki-readonly)
+  .ProseMirror
+  div[data-od-video-embed]:hover,
+.od-wiki-workspace__editor
+  .od-wiki-tiptap.od-rich-text-editor:not(.is-wiki-readonly)
+  .ProseMirror
+  div[data-od-video-embed].ProseMirror-selectednode {
+  outline: 2px solid rgba(252, 66, 0, 0.28);
+  outline-offset: 2px;
+}
+
+.od-wiki-workspace__editor .od-wiki-tiptap.od-rich-text-editor .ProseMirror li,
+.od-wiki-workspace__editor .od-wiki-tiptap.od-rich-text-editor .ProseMirror blockquote {
+  color: #37374b !important;
+  opacity: 1 !important;
+}
+
+.od-wiki-add-block-host {
+  display: inline-flex;
+  align-items: center;
+}
+
+.od-wiki-add-block-btn-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+ion-button.od-wiki-add-block-btn {
+  --border-radius: 8px;
+  --padding-start: 0;
+  --padding-end: 0;
+  --min-height: 34px;
+  --min-width: 34px;
+  margin: 0;
+  --background: #ffffff;
+  --background-hover: rgba(252, 66, 0, 0.1);
+  --color: var(--od-table-text, #0f2744);
+  --box-shadow: none;
+}
+
+ion-button.od-wiki-add-block-btn::part(native) {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  border: 1px solid #c5d0e6;
+  border-radius: 8px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+ion-button.od-wiki-add-block-btn:hover::part(native) {
+  background: rgba(252, 66, 0, 0.1);
+  border-color: rgba(252, 66, 0, 0.35);
+}
+
+ion-button.od-wiki-add-block-btn ion-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--od-table-text, #0f2744);
+}
+
+.od-wiki-block-panel-host {
+  flex: 0 0 0;
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.od-wiki-block-panel-host.is-open {
+  position: fixed;
+  top: var(--od-app-header-h, 52px);
+  right: 0;
+  bottom: 0;
+  width: 360px;
+  height: auto;
+  flex: none;
+  z-index: 3;
+  overflow: hidden;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.od-wiki-block-insert-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+  background: #ffffff;
+  border-left: 1px solid #dce3f5;
+  box-shadow: -4px 0 16px rgba(15, 39, 68, 0.06);
+}
+
+.od-wiki-block-insert-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e8edf7;
+}
+
+.od-wiki-block-insert-panel__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f2744;
+}
+
+.od-wiki-block-insert-panel__close {
+  border: none;
+  background: transparent;
+  padding: 2px 6px;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: #64748b;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.od-wiki-block-insert-panel__close:hover {
+  color: #37374b;
+  background: rgba(15, 39, 68, 0.05);
+}
+
+.od-wiki-block-insert-panel .od-wiki-add-block-menu {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.od-wiki-add-block-btn-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.od-wiki-add-block-btn-wrap .od-wiki-add-block-btn.is-active {
+  --background: rgba(252, 66, 0, 0.1);
+}
+
+.od-rich-text-slash-menu .od-rich-text-block-menu-panel.od-wiki-add-block-menu {
+  min-width: 280px;
+  max-width: 360px;
+  max-height: none;
+  padding: 10px 0;
+  overflow: visible;
+  border: none;
+  box-shadow: none;
+}
+
+.od-wiki-block-insert-panel .od-wiki-add-block-menu.od-rich-text-block-menu-panel {
+  max-height: none;
+  max-width: none;
+  min-width: 0;
+  width: 100%;
+  padding: 10px 0;
+  border: none;
+  box-shadow: none;
+}
+
+.od-wiki-block-menu-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.od-wiki-block-menu-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.od-wiki-block-menu-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.od-wiki-block-menu-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.od-wiki-block-menu-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.od-rich-text-slash-menu.od-rich-text-editor__toolbar-popover {
+  padding: 0;
+  background: #ffffff;
+  border: 1px solid #dce3f5;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(15, 39, 68, 0.14);
+  overflow: hidden;
+  max-height: calc(100dvh - var(--od-app-header-h, 52px) - 16px);
+}
+
+.od-wiki-save-toast {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 120;
+  max-width: min(340px, calc(100vw - 32px));
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.35;
+  border-radius: 8px;
+  pointer-events: none;
+  background: rgba(239, 246, 255, 0.97);
+  color: #0f2744;
+  border: 1px solid rgba(15, 39, 68, 0.14);
+  box-shadow: 0 6px 18px rgba(15, 39, 68, 0.12);
+}
+
+.od-wiki-save-toast.is-error {
+  background: rgba(255, 244, 237, 0.97);
+  color: #b91c1c;
+  border-color: rgba(252, 66, 0, 0.28);
+  box-shadow: 0 6px 18px rgba(124, 34, 0, 0.1);
+}
+
+.od-wiki-root-content-notice {
+  flex-shrink: 0;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+}
+
+.od-wiki-root-content-notice__text {
+  margin: 0;
+}
+
+.od-wiki-root-content-notice__actions {
+  margin-top: 8px;
+}
+
+.od-wiki-add-block-menu .od-rich-text-editor__menu-section {
+  padding: 6px 0;
+}
+
+.od-wiki-add-block-menu .od-rich-text-editor__menu-section-title {
+  padding: 4px 14px 6px;
+  font-size: 11px;
+}
+
+.od-wiki-add-block-menu .od-rich-text-editor__menu-section-items {
+  padding: 0 8px 6px;
+}
+
+.od-wiki-add-block-menu .od-rich-text-editor__menu-row {
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.od-wiki-add-block-menu .od-rich-text-editor__menu-row-icon,
+.od-wiki-add-block-menu .od-rich-text-editor__menu-row-glyph {
+  width: 20px;
+  height: 20px;
+}
+
+.od-rich-text-slash-menu__empty {
+  min-width: 220px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.od-app-root--wiki-workspace .od-wiki-workspace {
+  height: 100%;
+  min-height: 0;
+}
+
+.od-app-root--wiki-workspace .od-main-ion-content,
+.od-app-root--wiki-workspace ion-content.od-main-ion-content::part(background) {
+  --background: #ffffff;
+  background: #ffffff;
+}
+
+.od-wiki-library-table-wrap {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.od-wiki-library-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.od-wiki-table__actions-col,
+.od-wiki-table__actions-cell {
+  width: 56px;
+  min-width: 56px;
+  max-width: 56px;
+  white-space: nowrap;
+}
+
+.od-wiki-table__document-col {
+  width: auto;
+  min-width: 220px;
+}
+
+.od-wiki-table__actions-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.od-wiki-row-action {
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--od-color-muted, #717172);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+
+.od-wiki-row-action:hover {
+  background: rgba(252, 66, 0, 0.08);
+  border-color: rgba(252, 66, 0, 0.22);
+  color: var(--od-color-primary, #fc4200);
+}
+
+.od-wiki-row-action ion-icon {
+  font-size: 16px;
+}
+
+.od-wiki-title-inline-input {
+  width: 100%;
+  min-width: 220px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0.35rem 0.45rem;
+}
+
+.od-wiki-title-inline-input:hover {
+  border-color: rgba(113, 113, 114, 0.24);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.od-wiki-title-inline-input:focus {
+  outline: none;
+  border-color: rgba(252, 66, 0, 0.5);
+  background: rgba(252, 66, 0, 0.06);
+}
+
+.od-wiki-table__type-col,
+.od-wiki-table__type-cell {
+  width: 190px;
+  min-width: 190px;
+  max-width: 190px;
+}
+
+.od-wiki-table__visibility-col,
+.od-wiki-table__visibility-cell {
+  width: 190px;
+  min-width: 190px;
+  max-width: 190px;
+}
+
+.od-wiki-table__client-col,
+.od-wiki-table__client-cell {
+  width: 220px;
+  min-width: 220px;
+  max-width: 220px;
+}
+
+.od-wiki-table__contract-col,
+.od-wiki-table__contract-cell {
+  width: 260px;
+  min-width: 260px;
+  max-width: 260px;
+  padding-right: 8px;
+}
+
+.od-wiki-row-menu-popover {
+  --width: 240px;
+}
+
+.od-wiki-row-menu {
+  padding: 0.35rem;
+}
+
+.od-wiki-row-menu ion-item {
+  --min-height: 34px;
+  --padding-start: 0.55rem;
+  --inner-padding-end: 0.55rem;
+  --background: transparent;
+  --border-color: transparent;
+  font-size: 0.86rem;
+}
+
+.od-wiki-row-menu ion-icon {
+  font-size: 16px;
+  margin-right: 0.45rem;
+}
+
+.od-wiki-row-menu ion-item::part(native) {
+  border-radius: 8px;
+}
+
+.od-wiki-visibility-select {
+  width: 100%;
+}
+
+.od-wiki-fixed-select-trigger {
+  width: 100%;
+  min-width: 0;
+  justify-content: space-between;
+}
+
+.od-wiki-type-badge {
+  max-width: 100%;
+}
+
+.od-wiki-type-menu-popover {
+  --width: 250px;
+}
+
+.od-wiki-type-menu {
+  padding: 0.35rem;
+}
+
+.od-wiki-type-menu ion-item {
+  --min-height: 36px;
+  --padding-start: 0.45rem;
+  --inner-padding-end: 0.45rem;
+  --background: transparent;
+  --border-color: transparent;
+}
+
+.od-wiki-type-menu ion-item::part(native) {
+  border-radius: 8px;
+}
+
+.od-wiki-type-menu ion-item:hover::part(native),
+.od-wiki-type-menu__item--selected::part(native) {
+  background: rgba(252, 66, 0, 0.06);
+}
+
+.od-wiki-type-badge--menu {
+  width: auto;
+  max-width: 100%;
+}
+
+.od-wiki-visibility-modal {
+  max-width: 620px;
+}
+
+.od-wiki-visibility-modal__status {
+  margin: 4px 0 0;
+  color: #64748b;
+}
+
+.od-wiki-visibility-modal__field,
+.od-wiki-visibility-modal__url {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.od-wiki-visibility-modal__label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.od-wiki-visibility-modal__input {
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 1px solid #dce3f5;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #37374b;
+  color-scheme: light;
+  font: inherit;
+}
+
+.od-wiki-visibility-modal__input:focus {
+  outline: none;
+  border-color: #cbd5e1;
+  box-shadow: 0 0 0 2px rgba(226, 232, 240, 0.75);
+}
+
+.od-wiki-visibility-modal__url code {
+  padding: 8px;
+  border: 1px solid #dce3f5;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+  background: #f8fafc;
+  color: #37374b;
+}
+
+.od-wiki-visibility-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.od-wiki-visibility-modal__actions .od-modal-primary {
+  width: auto;
+}
+
+.od-wiki-button-secondary,
+.od-wiki-button-danger {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.od-wiki-button-secondary {
+  border: 1px solid #dce3f5;
+  background: #ffffff;
+  color: #334155;
+}
+
+.od-wiki-button-secondary:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.od-wiki-button-danger {
+  border: 1px solid #fecaca;
+  background: #fff7f7;
+  color: #a63a3a;
+}
+
+.od-wiki-button-danger:hover {
+  border-color: #fca5a5;
+  background: #fff1f1;
+  color: #8b2e2e;
+}
+
+.od-wiki-visibility-modal button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.od-wiki-public-shell {
+  min-height: 100dvh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  color: #37374b;
+}
+
+.od-wiki-public-topbar {
+  height: 52px;
+  max-height: 52px;
+  flex: 0 0 52px;
+  border-bottom: 1px solid #e4e4e8;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+}
+
+.od-wiki-public-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #111229;
+}
+
+.od-wiki-public-brand img {
+  width: 28px;
+  height: 28px;
+  display: block;
+  flex: 0 0 auto;
+}
+
+.od-wiki-workspace--public {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: calc(100dvh - 52px);
+}
+
+.od-wiki-workspace--public .od-wiki-workspace__sidebar-top {
+  justify-content: flex-end;
+}
+
+.od-wiki-workspace--public .od-wiki-workspace__sidebar-doc-label {
+  color: #111229;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+.od-wiki-workspace--public .od-wiki-workspace__sidebar-expand-tab {
+  top: calc(52px + 0.85rem);
+}
+
+.od-wiki-workspace--public .od-wiki-workspace__mobile-drawer-backdrop,
+.od-wiki-workspace--public .od-wiki-workspace__mobile-drawer {
+  top: 52px;
+}
+
+.od-wiki-workspace--public .od-wiki-workspace__canvas {
+  background: #ffffff;
+}
+
+.od-wiki-workspace--public .od-wiki-public-title {
+  pointer-events: none;
+  cursor: default;
+}
+
+.od-wiki-workspace--public .od-wiki-add-block-btn-wrap,
+.od-wiki-workspace--public .od-wiki-block-insert-panel,
+.od-wiki-workspace--public .od-rich-text-editor__toolbar-popover,
+.od-wiki-workspace--public .od-rich-text-slash-menu {
+  display: none !important;
+}

@@ -1,0 +1,85 @@
+/*
+ * OrangeDesk — pila global de modales / overlays.
+ * Ver src/shared/overlay/odModalStack.js para la escala numérica.
+ *
+ * Uso en modales portaled:
+ *   const level = useModalStackLayer(open);
+ *   className={`od-modal-backdrop … ${modalBackdropLevelClass(level)}`}
+ *
+ * html.od-modal-stack-N eleva ion-popover, ODFilterSelect portal y menús Comms.
+ *
+ * ion-popover: Ionic fija style="z-index: 20000+N" en el host; !important
+ * aplica la escala OD sin tocar cada IonPopover.
+ */
+
+:root {
+  --od-z-dropdown: 10050;
+  --od-z-modal-l1-backdrop: 120000;
+  --od-z-modal-l1-overlay: 120050;
+  --od-z-modal-l2-backdrop: 120100;
+  --od-z-modal-l2-overlay: 120150;
+  --od-z-modal-l3-backdrop: 120200;
+  --od-z-modal-l3-overlay: 120250;
+  --od-z-lightbox: 120300;
+}
+
+.od-modal-backdrop.od-modal-level-1 {
+  z-index: var(--od-z-modal-l1-backdrop);
+}
+
+.od-modal-backdrop.od-modal-level-2 {
+  z-index: var(--od-z-modal-l2-backdrop);
+}
+
+.od-modal-backdrop.od-modal-level-3 {
+  z-index: var(--od-z-modal-l3-backdrop);
+}
+
+/* Dropdown portal en página (sin modal abierta) */
+.od-filter-dropdown__panel.od-filter-dropdown__panel--portal,
+.od-filter-multiselect__panel.od-filter-multiselect__panel--portal {
+  z-index: var(--od-z-dropdown);
+}
+
+/* Menús portal (CommsPortalMenu y equivalentes en modales portaleadas) */
+.od-comms-portal-menu {
+  overflow-y: auto;
+  border-radius: 8px;
+  background: var(--od-panel-surface, #fff);
+  color: #334155;
+  color-scheme: light;
+  box-shadow:
+    0 8px 24px rgba(15, 23, 42, 0.14),
+    0 2px 8px rgba(15, 23, 42, 0.08);
+  border: 1px solid #e2e8f0;
+}
+
+html.od-modal-stack-1 ion-popover,
+html.od-modal-stack-1 .od-filter-dropdown__panel--portal,
+html.od-modal-stack-1 .od-filter-multiselect__panel--portal,
+html.od-modal-stack-1 .od-comms-portal-menu,
+html.od-modal-stack-1 .od-comms-entity-select__panel,
+html.od-modal-stack-1 .od-rich-text-editor__toolbar-popover {
+  --z-index: var(--od-z-modal-l1-overlay);
+  z-index: var(--od-z-modal-l1-overlay) !important;
+}
+
+html.od-modal-stack-2 ion-popover,
+html.od-modal-stack-2 .od-filter-dropdown__panel--portal,
+html.od-modal-stack-2 .od-filter-multiselect__panel--portal,
+html.od-modal-stack-2 .od-comms-portal-menu,
+html.od-modal-stack-2 .od-comms-entity-select__panel,
+html.od-modal-stack-2 .od-rich-text-editor__toolbar-popover {
+  --z-index: var(--od-z-modal-l2-overlay);
+  z-index: var(--od-z-modal-l2-overlay) !important;
+}
+
+html.od-modal-stack-3 ion-popover,
+html.od-modal-stack-3 .od-filter-dropdown__panel--portal,
+html.od-modal-stack-3 .od-filter-multiselect__panel--portal,
+html.od-modal-stack-3 .od-comms-portal-menu,
+html.od-modal-stack-3 .od-comms-entity-select__panel,
+html.od-modal-stack-3 .od-rich-text-editor__toolbar-popover {
+  --z-index: var(--od-z-modal-l3-overlay);
+  z-index: var(--od-z-modal-l3-overlay) !important;
+}

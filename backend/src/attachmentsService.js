@@ -149,17 +149,28 @@ async function linkAttachmentToEntity(req, id, body) {
   const usageType = String(body.usageType || body.usage_type || "embedded_image").trim() || "embedded_image";
   if (!isUuid(id) || !entityType || !isUuid(entityId) || entityType.length > 100 || fieldKey.length > 100 || usageType.length > 100) return { ok: false, status: 400, reason: "Datos de vínculo no válidos." };
   const result = await pool.query(
-    `INSERT INTO public.attachment_links (attachment_id,entity_type,entity_id,field_key,usage_type,created_by)
-     SELECT id,$3,$4::uuid,$5,$6,$7::uuid FROM public.attachments
-     WHERE id=$1::uuid AND family_id=$2::uuid AND status='active' AND deleted_at IS NULL
-     ON CONFLICT (attachment_id,entity_type,entity_id,field_key,usage_type) DO NOTHING RETURNING id`,
+    `WITH attachment AS (
+       SELECT id, bucket, storage_key, original_filename, mime_type, size_bytes,
+              width, height, created_at
+       FROM public.attachments
+       WHERE id=$1::uuid AND family_id=$2::uuid AND status='active' AND deleted_at IS NULL
+     ), inserted AS (
+       INSERT INTO public.attachment_links (attachment_id,entity_type,entity_id,field_key,usage_type,created_by)
+       SELECT id,$3,$4::uuid,$5,$6,$7::uuid FROM attachment
+       ON CONFLICT (attachment_id,entity_type,entity_id,field_key,usage_type) DO NOTHING
+     )
+     SELECT * FROM attachment
+    `,
     [id, auth.familyId, entityType, entityId, fieldKey, usageType, auth.userId]
   );
-  if (!result.rows[0]) {
-    const exists = await pool.query("SELECT 1 FROM public.attachments WHERE id=$1::uuid AND family_id=$2::uuid AND status='active' AND deleted_at IS NULL", [id, auth.familyId]);
-    if (!exists.rows[0]) return { ok: false, status: 404, reason: "Attachment no encontrado." };
-  }
-  return { ok: true, payload: { linked: true } };
+  const row = result.rows[0];
+  if (!row) return { ok: false, status: 404, reason: "Attachment no encontrado." };
+  return { ok: true, payload: { attachment: {
+    id: row.id, url: await getSignedUrlForStorageKey(row),
+    filename: row.original_filename || "imagen", mimeType: row.mime_type,
+    sizeBytes: row.size_bytes, width: row.width, height: row.height,
+    createdAt: row.created_at,
+  } } };
 }
 
 async function deleteAttachmentIfUnused(req, id) {

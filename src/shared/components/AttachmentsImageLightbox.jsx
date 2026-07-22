@@ -1,40 +1,152 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { IonIcon } from "@ionic/react";
-import { addOutline, closeOutline, contractOutline, removeOutline } from "ionicons/icons";
+import { OD_ICONS } from "../ui/odIcons.js";
 
-const STEP = 1.25;
-function fitScale(width, height) {
-  return Math.min((window.innerWidth - 48) / width, (window.innerHeight - 104) / height, 1);
+const LIGHTBOX_MARGIN = 48;
+const LIGHTBOX_TOOLBAR = 56;
+const ZOOM_MIN = 0.25;
+const ZOOM_MAX = 4;
+const ZOOM_STEP = 1.25;
+
+function computeFitScale(naturalW, naturalH) {
+  if (!naturalW || !naturalH) return 1;
+
+  const maxW = Math.max(120, window.innerWidth - LIGHTBOX_MARGIN);
+  const maxH = Math.max(120, window.innerHeight - LIGHTBOX_TOOLBAR - LIGHTBOX_MARGIN);
+
+  return Math.min(maxW / naturalW, maxH / naturalH, 1);
 }
 
 export default function AttachmentsImageLightbox({ viewer, onClose }) {
-  const [zoom, setZoom] = useState(1);
-  const [natural, setNatural] = useState({ width: 0, height: 0 });
-  const close = useCallback(() => { setZoom(1); setNatural({ width: 0, height: 0 }); onClose?.(); }, [onClose]);
+  const [viewerZoom, setViewerZoom] = useState(1);
+  const [viewerNatural, setViewerNatural] = useState({ w: 0, h: 0 });
+
+  const closeViewer = useCallback(() => {
+    setViewerZoom(1);
+    setViewerNatural({ w: 0, h: 0 });
+    onClose?.();
+  }, [onClose]);
+
+  const viewerDisplaySize = useMemo(() => {
+    const { w, h } = viewerNatural;
+
+    if (!w || !h) return null;
+
+    const fit = computeFitScale(w, h);
+
+    return {
+      width: Math.round(w * fit * viewerZoom),
+      height: Math.round(h * fit * viewerZoom),
+    };
+  }, [viewerNatural, viewerZoom]);
+
   useEffect(() => {
     if (!viewer) return undefined;
-    const onKey = (event) => { if (event.key === "Escape") close(); };
+
+    setViewerZoom(1);
+    setViewerNatural({ w: 0, h: 0 });
+
+    const onKey = (event) => {
+      if (event.key === "Escape") closeViewer();
+    };
+
     window.addEventListener("keydown", onKey);
+
     return () => window.removeEventListener("keydown", onKey);
-  }, [viewer, close]);
-  const size = useMemo(() => natural.width ? { width: natural.width * fitScale(natural.width, natural.height) * zoom, height: natural.height * fitScale(natural.width, natural.height) * zoom } : null, [natural, zoom]);
+  }, [viewer, closeViewer]);
+
   if (!viewer || typeof document === "undefined") return null;
-  const button = (label, icon, action, extra = "") => <button type="button" className={`od-attachments-lightbox__btn ${extra}`} aria-label={label} onClick={action}><IonIcon icon={icon} aria-hidden="true" /></button>;
-  return createPortal(
-    <div className="od-attachments-lightbox" role="dialog" aria-modal="true" aria-label={viewer.title} onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div className="od-attachments-lightbox__toolbar" onMouseDown={(e) => e.stopPropagation()}>
-        <p className="od-attachments-lightbox__title">{viewer.title}</p>
+
+  const title = viewer.title || viewer.filename || "Imagen";
+
+  const lightbox = (
+    <div
+      className="od-attachments-lightbox"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) closeViewer();
+      }}
+    >
+      <div
+        className="od-attachments-lightbox__toolbar"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <p className="od-attachments-lightbox__title" title={title}>
+          {title}
+        </p>
+
         <div className="od-attachments-lightbox__controls">
-          {button("Reducir zoom", removeOutline, () => setZoom((v) => Math.max(v / STEP, 0.25)))}
-          {button("Ampliar zoom", addOutline, () => setZoom((v) => Math.min(v * STEP, 4)))}
-          {button("Ajustar a pantalla", contractOutline, () => setZoom(1))}
-          {button("Cerrar", closeOutline, close, "od-attachments-lightbox__btn--close")}
+          <button
+            type="button"
+            className="od-attachments-lightbox__btn"
+            aria-label="Reducir zoom"
+            onClick={() => setViewerZoom((zoom) => Math.max(zoom / ZOOM_STEP, ZOOM_MIN))}
+          >
+            <IonIcon icon={OD_ICONS.richStrike} aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            className="od-attachments-lightbox__btn"
+            aria-label="Ampliar zoom"
+            onClick={() => setViewerZoom((zoom) => Math.min(zoom * ZOOM_STEP, ZOOM_MAX))}
+          >
+            <IonIcon icon={OD_ICONS.add} aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            className="od-attachments-lightbox__btn"
+            aria-label="Ajustar a pantalla"
+            onClick={() => setViewerZoom(1)}
+          >
+            <IonIcon icon={OD_ICONS.collapseSections} aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            className="od-attachments-lightbox__btn od-attachments-lightbox__btn--close"
+            aria-label="Cerrar"
+            onClick={closeViewer}
+          >
+            <IonIcon icon={OD_ICONS.bulkExit} aria-hidden="true" />
+          </button>
         </div>
       </div>
-      <div className="od-attachments-lightbox__stage" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-        <img className="od-attachments-lightbox__img" src={viewer.url} alt={viewer.title} style={size || undefined} onLoad={(e) => setNatural({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })} onMouseDown={(e) => e.stopPropagation()} />
+
+      <div
+        className="od-attachments-lightbox__stage"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) closeViewer();
+        }}
+      >
+        <img
+          src={viewer.url}
+          alt={title}
+          className="od-attachments-lightbox__img"
+          style={
+            viewerDisplaySize
+              ? {
+                  width: viewerDisplaySize.width,
+                  height: viewerDisplaySize.height,
+                }
+              : undefined
+          }
+          onLoad={(event) => {
+            const img = event.currentTarget;
+            setViewerNatural({
+              w: img.naturalWidth,
+              h: img.naturalHeight,
+            });
+          }}
+          onMouseDown={(event) => event.stopPropagation()}
+        />
       </div>
-    </div>, document.body
+    </div>
   );
+
+  return createPortal(lightbox, document.body);
 }
