@@ -65,7 +65,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
           {NAV_ITEMS.map((item) => (
             <IonItem
               key={item.href}
-              className={`od-main-item ${pathname === item.href ? "od-item-active" : ""}`}
+              className={`od-main-item ${pathname === item.href || (item.href === "/app/wiki" && pathname.startsWith("/app/wiki/")) ? "od-item-active" : ""}`}
               button
               detail={false}
               lines="none"

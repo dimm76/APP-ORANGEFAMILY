@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import AuthGate from "./app/AuthGate.jsx";
 import AppLayout from "./app/AppLayout.jsx";
 import AttachmentsLibraryPage from "./app/AttachmentsLibraryPage.jsx";
+import WikiPage, { WikiPublicPage } from "./features/wiki/WikiPage.jsx";
 import "./App.css";
 
 const OD_NAV_EVENT = "od-spa-navigate";
@@ -75,6 +76,8 @@ function AppContent() {
     <AppLayout>
       {pathname === "/app/settings/attachments" ? (
         <AttachmentsLibraryPage />
+      ) : pathname === "/app/wiki" || pathname.startsWith("/app/wiki/") ? (
+        <WikiPage />
       ) : (
         <ModulePlaceholder title={route.title} description={route.description} />
       )}
@@ -83,6 +86,11 @@ function AppContent() {
 }
 
 function App() {
+  const pathname = currentPathname();
+  if (pathname.startsWith("/public/wiki/")) {
+    const token = decodeURIComponent(pathname.slice("/public/wiki/".length)).trim();
+    return <WikiPublicPage token={token} />;
+  }
   return (
     <AuthGate>
       <AppContent />

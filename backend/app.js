@@ -9,6 +9,7 @@ const {
   handleAuthMe,
 } = require("./src/auth");
 const { handleAttachmentsRoutes } = require("./src/attachmentsHttp");
+const { handleWikiRoutes } = require("./src/wikiHttp");
 
 const app = express();
 const port = Number(process.env.PORT || 3001);
@@ -34,6 +35,7 @@ app.get("/api/auth/me", async (req, res) => {
 });
 
 handleAttachmentsRoutes(app);
+handleWikiRoutes(app);
 
 app.get("/api/health", async (_req, res) => {
   try {

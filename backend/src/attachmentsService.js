@@ -15,7 +15,39 @@ function resolveAuthenticatedFamily(req) {
   if (!family?.id || !isUuid(family.id)) {
     return { ok: false, status: 403, reason: "El usuario no tiene una familia activa." };
   }
-  return { ok: true, userId: String(req.user.id), familyId: String(family.id) };
+  return { ok: true, userId: String(req.user.id), familyId: String(family.id), membership: family, role: family.role || null };
+}
+
+async function reconcileAttachmentLinks(queryable, { familyId, userId, entityType, entityId, fieldKey = "content", usageType = "embedded_image", attachmentIds = [] }) {
+  const ids = [...new Set(attachmentIds.map((id) => String(id || "").toLowerCase()).filter(isUuid))];
+  const owned = ids.length ? await queryable.query(
+    `SELECT id::text FROM public.attachments WHERE family_id=$1::uuid AND id=ANY($2::uuid[]) AND status='active' AND deleted_at IS NULL`,
+    [familyId, ids]
+  ) : { rows: [] };
+  if (owned.rows.length !== ids.length) throw new Error("El contenido referencia attachments no disponibles para esta familia.");
+  await queryable.query(
+    `DELETE FROM public.attachment_links WHERE entity_type=$1 AND entity_id=$2::uuid AND field_key=$3 AND usage_type=$4 AND NOT (attachment_id=ANY($5::uuid[]))`,
+    [entityType, entityId, fieldKey, usageType, ids]
+  );
+  if (ids.length) await queryable.query(
+    `INSERT INTO public.attachment_links (attachment_id,entity_type,entity_id,field_key,usage_type,created_by)
+     SELECT unnest($1::uuid[]),$2,$3::uuid,$4,$5,$6::uuid
+     ON CONFLICT (attachment_id,entity_type,entity_id,field_key,usage_type) DO NOTHING`,
+    [ids, entityType, entityId, fieldKey, usageType, userId]
+  );
+}
+
+async function getPublicAttachmentUrls(entityIds) {
+  const ids = entityIds.filter(isUuid);
+  if (!ids.length) return {};
+  const result = await pool.query(
+    `SELECT DISTINCT a.id,a.bucket,a.storage_key FROM public.attachments a
+     INNER JOIN public.attachment_links al ON al.attachment_id=a.id
+     WHERE al.entity_type='wiki_page' AND al.entity_id=ANY($1::uuid[])
+       AND a.status='active' AND a.deleted_at IS NULL`, [ids]
+  );
+  const pairs = await Promise.all(result.rows.map(async (row) => [String(row.id).toLowerCase(), await getSignedUrlForStorageKey(row)]));
+  return Object.fromEntries(pairs);
 }
 
 function imageDimensions(buffer, mimeType) {
@@ -194,5 +226,5 @@ async function deleteAttachmentIfUnused(req, id) {
   } finally { client.release(); }
 }
 
-module.exports = { resolveAuthenticatedFamily, uploadImageAttachment, listAttachmentsFromDb,
+module.exports = { resolveAuthenticatedFamily, reconcileAttachmentLinks, getPublicAttachmentUrls, uploadImageAttachment, listAttachmentsFromDb,
   listImageAttachmentsFromDb, getSignedAttachmentUrl, linkAttachmentToEntity, deleteAttachmentIfUnused };
