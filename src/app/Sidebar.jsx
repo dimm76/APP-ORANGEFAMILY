@@ -15,6 +15,7 @@ import {
   walletOutline,
 } from "ionicons/icons";
 import { useAuth } from "./authContext.js";
+import OrangePhotosSidebar from "../features/orange-photos/OrangePhotosSidebar.jsx";
 
 const OD_NAV_EVENT = "od-spa-navigate";
 
@@ -56,6 +57,10 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
   function navigate(href) {
     spaNavigate(href);
     onNavigate?.();
+  }
+
+  if (pathname.startsWith("/app/orangephotos")) {
+    return <OrangePhotosSidebar pathname={pathname} onNavigate={onNavigate} />;
   }
 
   return (

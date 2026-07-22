@@ -79,7 +79,7 @@ function AppContent() {
         <AttachmentsLibraryPage />
       ) : pathname === "/app/wiki" || pathname.startsWith("/app/wiki/") ? (
         <WikiPage />
-      ) : pathname === "/app/orangephotos" || pathname === "/app/orange-photos" ? (
+      ) : pathname.startsWith("/app/orangephotos") || pathname === "/app/orange-photos" ? (
         <OrangePhotosPage />
       ) : (
         <ModulePlaceholder title={route.title} description={route.description} />

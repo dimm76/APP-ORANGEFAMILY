@@ -15,13 +15,11 @@ export default function OrangePhotoCard({ photo, selected, onSelect, onOpen }) {
         onClick={() => onOpen(photo)}
         aria-label={`Abrir ${label}`}
       >
-        <img
-          src={photo.thumbnail_url || photo.preview_url}
-          alt={label}
-          loading="lazy"
-        />
+        {photo.media_type === "video" && !photo.thumbnail_url ? (
+          <span className="od-orange-photo-card__video-placeholder"><b>▶</b><span>Vídeo</span></span>
+        ) : <img src={photo.thumbnail_url || photo.preview_url} alt={label} loading="lazy" />}
         {photo.media_type === "video" ? (
-          <span className="od-orange-photo-card__video">▶ {duration(photo.duration_seconds)}</span>
+          <span className="od-orange-photo-card__video">Vídeo {duration(photo.duration_seconds)}</span>
         ) : null}
       </button>
       <label className="od-orange-photo-card__selection">

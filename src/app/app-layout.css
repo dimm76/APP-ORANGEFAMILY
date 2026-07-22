@@ -166,6 +166,15 @@ ion-app.od-app-root {
   width: var(--od-sidebar-w-collapsed);
 }
 
+.od-app-root--orangephotos-workspace .od-sidebar { width: var(--od-sidebar-w); }
+.od-app-root--orangephotos-workspace .od-main-label { display: block !important; }
+.od-app-root--orangephotos-workspace .od-app-header-actions { width: auto; flex-basis: auto; }
+#od-orangephotos-search-host { display: block; width: 100%; }
+#od-orangephotos-actions-host { display: inline-flex; align-items: center; }
+.od-orangephotos-sidebar__back { display: flex; align-items: center; gap: 7px; min-height: 38px; margin: 8px 10px 10px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #334155; font: 600 12px inherit; cursor: pointer; }
+.od-orangephotos-sidebar__back:hover { background: var(--od-nav-bg-hover); color: var(--od-nav-fg-hover); }
+.od-orangephotos-sidebar__back ion-icon { width: 16px; height: 16px; }
+
 .od-sidebar-inner {
   display: flex;
   flex-direction: column;
@@ -383,6 +392,12 @@ ion-app.od-app-root {
 .od-attachments-lightbox__btn--close { margin-left: 4px; }
 .od-attachments-lightbox__stage { position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; overflow: auto; padding: 56px 24px 24px; }
 .od-attachments-lightbox__img { display: block; max-width: calc(100vw - 48px); max-height: calc(100vh - 104px); object-fit: contain; border-radius: 4px; box-shadow: 0 12px 40px rgba(0,0,0,.45); }
+.od-attachments-lightbox__video { display:block; max-width:calc(100vw - 80px); max-height:calc(100vh - 104px); }
+.od-attachments-lightbox__nav { position:absolute; top:50%; z-index:3; width:44px; height:52px; border:0; border-radius:8px; background:rgba(30,41,59,.8); color:#fff; cursor:pointer; transform:translateY(-50%); }
+.od-attachments-lightbox__nav:disabled { opacity:.25; cursor:default; }
+.od-attachments-lightbox__nav--previous { left:12px; }.od-attachments-lightbox__nav--next { right:12px; }
+.od-attachments-lightbox__info { position:absolute; inset:52px 0 0 auto; z-index:4; width:min(340px,90vw); overflow:auto; background:#fff; color:#334155; }
+.od-attachments-lightbox.is-info-open .od-attachments-lightbox__stage { right:min(340px,90vw); }
 
 .od-page-title {
   margin: 0 0 8px;
@@ -397,6 +412,7 @@ ion-app.od-app-root {
 }
 
 @media (max-width: 767px) {
+  .od-app-root--orangephotos-workspace .od-app-header-actions { display: flex; }
   .od-app-header-menu-toggle {
     display: inline-flex;
   }

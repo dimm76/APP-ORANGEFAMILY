@@ -1,152 +1,18 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { IonIcon } from "@ionic/react";
+import { chevronBackOutline, chevronForwardOutline, informationCircleOutline } from "ionicons/icons";
 import { OD_ICONS } from "../ui/odIcons.js";
 
-const LIGHTBOX_MARGIN = 48;
-const LIGHTBOX_TOOLBAR = 56;
-const ZOOM_MIN = 0.25;
-const ZOOM_MAX = 4;
-const ZOOM_STEP = 1.25;
+const MARGIN=48, TOOLBAR=56, ZOOM_MIN=.25, ZOOM_MAX=4, ZOOM_STEP=1.25;
+function fitScale(w,h){if(!w||!h)return 1;return Math.min(Math.max(120,window.innerWidth-MARGIN)/w,Math.max(120,window.innerHeight-TOOLBAR-MARGIN)/h,1);}
 
-function computeFitScale(naturalW, naturalH) {
-  if (!naturalW || !naturalH) return 1;
-
-  const maxW = Math.max(120, window.innerWidth - LIGHTBOX_MARGIN);
-  const maxH = Math.max(120, window.innerHeight - LIGHTBOX_TOOLBAR - LIGHTBOX_MARGIN);
-
-  return Math.min(maxW / naturalW, maxH / naturalH, 1);
-}
-
-export default function AttachmentsImageLightbox({ viewer, onClose }) {
-  const [viewerZoom, setViewerZoom] = useState(1);
-  const [viewerNatural, setViewerNatural] = useState({ w: 0, h: 0 });
-
-  const closeViewer = useCallback(() => {
-    setViewerZoom(1);
-    setViewerNatural({ w: 0, h: 0 });
-    onClose?.();
-  }, [onClose]);
-
-  const viewerDisplaySize = useMemo(() => {
-    const { w, h } = viewerNatural;
-
-    if (!w || !h) return null;
-
-    const fit = computeFitScale(w, h);
-
-    return {
-      width: Math.round(w * fit * viewerZoom),
-      height: Math.round(h * fit * viewerZoom),
-    };
-  }, [viewerNatural, viewerZoom]);
-
-  useEffect(() => {
-    if (!viewer) return undefined;
-
-    setViewerZoom(1);
-    setViewerNatural({ w: 0, h: 0 });
-
-    const onKey = (event) => {
-      if (event.key === "Escape") closeViewer();
-    };
-
-    window.addEventListener("keydown", onKey);
-
-    return () => window.removeEventListener("keydown", onKey);
-  }, [viewer, closeViewer]);
-
-  if (!viewer || typeof document === "undefined") return null;
-
-  const title = viewer.title || viewer.filename || "Imagen";
-
-  const lightbox = (
-    <div
-      className="od-attachments-lightbox"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) closeViewer();
-      }}
-    >
-      <div
-        className="od-attachments-lightbox__toolbar"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <p className="od-attachments-lightbox__title" title={title}>
-          {title}
-        </p>
-
-        <div className="od-attachments-lightbox__controls">
-          <button
-            type="button"
-            className="od-attachments-lightbox__btn"
-            aria-label="Reducir zoom"
-            onClick={() => setViewerZoom((zoom) => Math.max(zoom / ZOOM_STEP, ZOOM_MIN))}
-          >
-            <IonIcon icon={OD_ICONS.richStrike} aria-hidden="true" />
-          </button>
-
-          <button
-            type="button"
-            className="od-attachments-lightbox__btn"
-            aria-label="Ampliar zoom"
-            onClick={() => setViewerZoom((zoom) => Math.min(zoom * ZOOM_STEP, ZOOM_MAX))}
-          >
-            <IonIcon icon={OD_ICONS.add} aria-hidden="true" />
-          </button>
-
-          <button
-            type="button"
-            className="od-attachments-lightbox__btn"
-            aria-label="Ajustar a pantalla"
-            onClick={() => setViewerZoom(1)}
-          >
-            <IonIcon icon={OD_ICONS.collapseSections} aria-hidden="true" />
-          </button>
-
-          <button
-            type="button"
-            className="od-attachments-lightbox__btn od-attachments-lightbox__btn--close"
-            aria-label="Cerrar"
-            onClick={closeViewer}
-          >
-            <IonIcon icon={OD_ICONS.bulkExit} aria-hidden="true" />
-          </button>
-        </div>
-      </div>
-
-      <div
-        className="od-attachments-lightbox__stage"
-        onMouseDown={(event) => {
-          if (event.target === event.currentTarget) closeViewer();
-        }}
-      >
-        <img
-          src={viewer.url}
-          alt={title}
-          className="od-attachments-lightbox__img"
-          style={
-            viewerDisplaySize
-              ? {
-                  width: viewerDisplaySize.width,
-                  height: viewerDisplaySize.height,
-                }
-              : undefined
-          }
-          onLoad={(event) => {
-            const img = event.currentTarget;
-            setViewerNatural({
-              w: img.naturalWidth,
-              h: img.naturalHeight,
-            });
-          }}
-          onMouseDown={(event) => event.stopPropagation()}
-        />
-      </div>
-    </div>
-  );
-
-  return createPortal(lightbox, document.body);
+export default function AttachmentsImageLightbox({viewer,onClose,onPrevious,onNext,hasPrevious=false,hasNext=false,renderInfo,infoOpen=false,onToggleInfo,renderExtraActions}){
+ const [zoom,setZoom]=useState(1),[natural,setNatural]=useState({w:0,h:0});
+ const close=useCallback(()=>{setZoom(1);setNatural({w:0,h:0});onClose?.();},[onClose]);
+ const size=useMemo(()=>natural.w&&natural.h?{width:Math.round(natural.w*fitScale(natural.w,natural.h)*zoom),height:Math.round(natural.h*fitScale(natural.w,natural.h)*zoom)}:null,[natural,zoom]);
+ useEffect(()=>{if(!viewer)return undefined;setZoom(1);setNatural({w:0,h:0});const key=e=>{if(e.key==='Escape')close();if(e.key==='ArrowLeft'&&hasPrevious)onPrevious?.();if(e.key==='ArrowRight'&&hasNext)onNext?.();};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[viewer,close,hasPrevious,hasNext,onPrevious,onNext]);
+ if(!viewer||typeof document==='undefined')return null;const title=viewer.title||viewer.filename||'Imagen',isVideo=viewer.mediaType==='video'||viewer.media_type==='video';
+ return createPortal(<div className={`od-attachments-lightbox${infoOpen?' is-info-open':''}`} role="dialog" aria-modal="true" aria-label={title} onMouseDown={e=>{if(e.target===e.currentTarget)close();}}><div className="od-attachments-lightbox__toolbar" onMouseDown={e=>e.stopPropagation()}><p className="od-attachments-lightbox__title">{viewer.positionLabel||title}</p><div className="od-attachments-lightbox__controls">{renderExtraActions?.()}<button type="button" className="od-attachments-lightbox__btn" aria-label="Reducir zoom" onClick={()=>setZoom(v=>Math.max(v/ZOOM_STEP,ZOOM_MIN))}>−</button><button type="button" className="od-attachments-lightbox__btn" aria-label="Ampliar zoom" onClick={()=>setZoom(v=>Math.min(v*ZOOM_STEP,ZOOM_MAX))}><IonIcon icon={OD_ICONS.add}/></button><button type="button" className="od-attachments-lightbox__btn" aria-label="Ajustar a pantalla" onClick={()=>setZoom(1)}><IonIcon icon={OD_ICONS.collapseSections}/></button>{renderInfo?<button type="button" className="od-attachments-lightbox__btn" aria-label="Información" onClick={onToggleInfo}><IonIcon icon={informationCircleOutline}/></button>:null}<button type="button" className="od-attachments-lightbox__btn od-attachments-lightbox__btn--close" aria-label="Cerrar" onClick={close}><IonIcon icon={OD_ICONS.bulkExit}/></button></div></div><button type="button" className="od-attachments-lightbox__nav od-attachments-lightbox__nav--previous" aria-label="Anterior" disabled={!hasPrevious} onClick={onPrevious}><IonIcon icon={chevronBackOutline}/></button><div className="od-attachments-lightbox__stage">{isVideo?<video className="od-attachments-lightbox__video" src={viewer.url} poster={viewer.poster||undefined} controls onMouseDown={e=>e.stopPropagation()}/>:<img src={viewer.url} alt={title} className="od-attachments-lightbox__img" style={size||undefined} onLoad={e=>setNatural({w:e.currentTarget.naturalWidth,h:e.currentTarget.naturalHeight})} onMouseDown={e=>e.stopPropagation()}/>}</div><button type="button" className="od-attachments-lightbox__nav od-attachments-lightbox__nav--next" aria-label="Siguiente" disabled={!hasNext} onClick={onNext}><IonIcon icon={chevronForwardOutline}/></button>{infoOpen&&renderInfo?<aside className="od-attachments-lightbox__info">{renderInfo()}</aside>:null}</div>,document.body);
 }

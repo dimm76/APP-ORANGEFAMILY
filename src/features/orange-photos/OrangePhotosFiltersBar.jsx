@@ -47,9 +47,7 @@ export default function OrangePhotosFiltersBar({ filters, onChange, onClose }) {
         />
         Papelera
       </label>
-      <button className="od-button-secondary" type="button" onClick={onClose}>
-        Cerrar
-      </button>
+      {onClose ? <button className="od-button-secondary" type="button" onClick={onClose}>Cerrar</button> : null}
     </div>
   );
 }

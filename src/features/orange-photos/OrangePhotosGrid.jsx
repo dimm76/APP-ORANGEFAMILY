@@ -4,34 +4,28 @@ import OrangePhotoCard from "./OrangePhotoCard.jsx";
 function aspectRatio(photo) {
   const width = Number(photo.width);
   const height = Number(photo.height);
-  return width > 0 && height > 0 ? width / height : 1;
+  return width > 0 && height > 0 ? width / height : photo.media_type === "video" ? 16 / 9 : 1;
 }
 
 function buildJustifiedRows(photos, availableWidth) {
   const mobile = availableWidth < 600;
   const tablet = availableWidth >= 600 && availableWidth < 900;
   const targetHeight = mobile ? 140 : tablet ? 180 : 220;
-  const minHeight = mobile ? 110 : 150;
-  const maxHeight = mobile ? 190 : 300;
   const gap = mobile ? 3 : 6;
   const rows = [];
   let current = [];
-  let ratioSum = 0;
+  let currentWidth = 0;
 
   photos.forEach((photo) => {
-    current.push(photo);
-    ratioSum += aspectRatio(photo);
-    const totalGaps = gap * Math.max(0, current.length - 1);
-    const justifiedHeight = (availableWidth - totalGaps) / ratioSum;
-
-    if (justifiedHeight <= targetHeight) {
-      rows.push({
-        photos: current,
-        height: Math.max(minHeight, Math.min(maxHeight, justifiedHeight)),
-        gap,
-      });
-      current = [];
-      ratioSum = 0;
+    const itemWidth = aspectRatio(photo) * targetHeight;
+    const nextWidth = currentWidth + (current.length ? gap : 0) + itemWidth;
+    if (current.length && nextWidth > availableWidth) {
+      rows.push({ photos: current, height: targetHeight, gap });
+      current = [photo];
+      currentWidth = itemWidth;
+    } else {
+      current.push(photo);
+      currentWidth = nextWidth;
     }
   });
 

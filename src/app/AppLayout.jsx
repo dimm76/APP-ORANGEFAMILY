@@ -25,6 +25,10 @@ function isWikiDocumentWorkspacePath(pathname) {
   return rest !== "" && !rest.includes("/");
 }
 
+function isOrangePhotosWorkspacePath(pathname) {
+  return normalizePathname(pathname).startsWith("/app/orangephotos");
+}
+
 export default function AppLayout({ children }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -33,6 +37,7 @@ export default function AppLayout({ children }) {
   const pathname =
     typeof window !== "undefined" ? window.location.pathname : "/";
   const wikiWorkspaceMode = isWikiDocumentWorkspacePath(pathname);
+  const orangePhotosWorkspaceMode = isOrangePhotosWorkspacePath(pathname);
 
   useEffect(() => {
     const sync = () => setRouteTick((value) => value + 1);
@@ -46,9 +51,11 @@ export default function AppLayout({ children }) {
 
   return (
     <IonApp
-      className={`od-app-root ${collapsed ? "od-app-root--collapsed" : ""} ${
+      className={`od-app-root ${collapsed && !orangePhotosWorkspaceMode ? "od-app-root--collapsed" : ""} ${
         mobileNavOpen ? "od-app-root--mobile-nav-open" : ""
-      } ${wikiWorkspaceMode ? "od-app-root--wiki-workspace" : ""}`}
+      } ${wikiWorkspaceMode ? "od-app-root--wiki-workspace" : ""} ${
+        orangePhotosWorkspaceMode ? "od-app-root--orangephotos-workspace" : ""
+      }`}
     >
       <div className="od-app-shell">
         <header className="od-app-header">
@@ -75,11 +82,12 @@ export default function AppLayout({ children }) {
             />
           </a>
 
-          <div className="od-app-header-search" aria-label="Búsqueda global">
-            <GlobalSearch />
+          <div className="od-app-header-search" aria-label={orangePhotosWorkspaceMode ? "Búsqueda de fotografías" : "Búsqueda global"}>
+            {orangePhotosWorkspaceMode ? <span id="od-orangephotos-search-host" /> : <GlobalSearch />}
           </div>
 
           <div className="od-app-header-actions">
+            {orangePhotosWorkspaceMode ? <span id="od-orangephotos-actions-host" /> : null}
             {wikiWorkspaceMode ? (
               <span
                 id="od-wiki-add-block-host"
@@ -92,11 +100,11 @@ export default function AppLayout({ children }) {
 
         <div className="od-app-body">
           <aside
-            className={`od-sidebar ${collapsed ? "od-sidebar--collapsed" : ""}`}
+            className={`od-sidebar ${collapsed && !orangePhotosWorkspaceMode ? "od-sidebar--collapsed" : ""}`}
             aria-label="Navegación principal"
           >
             <Sidebar
-              collapsed={collapsed}
+              collapsed={orangePhotosWorkspaceMode ? false : collapsed}
               onToggleCollapse={() => setCollapsed((current) => !current)}
               onNavigate={() => setMobileNavOpen(false)}
             />
