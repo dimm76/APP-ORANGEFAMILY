@@ -8,6 +8,7 @@ const {
   handleAuthLogout,
   handleAuthMe,
 } = require("./src/auth");
+const { handleAttachmentsRoutes } = require("./src/attachmentsHttp");
 
 const app = express();
 const port = Number(process.env.PORT || 3001);
@@ -31,6 +32,8 @@ app.post("/api/auth/logout", async (req, res) => {
 app.get("/api/auth/me", async (req, res) => {
   return sendAuthResult(res, await handleAuthMe(req));
 });
+
+handleAttachmentsRoutes(app);
 
 app.get("/api/health", async (_req, res) => {
   try {
