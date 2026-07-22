@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ionic/react": "^8.8.14",
+    "ionicons": "^8.0.13",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

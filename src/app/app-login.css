@@ -1,0 +1,186 @@
+/* Pantalla de login — split ~30 / 70; formulario estilo compacto original de la app. */
+
+.od-login-page {
+  --background: #ffffff;
+}
+
+.od-login-page__content {
+  --background: #ffffff;
+  --overflow: hidden;
+}
+
+.od-login-page__split {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+}
+
+/* Columna formulario ~30 %, contenido centrado */
+.od-login-page__form-side {
+  flex: 0 0 30%;
+  width: 30%;
+  max-width: 30%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px clamp(16px, 3vw, 28px);
+  box-sizing: border-box;
+  background: #ffffff;
+}
+
+.od-login-page__form-stack {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.od-login-page__card {
+  width: 100%;
+  padding: 28px 24px 32px;
+  background: #fff;
+  border: 1px solid var(--od-sidebar-border, #e4e4e8);
+  border-radius: 10px;
+  box-sizing: border-box;
+}
+
+.od-login-page__title {
+  margin: 0 0 6px;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--od-nav-fg, #37374b);
+}
+
+.od-login-page__subtitle {
+  margin: 0 0 20px;
+  font-size: 0.9rem;
+  color: #6b6b7a;
+}
+
+.od-login-page__form {
+  margin: 0;
+}
+
+.od-login-page__list {
+  margin: 0 0 12px;
+  padding: 0;
+  background: transparent;
+}
+
+.od-login-page__item {
+  --background: transparent;
+  --padding-start: 0;
+  --inner-padding-end: 0;
+  margin-bottom: 4px;
+}
+
+.od-login-page__item--password {
+  --min-height: 52px;
+}
+
+.od-login-page__toggle-password {
+  margin-top: auto;
+  margin-bottom: auto;
+  align-self: center;
+  --padding-start: 6px;
+  --padding-end: 0;
+  height: 40px;
+  color: var(--od-nav-fg, #37374b);
+}
+
+.od-login-page__toggle-password ion-icon {
+  font-size: 22px;
+  width: 22px;
+  height: 22px;
+}
+
+.od-login-page__error {
+  margin: 0 0 12px;
+  font-size: 0.875rem;
+}
+
+.od-login-page__submit {
+  --background: #fc4200;
+  --background-activated: #e03b00;
+  --background-hover: #ff5a1a;
+  --color: #ffffff;
+  --border-radius: 10px;
+  --box-shadow: none;
+  margin-top: 8px;
+  font-weight: 600;
+  text-transform: none;
+}
+
+/* Panel ~70 %: azul corporativo + nebulosa naranja un poco más presente */
+.od-login-page__brand-side {
+  flex: 1 1 70%;
+  width: 70%;
+  min-width: 0;
+  min-height: 0;
+  background-color: #0a1628;
+  background-image:
+    radial-gradient(
+      ellipse 95% 72% at 72% 20%,
+      rgba(252, 120, 50, 0.18) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 80% 58% at 15% 85%,
+      rgba(252, 66, 0, 0.12) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse 55% 40% at 88% 65%,
+      rgba(255, 150, 80, 0.09) 0%,
+      transparent 48%
+    ),
+    radial-gradient(
+      circle at 48% 48%,
+      rgba(255, 130, 70, 0.07) 0%,
+      transparent 42%
+    ),
+    linear-gradient(168deg, #0a1628 0%, #0f2744 40%, #0c1e36 70%, #081420 100%);
+}
+
+@media (max-width: 720px) {
+  .od-login-page__split {
+    flex-direction: column;
+  }
+
+  .od-login-page__form-side {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: none;
+    padding: 28px 20px 36px;
+    order: 2;
+  }
+
+  .od-login-page__form-stack {
+    max-width: none;
+  }
+
+  .od-login-page__brand-side {
+    flex: 0 0 auto;
+    width: 100%;
+    min-height: 200px;
+    order: 1;
+  }
+}
+
+.od-login-loading {
+  --background: var(--od-page-bg, #f4f5f7);
+}
+
+.od-login-loading-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+}
