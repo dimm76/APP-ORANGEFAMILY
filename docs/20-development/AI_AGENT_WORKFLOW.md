@@ -141,3 +141,7 @@ Las instrucciones para Cursor o Codex deben indicar:
 Las instrucciones deben ser breves, pero suficientemente precisas.
 
 Las reglas estables deben referenciar esta documentación en lugar de repetirse íntegramente en cada tarea.
+
+Para cualquier tarea de reutilización desde APP-ORANGEDESK, revisar previamente:
+
+- `docs/20-development/ORANGEDESK_TO_ORANGEFAMILY_REUSE.md`
