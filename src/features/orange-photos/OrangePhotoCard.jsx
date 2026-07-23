@@ -31,7 +31,22 @@ export default function OrangePhotoCard({ photo, selectionMode, selected, onSele
     if (activePreview === stop) activePreview = null;
     setPreviewing(false);
   };
-  const start = () => { if (!previewUrl || !window.matchMedia("(hover: hover) and (pointer: fine)").matches || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return; timerRef.current = setTimeout(() => { activePreview?.(); activePreview = stop; setPreviewing(true); }, 350); };
+  const start = () => {
+    if (!previewUrl) {
+      console.warn("OrangePhotos preview unavailable", {
+        photo_id: photo.id,
+        filename: photo.original_filename,
+        has_video_preview_url: false,
+      });
+      return;
+    }
+    window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => {
+      if (activePreview && activePreview !== stop) activePreview();
+      activePreview = stop;
+      setPreviewing(true);
+    }, 350);
+  };
   useEffect(() => () => {
     window.clearTimeout(timerRef.current);
     const video = videoRef.current;
@@ -42,6 +57,14 @@ export default function OrangePhotoCard({ photo, selectionMode, selected, onSele
     }
     if (activePreview === stop) activePreview = null;
   }, []);
+  useEffect(() => {
+    if (!previewing) return;
+    console.debug("OrangePhotos preview mounted", {
+      photo_id: photo.id,
+      filename: photo.original_filename,
+      has_video_preview_url: Boolean(previewUrl),
+    });
+  }, [previewing, photo.id, photo.original_filename, previewUrl]);
   const handleMediaClick = () => { if (selectionMode) { onSelect(photo.id); return; } onOpen(photo); };
-  return <article ref={cardRef} className={`od-orange-photo-card${selected ? " is-selected" : ""}${selectionMode ? " is-selection-mode" : ""}`} onMouseEnter={start} onMouseLeave={stop}><button type="button" className="od-orange-photo-card__media" onClick={handleMediaClick} aria-label={`Abrir ${label}`}>{previewing ? <video ref={videoRef} src={previewUrl} muted playsInline preload="metadata" controls={false} onLoadedMetadata={event=>{const duration=Number(event.currentTarget.duration);if(Number.isFinite(duration)&&duration>0)setHoverDuration(duration);}} onCanPlay={event=>{event.currentTarget.play().catch(()=>stop());}} onTimeUpdate={event=>{if(event.currentTarget.currentTime>=3)stop();}} onError={()=>stop()} /> : gridUrl ? <img src={gridUrl} alt={label} title={label} loading={eager ? "eager" : "lazy"} decoding="async" fetchPriority={eager ? "auto" : "low"} width={photo.width || undefined} height={photo.height || undefined} /> : <span className="od-orange-photo-card__video-placeholder"><IonIcon icon={OD_ICONS.timerRestart} /></span>}{photo.media_type === "video" ? <span className="od-orange-photo-card__video"><IonIcon icon={OD_ICONS.timerRestart} />{effectiveDuration ? formatDuration(effectiveDuration) : null}</span> : null}</button><label className={`od-orange-photo-card__selection-control${selected ? " is-selected" : ""}`} onClick={event => event.stopPropagation()}><input className="od-orange-photo-card__selection-input" type="checkbox" checked={selected} onChange={() => onSelect(photo.id)} /><span className="od-orange-photo-card__selection-circle" aria-hidden="true">{selected ? <IonIcon icon={checkmarkOutline} /> : null}</span><span className="od-orange-photo-card__sr">Seleccionar</span></label><button type="button" className="od-orange-photo-card__inspect" aria-label={`Abrir ${label}`} title="Abrir" onClick={event => { event.stopPropagation(); onOpen(photo); }}><IonIcon icon={searchCircleOutline} /></button></article>;
+  return <article ref={cardRef} className={`od-orange-photo-card${selected ? " is-selected" : ""}${selectionMode ? " is-selection-mode" : ""}`} onMouseEnter={start} onMouseLeave={stop}><button type="button" className="od-orange-photo-card__media" onClick={handleMediaClick} aria-label={`Abrir ${label}`}>{previewing ? <video key={previewUrl} ref={videoRef} src={previewUrl} muted autoPlay playsInline preload="auto" controls={false} disablePictureInPicture disableRemotePlayback controlsList="nodownload noplaybackrate noremoteplayback" onLoadedMetadata={event=>{const video=event.currentTarget;const duration=Number(video.duration);if((!Number(photo.duration_seconds)||Number(photo.duration_seconds)<=0)&&Number.isFinite(duration)&&duration>0)setHoverDuration(duration);video.currentTime=0;video.play().catch(error=>{console.warn("OrangePhotos preview play",{photo_id:photo.id,name:error?.name||null,message:error?.message||null});});}} onPlaying={()=>{console.debug("OrangePhotos preview playing",{photo_id:photo.id});}} onTimeUpdate={event=>{if(event.currentTarget.currentTime>=3)stop();}} onEnded={stop} onError={event=>{const video=event.currentTarget;console.warn("OrangePhotos preview error",{photo_id:photo.id,media_error_code:video.error?.code||null,media_error_message:video.error?.message||null,ready_state:video.readyState,network_state:video.networkState,has_preview_url:Boolean(previewUrl)});stop();}} /> : gridUrl ? <img src={gridUrl} alt={label} title={label} loading={eager ? "eager" : "lazy"} decoding="async" fetchPriority={eager ? "auto" : "low"} width={photo.width || undefined} height={photo.height || undefined} /> : <span className="od-orange-photo-card__video-placeholder"><IonIcon icon={OD_ICONS.timerRestart} /></span>}{photo.media_type === "video" ? <span className="od-orange-photo-card__video"><IonIcon icon={OD_ICONS.timerRestart} />{effectiveDuration ? formatDuration(effectiveDuration) : null}</span> : null}</button><label className={`od-orange-photo-card__selection-control${selected ? " is-selected" : ""}`} onClick={event => event.stopPropagation()}><input className="od-orange-photo-card__selection-input" type="checkbox" checked={selected} onChange={() => onSelect(photo.id)} /><span className="od-orange-photo-card__selection-circle" aria-hidden="true">{selected ? <IonIcon icon={checkmarkOutline} /> : null}</span><span className="od-orange-photo-card__sr">Seleccionar</span></label><button type="button" className="od-orange-photo-card__inspect" aria-label={`Abrir ${label}`} title="Abrir" onClick={event => { event.stopPropagation(); onOpen(photo); }}><IonIcon icon={searchCircleOutline} /></button></article>;
 }
