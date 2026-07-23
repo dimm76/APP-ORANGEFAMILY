@@ -27,3 +27,22 @@ Si la eliminación de algún objeto de Wasabi falla, no debe eliminarse el regis
 Si una subida a Wasabi termina pero falla la transacción SQL, se registra el posible objeto huérfano para reconciliación manual; no se borra automáticamente.
 
 El backend utiliza `ffprobe-static` y `ffmpeg-static` únicamente para obtener metadatos multimedia y crear previews derivados reproducibles. Estas herramientas nunca modifican ni sustituyen el archivo original.
+
+## Vídeo nuevo
+
+1. Se almacena el original.
+2. `ffprobe` obtiene duración y dimensiones.
+3. El poster JPEG se genera antes de responder.
+4. El registro se crea con original y poster.
+5. El preview MP4 se genera de forma aplazada.
+6. Si el proceso aplazado falla, el reconciliador lo completa.
+
+## Vídeo existente
+
+El reconciliador completa únicamente:
+
+- metadatos ausentes;
+- poster cuando no existe poster ni thumbnail;
+- preview cuando no existe.
+
+Nunca duplica variantes ni modifica originales.
