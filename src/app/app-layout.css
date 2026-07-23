@@ -501,3 +501,37 @@ ion-app.od-app-root {
 .od-app-root--orangephotos-workspace .od-main,
 .od-app-root--orangephotos-workspace .od-main-ion-content { height:100%; min-height:0; overflow:hidden; }
 .od-app-root--orangephotos-workspace .od-main-ion-content::part(scroll) { overflow:hidden; }
+
+.od-app-root--orangephotos-workspace,
+.od-app-root--orangephotos-workspace .od-app-shell {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.od-app-root--orangephotos-workspace .od-app-body {
+  flex: 1 1 0;
+  height: calc(100dvh - var(--od-header-height));
+  min-height: 0;
+  overflow: hidden;
+}
+
+.od-app-root--orangephotos-workspace .od-main {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.od-app-root--orangephotos-workspace .od-main-ion-content {
+  height: 100%;
+  min-height: 0;
+}
+
+.od-app-root--orangephotos-workspace .od-main-ion-content::part(scroll) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
