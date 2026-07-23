@@ -10,7 +10,7 @@ function aspectRatio(photo) {
 function buildJustifiedRows(photos, availableWidth) {
   const mobile = availableWidth < 600;
   const tablet = availableWidth >= 600 && availableWidth < 900;
-  const targetHeight = mobile ? 140 : tablet ? 180 : 220;
+  const targetHeight = mobile ? 120 : tablet ? 145 : availableWidth >= 1280 ? 180 : 165;
   const gap = mobile ? 3 : 6;
   const rows = [];
   let current = [];
@@ -20,7 +20,8 @@ function buildJustifiedRows(photos, availableWidth) {
     const itemWidth = aspectRatio(photo) * targetHeight;
     const nextWidth = currentWidth + (current.length ? gap : 0) + itemWidth;
     if (current.length && nextWidth > availableWidth) {
-      rows.push({ photos: current, height: targetHeight, gap });
+      const ratio = current.reduce((sum, item) => sum + aspectRatio(item), 0);
+      rows.push({ photos: current, height: Math.min(targetHeight * 1.15, (availableWidth - gap * (current.length - 1)) / ratio), gap, complete: true });
       current = [photo];
       currentWidth = itemWidth;
     } else {
@@ -30,7 +31,7 @@ function buildJustifiedRows(photos, availableWidth) {
   });
 
   if (current.length) {
-    rows.push({ photos: current, height: targetHeight, gap });
+    rows.push({ photos: current, height: targetHeight, gap, complete: false });
   }
 
   return rows;
@@ -106,7 +107,7 @@ export default function OrangePhotosGrid({
                   style={{ height: row.height, gap: row.gap }}
                   key={`${day.key}-${rowIndex}`}
                 >
-                  {row.photos.map((photo) => (
+                  {row.photos.map((photo, photoIndex) => (
                     <div
                       className="od-orange-photos__justified-item"
                       style={{ width: aspectRatio(photo) * row.height, height: row.height }}
@@ -117,6 +118,7 @@ export default function OrangePhotosGrid({
                         selected={selected.has(photo.id)}
                         onSelect={onSelect}
                         onOpen={onOpen}
+                        eager={rowIndex === 0 && photoIndex < 4}
                       />
                     </div>
                   ))}

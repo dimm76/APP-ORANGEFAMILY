@@ -8,6 +8,7 @@ export const updateOrangePhoto=(id,body)=>request(`/api/orange-photos/${encodeUR
 export const trashOrangePhoto=id=>request(`/api/orange-photos/${encodeURIComponent(id)}/trash`,{method:'POST',body:'{}'});
 export const restoreOrangePhoto=id=>request(`/api/orange-photos/${encodeURIComponent(id)}/restore`,{method:'POST',body:'{}'});
 export const shareOrangePhoto=(id,body)=>request(`/api/orange-photos/${encodeURIComponent(id)}/share`,{method:'POST',body:JSON.stringify(body)});
+export const orangePhotoDownloadUrl=id=>`${BASE}/api/orange-photos/${encodeURIComponent(id)}/download`;
 export function uploadOrangePhoto(file,metadata={},options={}){const form=new FormData();form.append('file',file);form.append('metadata',JSON.stringify(metadata));if(options.posterBlob)form.append('poster',options.posterBlob,'poster.jpg');return new Promise((resolve,reject)=>{const xhr=new XMLHttpRequest();xhr.open('POST',`${BASE}/api/orange-photos`);xhr.withCredentials=true;xhr.upload.onprogress=event=>{if(event.lengthComputable)options.onProgress?.(Math.round(event.loaded/event.total*100));};xhr.onerror=()=>reject(new Error('No se pudo completar la petición.'));xhr.onload=()=>{let data;try{data=JSON.parse(xhr.responseText);}catch{data=null;}if(xhr.status<200||xhr.status>=300)return reject(new Error(data?.message||'No se pudo completar la petición.'));resolve(data);};xhr.send(form);});}
 export const listOrangeAlbums=()=>request('/api/orange-photo-albums');
 export const createOrangeAlbum=body=>request('/api/orange-photo-albums',{method:'POST',body:JSON.stringify(body)});

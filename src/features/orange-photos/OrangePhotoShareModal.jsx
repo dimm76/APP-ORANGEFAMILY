@@ -5,9 +5,9 @@ import { acquireModalStackLayer, OD_OVERLAY_Z } from "../../shared/overlay/odMod
 
 export default function OrangePhotoShareModal({ photo, members, onClose, onSave, returnFocusRef }) {
   const [visibility, setVisibility] = useState(photo.visibility);
-  const [ids, setIds] = useState([]);
+  const [ids, setIds] = useState(photo.shared_user_ids || []);
   const [busy, setBusy] = useState(false);
-  useEffect(() => setVisibility(photo.visibility), [photo]);
+  useEffect(() => { setVisibility(photo.visibility); setIds(photo.shared_user_ids || []); }, [photo]);
   useEffect(() => { const layer = acquireModalStackLayer(), returnFocus = returnFocusRef?.current; const key = event => { if (event.key === "Escape") { event.stopImmediatePropagation(); onClose(); } }; window.addEventListener("keydown", key, true); return () => { window.removeEventListener("keydown", key, true); layer.release(); returnFocus?.focus(); }; }, [onClose, returnFocusRef]);
   const toggle = id => setIds(value => value.includes(id) ? value.filter(item => item !== id) : [...value, id]);
   if (typeof document === "undefined") return null;

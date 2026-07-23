@@ -35,6 +35,7 @@ async function multipart(req, maxBytes) {
 }
 
 function safe(handler, message, status = 200) { return async (req, res) => { try { return send(res, await handler(req), status); } catch (error) { console.error("OrangePhotos", error); return res.status(500).json({ ok: false, message }); } }; }
+function attachmentName(value) { return String(value || "orange-photo").replace(/[\r\n"\\/]/g, "_").slice(0, 500); }
 function handleOrangePhotosRoutes(app) {
   app.get("/api/orange-photo-members", safe(req => service.familyMembers(req), "No se pudieron cargar los miembros."));
   app.get("/api/orange-photos", safe(req => service.list(req), "No se pudo cargar la biblioteca."));
@@ -47,6 +48,7 @@ function handleOrangePhotosRoutes(app) {
   app.post("/api/orange-photos/:id/restore", safe(req => service.trash(req, req.params.id, true), "No se pudo restaurar la foto."));
   app.get("/api/orange-photos/:id/url", safe(req => service.signedUrl(req, req.params.id), "No se pudo firmar la URL."));
   app.get("/api/orange-photos/:id/original-url", safe(req => service.signedUrl(req, req.params.id, true), "No se pudo firmar la URL original."));
+  app.get("/api/orange-photos/:id/download", async (req, res) => { try { const result = await service.download(req, req.params.id); if (!result.ok) return send(res, result); const { download, filename } = result.payload; res.setHeader("Content-Type", download.ContentType); if (download.ContentLength != null) res.setHeader("Content-Length", String(download.ContentLength)); res.setHeader("Content-Disposition", `attachment; filename="${attachmentName(filename)}"; filename*=UTF-8''${encodeURIComponent(attachmentName(filename))}`); download.Body.on?.("error", error => { console.error("OrangePhotos download", error); if (!res.headersSent) res.status(502).end(); else res.destroy(error); }); return download.Body.pipe(res); } catch (error) { console.error("OrangePhotos download", error); return res.status(502).json({ ok: false, message: "No se pudo descargar el archivo." }); } });
   app.post("/api/orange-photos/:id/share", safe(req => service.share(req, req.params.id, req.body || {}), "No se pudo compartir la foto."));
   app.get("/api/orange-photo-albums", safe(req => service.albums(req), "No se pudieron cargar los álbumes."));
   app.post("/api/orange-photo-albums", safe(req => service.createAlbum(req, req.body || {}), "No se pudo crear el álbum.", 201));

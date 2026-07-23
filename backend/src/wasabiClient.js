@@ -102,6 +102,14 @@ async function getSignedOrangePhotoUrl(record) {
   return getSignedUrl(client, new GetObjectCommand({ Bucket: record.bucket || config.bucket, Key: key }), { expiresIn: config.signedUrlSeconds });
 }
 
+async function getOrangePhotoObjectStream(record) {
+  const { client, config } = getS3Client();
+  const key = assertOrangePhotosStorageKey(record.object_key);
+  const result = await sendWithTimeout(client, new GetObjectCommand({ Bucket: record.bucket || config.bucket, Key: key }), 120000, "GetObject", key);
+  if (!result.Body) throw new Error("El objeto de OrangePhotos está vacío.");
+  return { Body: result.Body, ContentType: result.ContentType || record.mime_type || "application/octet-stream", ContentLength: result.ContentLength == null ? null : Number(result.ContentLength) };
+}
+
 function normalizeEtag(value) {
   return value == null ? null : String(value).replace(/^"|"$/g, "");
 }
@@ -292,6 +300,7 @@ module.exports = {
   assertOrangePhotosStorageKey,
   uploadOrangePhotoToWasabi,
   getSignedOrangePhotoUrl,
+  getOrangePhotoObjectStream,
   listOrangePhotosObjects,
   headOrangePhotoObject,
   getOrangePhotoObjectBuffer,
