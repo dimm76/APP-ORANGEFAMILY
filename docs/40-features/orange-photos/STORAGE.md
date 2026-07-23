@@ -53,6 +53,24 @@ El reconciliador completa únicamente:
 
 Nunca duplica variantes ni modifica originales.
 
+## Fecha de captura
+
+Prioridad para imágenes:
+
+1. fecha manual;
+2. EXIF `DateTimeOriginal` o `CreateDate`;
+3. fecha de modificación proporcionada por el dispositivo;
+4. fecha de subida.
+
+Prioridad para vídeos:
+
+1. fecha manual;
+2. `creation_time` embebido en el contenedor;
+3. fecha de modificación proporcionada por el dispositivo;
+4. fecha de subida.
+
+El navegador no proporciona la fecha de creación del sistema de archivos. `File.lastModified` corresponde normalmente a la fecha de modificación. En esta fase no se infiere ninguna fecha a partir del nombre del archivo.
+
 ## Límites y modos de subida
 
 - Imágenes: máximo 30 MB mediante la subida simple a la API Node.
