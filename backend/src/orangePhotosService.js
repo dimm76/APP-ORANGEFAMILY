@@ -4,6 +4,7 @@ const pool = require("../db");
 const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
+const { createHash } = require("node:crypto");
 const { resolveAuthenticatedFamily } = require("./attachmentsService");
 const { assertOrangePhotosStorageKey, deleteOrangePhotoObject, getSignedOrangePhotoUrl, getOrangePhotoObjectStream, uploadOrangePhotoToWasabi } = require("./wasabiClient");
 const { probeVideoFile, createVideoPoster, processStoredOrangePhotoVideo } = require("./orangePhotosVideoProcessor");
@@ -12,8 +13,16 @@ const exifr = require("exifr");
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const VISIBILITIES=new Set(["private","family","selected"]); const MEDIA_TYPES=new Set(["image","video"]);
 const MIME_EXT={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/heic":"heic","video/mp4":"mp4","video/quicktime":"mov","video/webm":"webm"};
-const MAX_IMAGE_BYTES=30*1024*1024, MAX_VIDEO_BYTES=500*1024*1024;
-const ok=payload=>({ok:true,payload}); const bad=(status,reason)=>({ok:false,status,reason});
+const MAX_IMAGE_BYTES = 30 * 1024 * 1024;
+const SIMPLE_VIDEO_MAX_BYTES = 500 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 10 * 1024 * 1024 * 1024;
+const MULTIPART_PART_BYTES = 25 * 1024 * 1024;
+const MULTIPART_UPLOAD_TTL_HOURS = 24;
+const ok=payload=>({ok:true,payload});
+const bad=(status,code,reason,details=null)=>{
+  if(reason==null){reason=code;code=status===404?"UPLOAD_NOT_FOUND":status===413?"FILE_TOO_LARGE":"INVALID_METADATA";}
+  return {ok:false,status,code,reason,details};
+};
 const uuid=v=>UUID_RE.test(String(v||"").trim()); const text=(v,n=500)=>v==null?null:String(v).trim().slice(0,n)||null;
 const number=(v)=>v==null||v===""?null:Number(v); const bool=v=>v===true||v==="true"||v===1||v==="1";
 const visibilitySql=(alias="p")=>`(${alias}.owner_user_id=$2::uuid OR ${alias}.visibility='family' OR (${alias}.visibility='selected' AND EXISTS(SELECT 1 FROM public.orange_photo_shares s WHERE s.photo_id=${alias}.id AND s.user_id=$2::uuid)))`;
@@ -30,25 +39,67 @@ function imageDimensions(buffer,mime){try{if(mime==='image/png'&&buffer.length>=
 function normalizeMetadata(body={},file={}){const m=body.metadata||body;const mime=String(file.mimeType||m.mime_type||"").toLowerCase();const media=String(m.media_type||mime.split('/')[0]);const manualCaptured=text(m.captured_at,100);return{media_type:media,original_filename:text(file.filename||m.original_filename,500),mime_type:mime,extension:text(m.extension||MIME_EXT[mime],20),title:text(m.title),description:text(m.description,5000),captured_at:manualCaptured||new Date().toISOString(),captured_at_source:manualCaptured?'manual':'upload_date',timezone:text(m.timezone,100),width:number(m.width),height:number(m.height),duration_seconds:number(m.duration_seconds),orientation:number(m.orientation),camera_make:text(m.camera_make,200),camera_model:text(m.camera_model,200),lens_model:text(m.lens_model,200),latitude:number(m.latitude),longitude:number(m.longitude),altitude_meters:number(m.altitude_meters),location_name:text(m.location_name),location_country:text(m.location_country,200),location_region:text(m.location_region,200),location_locality:text(m.location_locality,200),location_source:m.location_source||((m.latitude!=null||m.longitude!=null||m.location_name)?'manual':null),visibility:m.visibility||'private',exif_json:{}};}
 
 async function applyExifMetadata(buffer,m){if(m.media_type!=="image"||m.mime_type==="image/heic")return;let raw;try{raw=await exifr.parse(buffer,{tiff:true,exif:true,gps:true,ifd0:true,ifd1:false,icc:false,iptc:false,jfif:false,xmp:false,translateValues:false,reviveValues:true,sanitize:true});}catch{return;}if(!raw)return;const picked={};for(const key of ["DateTimeOriginal","CreateDate","ModifyDate","Orientation","Make","Model","LensModel","GPSLatitude","GPSLongitude","GPSAltitude","latitude","longitude","ImageWidth","ImageHeight","ExifImageWidth","ExifImageHeight"]){const value=raw[key];if(value!=null)picked[key]=value instanceof Date?value.toISOString():value;}const captured=raw.DateTimeOriginal||raw.CreateDate;if(captured instanceof Date&&!Number.isNaN(captured.getTime())){m.captured_at=captured.toISOString();m.captured_at_source="exif";}m.orientation=number(raw.Orientation)||m.orientation;m.camera_make=text(raw.Make,200)||m.camera_make;m.camera_model=text(raw.Model,200)||m.camera_model;m.lens_model=text(raw.LensModel,200)||m.lens_model;m.latitude=number(raw.latitude??raw.GPSLatitude)??m.latitude;m.longitude=number(raw.longitude??raw.GPSLongitude)??m.longitude;m.altitude_meters=number(raw.GPSAltitude)??m.altitude_meters;let width=number(raw.ExifImageWidth??raw.ImageWidth),height=number(raw.ExifImageHeight??raw.ImageHeight);if(width&&height&&[5,6,7,8].includes(m.orientation)){[width,height]=[height,width];}m.width=width||m.width;m.height=height||m.height;if(m.latitude!=null&&m.longitude!=null)m.location_source="exif";m.exif_json=picked;}
-function validateMetadata(m){if(!MEDIA_TYPES.has(m.media_type)||!MIME_EXT[m.mime_type])return bad(400,"Tipo de archivo no permitido.");if(!m.original_filename)return bad(400,"Nombre original obligatorio.");if(!VISIBILITIES.has(m.visibility))return bad(400,"Visibilidad no válida.");if(m.latitude!=null&&(m.latitude < -90||m.latitude>90)||m.longitude!=null&&(m.longitude < -180||m.longitude>180))return bad(400,"Coordenadas no válidas.");return null;}
+function validateMetadata(m){if(!MEDIA_TYPES.has(m.media_type)||!MIME_EXT[m.mime_type])return bad(400,"UNSUPPORTED_FILE_TYPE","Tipo de archivo no permitido.");if(!m.original_filename)return bad(400,"INVALID_METADATA","Nombre original obligatorio.");if(!VISIBILITIES.has(m.visibility))return bad(400,"INVALID_METADATA","Visibilidad no válida.");if(m.latitude!=null&&(m.latitude < -90||m.latitude>90)||m.longitude!=null&&(m.longitude < -180||m.longitude>180))return bad(400,"INVALID_METADATA","Coordenadas no válidas.");return null;}
+
+function normalizeDuplicateFilename(value) {
+  return path.basename(String(value || "").replace(/\\/g, "/")).trim().toLowerCase().normalize("NFKC").replace(/\s+/g, " ");
+}
+
+async function findPossibleDuplicate(familyId, originalFilename, sizeBytes) {
+  const normalized = normalizeDuplicateFilename(originalFilename);
+  if (!normalized || !Number.isSafeInteger(Number(sizeBytes)) || Number(sizeBytes) <= 0) return null;
+  const result = await pool.query(`SELECT p.id photo_id,p.original_filename,f.size_bytes,p.captured_at,p.created_at,p.is_trashed FROM public.orange_photos p JOIN public.orange_photo_files f ON f.photo_id=p.id AND f.family_id=p.family_id AND f.variant='original' WHERE p.family_id=$1::uuid AND lower(p.original_filename)=$2 AND f.size_bytes=$3::bigint ORDER BY p.created_at DESC LIMIT 1`,[familyId,normalized,String(sizeBytes)]);
+  return result.rows[0] || null;
+}
+
+async function findExactDuplicate(familyId, checksumSha256) {
+  const checksum = String(checksumSha256 || "").trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(checksum)) return null;
+  const result = await pool.query(`SELECT p.id photo_id,p.original_filename,f.size_bytes,f.checksum_sha256,p.captured_at,p.created_at,p.is_trashed FROM public.orange_photo_files f JOIN public.orange_photos p ON p.id=f.photo_id AND p.family_id=f.family_id WHERE f.family_id=$1::uuid AND f.variant='original' AND f.checksum_sha256=$2 ORDER BY p.created_at DESC LIMIT 1`,[familyId,checksum]);
+  return result.rows[0] || null;
+}
+
+function uploadModeFor(mimeType, sizeBytes) {
+  const mime = String(mimeType || "").trim().toLowerCase(), size = Number(sizeBytes), mediaType = mime.split("/")[0];
+  if (!MIME_EXT[mime] || !MEDIA_TYPES.has(mediaType)) return bad(400,"UNSUPPORTED_FILE_TYPE","Tipo de archivo no permitido.");
+  if (!Number.isSafeInteger(size) || size <= 0) return bad(400,"EMPTY_FILE","El archivo está vacío.");
+  if (mediaType === "image" && size > MAX_IMAGE_BYTES) return bad(413,"FILE_TOO_LARGE","La imagen supera el límite máximo de 30 MB.");
+  if (mediaType === "video" && size > MAX_VIDEO_BYTES) return bad(413,"FILE_TOO_LARGE","El vídeo supera el límite máximo de 10 GB.");
+  return ok({ upload_mode:mediaType === "video" && size > SIMPLE_VIDEO_MAX_BYTES ? "multipart" : "simple" });
+}
+
+async function checkUpload(req, body = {}) {
+  const a=resolveAuthenticatedFamily(req); if(!a.ok)return a;
+  const filename=normalizeDuplicateFilename(body.original_filename), size=Number(body.size_bytes), mime=String(body.mime_type||"").toLowerCase();
+  if(!filename)return bad(400,"INVALID_METADATA","Nombre original obligatorio.");
+  const mode=uploadModeFor(mime,size); if(!mode.ok)return mode;
+  const possible=await findPossibleDuplicate(a.familyId,filename,size);
+  return ok({ possible_duplicate:possible, upload_mode:mode.payload.upload_mode, limits:{ max_image_bytes:MAX_IMAGE_BYTES,simple_video_max_bytes:SIMPLE_VIDEO_MAX_BYTES,max_video_bytes:MAX_VIDEO_BYTES,multipart_part_bytes:MULTIPART_PART_BYTES } });
+}
 
 async function insertPhoto(auth,m,storage,poster=null,warning=null){const client=await pool.connect();try{await client.query('BEGIN');const p=(await client.query(`INSERT INTO public.orange_photos(family_id,owner_user_id,media_type,title,description,original_filename,mime_type,extension,captured_at,captured_at_source,timezone,width,height,duration_seconds,orientation,camera_make,camera_model,lens_model,latitude,longitude,altitude_meters,location_name,location_country,location_region,location_locality,location_source,exif_json,visibility,created_by,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$2,$2) RETURNING *`,[auth.familyId,auth.userId,m.media_type,m.title,m.description,m.original_filename,m.mime_type,m.extension,m.captured_at,m.captured_at_source,m.timezone,m.width,m.height,m.duration_seconds,m.orientation,m.camera_make,m.camera_model,m.lens_model,m.latitude,m.longitude,m.altitude_meters,m.location_name,m.location_country,m.location_region,m.location_locality,m.location_source,m.exif_json,m.visibility])).rows[0];await client.query(`INSERT INTO public.orange_photo_files(family_id,photo_id,variant,provider,bucket,object_key,mime_type,width,height,size_bytes,checksum_sha256,etag) VALUES($1,$2,'original',$3,$4,$5,$6,$7,$8,$9,$10,$11)`,[auth.familyId,p.id,storage.provider||'wasabi',storage.bucket,storage.object_key,storage.mime_type||m.mime_type,m.width,m.height,storage.size_bytes||null,storage.checksum_sha256||null,storage.etag||null]);if(poster)await client.query(`INSERT INTO public.orange_photo_files(family_id,photo_id,variant,provider,bucket,object_key,mime_type,width,height,size_bytes,checksum_sha256,etag) VALUES($1,$2,'poster',$3,$4,$5,'image/jpeg',$6,$7,$8,$9,$10)`,[auth.familyId,p.id,poster.provider||'wasabi',poster.bucket,poster.object_key,poster.width,poster.height,poster.size_bytes||null,poster.checksum_sha256||null,poster.etag||null]);await client.query('COMMIT');return ok({item:p,warning});}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}}
 async function createFromExisting(req,body){const a=resolveAuthenticatedFamily(req);if(!a.ok)return a;if(a.role!=='owner')return bad(403,"Solo el propietario familiar puede registrar objetos existentes.");const s=body.storage||{};try{assertOrangePhotosStorageKey(s.object_key);}catch(e){return bad(400,e.message);}if(s.bucket!=='orangedesk'||s.variant!=='original')return bad(400,"Almacenamiento legacy no válido.");const m=normalizeMetadata(body);const err=validateMetadata(m);if(err)return err;return insertPhoto(a,m,{...s,provider:'wasabi',mime_type:m.mime_type});}
 async function upload(req, file, fields = {}, posterFile = null) {
   const a = resolveAuthenticatedFamily(req);
   if (!a.ok) return a;
-  if (!file?.buffer?.length) return bad(400, "Falta el archivo.");
+  if (!file?.buffer?.length) return bad(400, "EMPTY_FILE", "El archivo está vacío.");
 
   let supplied = {};
   try { supplied = fields.metadata ? JSON.parse(fields.metadata) : fields; }
-  catch { return bad(400, "Metadatos JSON no válidos."); }
+  catch { return bad(400, "INVALID_METADATA", "Metadatos JSON no válidos."); }
 
   const m = normalizeMetadata(supplied, file);
   const err = validateMetadata(m);
   if (err) return err;
-  const max = m.media_type === "video" ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
-  if (file.buffer.length > max) return bad(400, "El archivo supera el tamaño máximo permitido.");
-  if (posterFile && (m.media_type !== "video" || posterFile.mimeType !== "image/jpeg" || posterFile.buffer.length > 2 * 1024 * 1024)) return bad(400, "Póster no válido.");
+  const mode = uploadModeFor(m.mime_type,file.buffer.length); if(!mode.ok)return mode;
+  if (mode.payload.upload_mode !== "simple") return bad(413,"FILE_TOO_LARGE","Los vídeos de más de 500 MB deben utilizar la subida para archivos grandes.");
+  if (posterFile && (m.media_type !== "video" || posterFile.mimeType !== "image/jpeg" || posterFile.buffer.length > 2 * 1024 * 1024)) return bad(400, "INVALID_POSTER", "Póster no válido.");
+
+  let checksumSha256;
+  try { checksumSha256=createHash("sha256").update(file.buffer).digest("hex"); }
+  catch(error){ console.error("OrangePhotos hash",{message:error.message}); return bad(500,"HASH_CALCULATION_FAILED","No se pudo verificar el archivo."); }
+  const duplicate=await findExactDuplicate(a.familyId,checksumSha256);
+  if(duplicate && !bool(fields.force_duplicate))return bad(409,"DUPLICATE_FILE","Este archivo ya existe en OrangePhotos.",{duplicate});
 
   if (m.media_type === "image") {
     const d = imageDimensions(file.buffer, m.mime_type);
@@ -93,7 +144,8 @@ async function upload(req, file, fields = {}, posterFile = null) {
       }
     }
 
-    stored = await uploadOrangePhotoToWasabi(file.buffer, { familyId:a.familyId,mimeType:m.mime_type,extension:m.extension,originalFilename:m.original_filename });
+    try { stored = await uploadOrangePhotoToWasabi(file.buffer, { familyId:a.familyId,mimeType:m.mime_type,extension:m.extension,originalFilename:m.original_filename,checksumSha256 }); }
+    catch(error){ console.error("OrangePhotos storage upload",{message:error.message}); return bad(502,"STORAGE_UPLOAD_FAILED","No se pudo transferir el archivo al almacenamiento."); }
 
     if (m.media_type === "video") {
       const posterCandidates = [];
@@ -115,7 +167,14 @@ async function upload(req, file, fields = {}, posterFile = null) {
       if (!posterStored) warnings.push("Subido sin miniatura");
     }
 
-    const result = await insertPhoto(a, m, stored, posterStored, [...new Set(warnings)].join(" · ") || null);
+    let result;
+    try { result = await insertPhoto(a, m, stored, posterStored, [...new Set(warnings)].join(" · ") || null); }
+    catch(error){
+      console.error("OrangePhotos database registration",{object_key:stored.object_key,message:error.message});
+      try { await deleteOrangePhotoObject(stored); if(posterStored)await deleteOrangePhotoObject(posterStored); }
+      catch(cleanupError){ console.error("OrangePhotos database cleanup",{object_key:stored.object_key,message:cleanupError.message}); }
+      return bad(500,"DATABASE_REGISTRATION_FAILED","El archivo se transfirió, pero no pudo registrarse.");
+    }
     if (result.ok && m.media_type === "video" && result.payload?.item?.id) {
       const photoId = result.payload.item.id;
       setImmediate(() => {
@@ -127,7 +186,7 @@ async function upload(req, file, fields = {}, posterFile = null) {
   } catch (error) {
     if (stored) console.error("OrangePhotos: posible objeto huérfano", { bucket:stored.bucket, object_key:stored.object_key });
     if (posterStored) console.error("OrangePhotos: posible objeto huérfano", { bucket:posterStored.bucket, object_key:posterStored.object_key });
-    return bad(502, "No se pudo completar la subida.");
+    return bad(500, "INTERNAL_ERROR", "No se pudo completar la subida.");
   } finally {
     if (tempDir) await fs.rm(tempDir, { recursive:true, force:true });
   }
@@ -242,4 +301,4 @@ async function aroundDate(req) {
   return listSafe(req, { ...(req.query || {}), before: date.toISOString(), page: 1 });
 }
 
-module.exports={familyMembers,createFromExisting,upload,list:listSafe,timeline,aroundDate,detail,update,trash,purge,emptyTrash,signedUrl,download,share,albums,createAlbum,updateAlbum,addPhoto,shareAlbum,tags,createTag,MAX_VIDEO_BYTES};
+module.exports={familyMembers,createFromExisting,upload,checkUpload,list:listSafe,timeline,aroundDate,detail,update,trash,purge,emptyTrash,signedUrl,download,share,albums,createAlbum,updateAlbum,addPhoto,shareAlbum,tags,createTag,insertPhoto,normalizeMetadata,validateMetadata,findPossibleDuplicate,findExactDuplicate,normalizeDuplicateFilename,uploadModeFor,ok,bad,bool,MIME_EXT,MAX_IMAGE_BYTES,SIMPLE_VIDEO_MAX_BYTES,MAX_VIDEO_BYTES,MULTIPART_PART_BYTES,MULTIPART_UPLOAD_TTL_HOURS};

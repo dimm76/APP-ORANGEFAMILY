@@ -2,12 +2,16 @@
 const { createHash, randomUUID } = require("node:crypto");
 
 const {
+  AbortMultipartUploadCommand,
+  CompleteMultipartUploadCommand,
+  CreateMultipartUploadCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
+  UploadPartCommand,
 } = require("@aws-sdk/client-s3");
 
 const {
@@ -83,7 +87,7 @@ function assertOrangePhotosStorageKey(storageKey) {
   return key;
 }
 
-async function uploadOrangePhotoToWasabi(buffer, { familyId, mimeType, extension, originalFilename, variant = "original" } = {}) {
+async function uploadOrangePhotoToWasabi(buffer, { familyId, mimeType, extension, originalFilename, variant = "original", checksumSha256 = null } = {}) {
   const { client, config } = getS3Client();
   if (!Buffer.isBuffer(buffer) || !buffer.length) throw new Error("El archivo está vacío.");
   const now = new Date();
@@ -93,7 +97,39 @@ async function uploadOrangePhotoToWasabi(buffer, { familyId, mimeType, extension
   await client.send(new PutObjectCommand({ Bucket: config.bucket, Key: key, Body: buffer, ContentType: mimeType }));
   return { provider: "wasabi", bucket: config.bucket, object_key: key, mime_type: mimeType,
     original_filename: String(originalFilename || "archivo").slice(0, 500), size_bytes: buffer.length,
-    checksum_sha256: createHash("sha256").update(buffer).digest("hex") };
+    checksum_sha256: checksumSha256 || createHash("sha256").update(buffer).digest("hex") };
+}
+
+function buildOrangePhotoObjectKey(familyId, extension) {
+  const now = new Date();
+  const ext = String(extension || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return assertOrangePhotosStorageKey(`family_photos/originals/${familyId}/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}/${randomUUID()}.${ext}`);
+}
+
+async function createOrangePhotoMultipartUpload({ familyId, mimeType, extension }) {
+  const { client, config } = getS3Client();
+  const objectKey = buildOrangePhotoObjectKey(familyId, extension);
+  const result = await client.send(new CreateMultipartUploadCommand({ Bucket:config.bucket, Key:objectKey, ContentType:mimeType }));
+  if (!result.UploadId) throw new Error("Wasabi no devolvió un identificador multipart.");
+  return { provider:"wasabi", bucket:config.bucket, object_key:objectKey, provider_upload_id:String(result.UploadId) };
+}
+
+async function getOrangePhotoUploadPartUrl(record, partNumber, expiresIn = 900) {
+  const { client, config } = getS3Client();
+  const key = assertOrangePhotosStorageKey(record.object_key);
+  return getSignedUrl(client, new UploadPartCommand({ Bucket:record.bucket || config.bucket, Key:key, UploadId:record.provider_upload_id, PartNumber:partNumber }), { expiresIn });
+}
+
+async function completeOrangePhotoMultipartUpload(record, parts) {
+  const { client, config } = getS3Client();
+  const key = assertOrangePhotosStorageKey(record.object_key);
+  return client.send(new CompleteMultipartUploadCommand({ Bucket:record.bucket || config.bucket, Key:key, UploadId:record.provider_upload_id, MultipartUpload:{ Parts:parts.map(part => ({ PartNumber:part.part_number, ETag:part.etag })) } }));
+}
+
+async function abortOrangePhotoMultipartUpload(record) {
+  const { client, config } = getS3Client();
+  const key = assertOrangePhotosStorageKey(record.object_key);
+  return client.send(new AbortMultipartUploadCommand({ Bucket:record.bucket || config.bucket, Key:key, UploadId:record.provider_upload_id }));
 }
 
 async function getSignedOrangePhotoUrl(record) {
@@ -321,4 +357,8 @@ module.exports = {
   listOrangePhotosObjects,
   headOrangePhotoObject,
   getOrangePhotoObjectBuffer,
+  createOrangePhotoMultipartUpload,
+  getOrangePhotoUploadPartUrl,
+  completeOrangePhotoMultipartUpload,
+  abortOrangePhotoMultipartUpload,
 };
