@@ -25,3 +25,5 @@ No se eliminan por inferencia de nombre, patrón o carpeta variantes legacy que 
 Si la eliminación de algún objeto de Wasabi falla, no debe eliminarse el registro principal de PostgreSQL como si la operación hubiese finalizado correctamente. El error debe quedar informado para permitir reintento o reconciliación.
 
 Si una subida a Wasabi termina pero falla la transacción SQL, se registra el posible objeto huérfano para reconciliación manual; no se borra automáticamente.
+
+El backend utiliza `ffprobe-static` y `ffmpeg-static` únicamente para obtener metadatos multimedia y crear previews derivados reproducibles. Estas herramientas nunca modifican ni sustituyen el archivo original.
