@@ -105,12 +105,12 @@ export default function OrangePhotosGrid({
                 <div
                   className="od-orange-photos__justified-row"
                   style={{ height: row.height, gap: row.gap }}
-                  key={`${day.key}-${rowIndex}`}
+                  key={`${day.key}:${row.photos.map(photo => photo.id).join(",")}`}
                 >
                   {row.photos.map((photo, photoIndex) => (
                     <div
                       className="od-orange-photos__justified-item"
-                      style={{ width: aspectRatio(photo) * row.height, height: row.height }}
+                      style={{ width: aspectRatio(photo) * row.height, flexBasis: aspectRatio(photo) * row.height, height: row.height }}
                       key={photo.id}
                     >
                       <OrangePhotoCard
