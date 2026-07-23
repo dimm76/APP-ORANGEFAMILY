@@ -1,0 +1,109 @@
+name: Deploy OrangeFamily Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orangefamily-production
+  cancel-in-progress: false
+
+jobs:
+  validate-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Configure SSH
+        env:
+          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          install -m 600 /dev/null ~/.ssh/orangefamily_production
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > ~/.ssh/orangefamily_production
+          ssh-keyscan -H -- "$PROD_SSH_HOST" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy on production VPS
+        env:
+          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          PROD_APP_PATH: ${{ secrets.PROD_APP_PATH }}
+          PROD_FRONTEND_PATH: ${{ secrets.PROD_FRONTEND_PATH }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/orangefamily_production \
+            -o BatchMode=yes \
+            "$PROD_SSH_USER@$PROD_SSH_HOST" \
+            bash -s -- "$PROD_APP_PATH" "$PROD_FRONTEND_PATH" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+
+          app_path="$1"
+          frontend_path="$2"
+
+          cd "$app_path"
+
+          if [[ ! -d .git ]]; then
+            echo "Production application path is not a Git repository." >&2
+            exit 1
+          fi
+
+          if [[ "$(git branch --show-current)" != "main" ]]; then
+            echo "Production repository is not on the main branch." >&2
+            exit 1
+          fi
+
+          if [[ ! -f backend/.env ]]; then
+            echo "Production backend/.env is missing." >&2
+            exit 1
+          fi
+
+          git fetch origin main
+          git reset --hard origin/main
+
+          npm ci
+          npm run build
+          rsync -a --delete dist/ "$frontend_path/"
+
+          cd backend
+          npm ci
+
+          sudo systemctl restart orangefamily-backend.service
+          sudo systemctl is-active --quiet orangefamily-backend.service
+          sleep 5
+          curl --fail --silent --show-error \
+            http://127.0.0.1:4200/api/health
+          REMOTE_SCRIPT
+
+      - name: Remove SSH private key
+        if: always()
+        run: rm -f ~/.ssh/orangefamily_production
