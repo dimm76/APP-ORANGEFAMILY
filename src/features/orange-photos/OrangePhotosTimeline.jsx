@@ -1,30 +1,8 @@
-export default function OrangePhotosTimeline({ groups, activePeriod, onPeriodClick }) {
-  const years = new Map();
+const monthFormatter = new Intl.DateTimeFormat("es-ES", { month: "short" });
+const monthLabel = (year, month) => monthFormatter.format(new Date(Date.UTC(year, month - 1, 1))).replace(".", "");
 
-  groups.forEach((group) => {
-    if (group.key === "unknown") return;
-    const [year] = group.key.split("-");
-    if (!years.has(year)) years.set(year, []);
-    years.get(year).push(group);
-  });
-
-  return (
-    <nav className="od-orange-photos__timeline" aria-label="Navegación temporal">
-      {[...years].map(([year, periods]) => (
-        <div key={year}>
-          <strong>{year}</strong>
-          {periods.map((period) => (
-            <button
-              key={period.key}
-              type="button"
-              className={activePeriod === period.key ? "is-active" : ""}
-              onClick={() => onPeriodClick(period.key)}
-            >
-              {period.shortLabel}
-            </button>
-          ))}
-        </div>
-      ))}
-    </nav>
-  );
+export default function OrangePhotosTimeline({ items, activePeriod, onPeriodClick }) {
+  const [activeYearText] = String(activePeriod || "").split("-");
+  const activeYear = Number(activeYearText) || items.find(item => item.year != null)?.year;
+  return <nav className="od-orange-photos__timeline" aria-label="Navegación temporal">{items.filter(item => item.year != null).map(item => <div className={item.year === activeYear ? "is-active-year" : ""} key={item.year}><button type="button" className={item.year === activeYear ? "is-active" : ""} onClick={() => onPeriodClick({ ...item.months[0], year: item.year })}><strong>{item.year}</strong></button>{item.year === activeYear ? item.months.map(period => <button key={`${item.year}-${period.month}`} type="button" className={activePeriod === `${item.year}-${String(period.month).padStart(2, "0")}` ? "is-active" : ""} onClick={() => onPeriodClick({ ...period, year: item.year })}>{monthLabel(item.year, period.month)}</button>) : null}</div>)}</nav>;
 }

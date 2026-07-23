@@ -36,3 +36,6 @@ backend/.env.*
 
 # Local exports
 .exportables/
+
+# Local OrangePhotos import reports
+backend/tmp/

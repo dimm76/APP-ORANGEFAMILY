@@ -1,8 +1,11 @@
+/* global require, module, Buffer */
 const { createHash, randomUUID } = require("node:crypto");
 
 const {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } = require("@aws-sdk/client-s3");
@@ -80,12 +83,13 @@ function assertOrangePhotosStorageKey(storageKey) {
   return key;
 }
 
-async function uploadOrangePhotoToWasabi(buffer, { familyId, mimeType, extension, originalFilename } = {}) {
+async function uploadOrangePhotoToWasabi(buffer, { familyId, mimeType, extension, originalFilename, variant = "original" } = {}) {
   const { client, config } = getS3Client();
   if (!Buffer.isBuffer(buffer) || !buffer.length) throw new Error("El archivo está vacío.");
   const now = new Date();
   const ext = String(extension || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const key = assertOrangePhotosStorageKey(`family_photos/originals/${familyId}/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}/${randomUUID()}.${ext}`);
+  const folder = variant === "poster" ? "posters" : "originals";
+  const key = assertOrangePhotosStorageKey(`family_photos/${folder}/${familyId}/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}/${randomUUID()}.${ext}`);
   await client.send(new PutObjectCommand({ Bucket: config.bucket, Key: key, Body: buffer, ContentType: mimeType }));
   return { provider: "wasabi", bucket: config.bucket, object_key: key, mime_type: mimeType,
     original_filename: String(originalFilename || "archivo").slice(0, 500), size_bytes: buffer.length,
@@ -96,6 +100,67 @@ async function getSignedOrangePhotoUrl(record) {
   const { client, config } = getS3Client();
   const key = assertOrangePhotosStorageKey(record.object_key);
   return getSignedUrl(client, new GetObjectCommand({ Bucket: record.bucket || config.bucket, Key: key }), { expiresIn: config.signedUrlSeconds });
+}
+
+function normalizeEtag(value) {
+  return value == null ? null : String(value).replace(/^"|"$/g, "");
+}
+
+async function sendWithTimeout(client, command, timeoutMs, stage, objectKey = null, consume = null) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const result = await client.send(command, { abortSignal: controller.signal });
+    return consume ? await consume(result) : result;
+  } catch (error) {
+    if (controller.signal.aborted || error?.name === "AbortError") {
+      throw new Error(`Timeout en ${stage}${objectKey ? `: ${objectKey}` : ""}.`);
+    }
+    const detail = error?.message || error?.Code || error?.code || error?.name || "error desconocido";
+    throw new Error(`Error en ${stage}${objectKey ? `: ${objectKey}` : ""}: ${detail}.`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function listOrangePhotosObjects({
+  prefix = "family_photos/",
+  continuationToken = null,
+  maxKeys = 1000,
+} = {}) {
+  const safePrefix = String(prefix || "");
+  const safeMaxKeys = Number(maxKeys);
+  if (!safePrefix.startsWith("family_photos/") || safePrefix === "family_photos" || safePrefix.includes("..") || safePrefix.includes("\\")) {
+    throw new Error("Prefijo de OrangePhotos no válido.");
+  }
+  if (!Number.isInteger(safeMaxKeys) || safeMaxKeys < 1 || safeMaxKeys > 1000) {
+    throw new Error("maxKeys debe ser un entero entre 1 y 1000.");
+  }
+  const { client, config } = getS3Client();
+  const result = await sendWithTimeout(client, new ListObjectsV2Command({ Bucket: config.bucket, Prefix: safePrefix, ContinuationToken: continuationToken || undefined, MaxKeys: safeMaxKeys }), 30000, "ListObjectsV2");
+  return {
+    objects: (result.Contents || []).map(item => ({ key: String(item.Key || ""), size: Number(item.Size || 0), etag: normalizeEtag(item.ETag), last_modified: item.LastModified instanceof Date ? item.LastModified.toISOString() : null, storage_class: item.StorageClass ? String(item.StorageClass) : null })),
+    next_token: result.NextContinuationToken || null,
+    is_truncated: Boolean(result.IsTruncated),
+  };
+}
+
+async function headOrangePhotoObject(objectKey) {
+  const key = assertOrangePhotosStorageKey(objectKey);
+  const { client, config } = getS3Client();
+  const result = await sendWithTimeout(client, new HeadObjectCommand({ Bucket: config.bucket, Key: key }), 30000, "HeadObject", key);
+  return { content_type: result.ContentType ? String(result.ContentType).toLowerCase() : null, content_length: Number(result.ContentLength || 0), last_modified: result.LastModified instanceof Date ? result.LastModified.toISOString() : null, etag: normalizeEtag(result.ETag), metadata: result.Metadata && typeof result.Metadata === "object" ? { ...result.Metadata } : {} };
+}
+
+async function getOrangePhotoObjectBuffer(objectKey) {
+  const key = assertOrangePhotosStorageKey(objectKey);
+  const { client, config } = getS3Client();
+  return sendWithTimeout(client, new GetObjectCommand({ Bucket: config.bucket, Key: key }), 120000, "GetObject", key, async result => {
+    if (!result.Body) throw new Error("El objeto de OrangePhotos está vacío.");
+    const buffer = Buffer.from(await result.Body.transformToByteArray());
+    if (!buffer.length) throw new Error("El objeto de OrangePhotos está vacío.");
+    return buffer;
+  });
 }
 
 async function uploadImageToWasabi(buffer, metadata = {}) {
@@ -227,4 +292,7 @@ module.exports = {
   assertOrangePhotosStorageKey,
   uploadOrangePhotoToWasabi,
   getSignedOrangePhotoUrl,
+  listOrangePhotosObjects,
+  headOrangePhotoObject,
+  getOrangePhotoObjectBuffer,
 };

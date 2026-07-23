@@ -1,0 +1,8 @@
+export default function OrangePhotosUploadProgress({ queue, visible, running, onHide, onClose, onRetry }) {
+  if (!visible) return null;
+  const completed = queue.filter(item => item.status === "completed").length;
+  const failed = queue.filter(item => item.status === "error").length;
+  const finished = completed + failed;
+  const labels = { pending: "Pendiente", preparing: "Preparando", uploading: "Subiendo", completed: "Completado", error: "Error" };
+  return <section className="od-orangephotos-upload-progress" role="status" aria-live="polite"><header><h2>Importando elementos</h2></header><div className="od-orangephotos-upload-progress__list">{queue.map(item => <div className="od-orangephotos-upload-row" key={item.key}><div><span aria-hidden="true">{item.status === "completed" ? "✅" : item.status === "error" ? "❌" : item.status === "uploading" ? "⏳" : "○"}</span><strong>{item.file.name}</strong><small>{item.message || labels[item.status]}</small></div><progress max="100" value={item.progress || 0} aria-label={`${item.file.name}: ${item.progress || 0}%`} /></div>)}</div><footer><span>{running ? `${finished} de ${queue.length} completados` : failed ? `${completed} importados · ${failed} con error` : `${completed} de ${queue.length} elementos importados`}</span><div>{running ? <button className="od-button-secondary" type="button" onClick={onHide}>Ocultar</button> : <><button className="od-button-secondary" type="button" onClick={onClose}>Cerrar</button>{failed ? <button className="od-modal-primary" type="button" onClick={onRetry}>Reintentar fallidos</button> : null}</>}</div></footer></section>;
+}
