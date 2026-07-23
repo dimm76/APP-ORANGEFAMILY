@@ -120,7 +120,7 @@ export default function AppLayout({ children }) {
           ) : null}
 
           <main className="od-main">
-            <IonContent className="od-main-ion-content">{children}</IonContent>
+            <IonContent className="od-main-ion-content" scrollY={!orangePhotosWorkspaceMode}>{children}</IonContent>
           </main>
         </div>
       </div>

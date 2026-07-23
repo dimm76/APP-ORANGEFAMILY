@@ -498,3 +498,6 @@ ion-app.od-app-root {
   height: calc(100vh - var(--od-header-height));
   height: calc(100dvh - var(--od-header-height));
 }
+.od-app-root--orangephotos-workspace .od-main,
+.od-app-root--orangephotos-workspace .od-main-ion-content { height:100%; min-height:0; overflow:hidden; }
+.od-app-root--orangephotos-workspace .od-main-ion-content::part(scroll) { overflow:hidden; }
