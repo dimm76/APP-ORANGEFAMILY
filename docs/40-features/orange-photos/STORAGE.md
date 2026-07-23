@@ -51,20 +51,20 @@ Nunca duplica variantes ni modifica originales.
 
 - Imágenes: máximo 30 MB mediante la subida simple a la API Node.
 - Vídeo simple: hasta 500 MB mediante la subida actual a la API Node.
-- Vídeo grande: más de 500 MB y hasta 10 GB mediante multipart directo del navegador a Wasabi.
-- Parte multipart: 25 MB.
-- Concurrencia del navegador: máximo 3 partes.
-- Caducidad de una subida multipart: 24 horas.
-- Las URLs firmadas se solicitan en lotes de hasta 10 partes y caducan a los 15 minutos.
+- Vídeo grande: más de 500 MB y hasta 10 GB mediante stream binario del navegador a Node.
+- Parte multipart interna desde Node a Wasabi: 25 MB.
+- Concurrencia de la transferencia interna: 1.
 
-Wasabi debe permitir por CORS los `PUT` desde el dominio de OrangeFamily y
-exponer la cabecera `ETag` al navegador; sin esa cabecera el cliente no puede
-completar el multipart.
+En el flujo activo el navegador nunca accede directamente a Wasabi, por lo que
+no se necesita permitir `PUT` por CORS ni exponer `ETag`. Node recibe el cuerpo
+sin cargarlo completo en memoria, calcula SHA-256 incrementalmente y lo escribe
+en un directorio temporal. Después obtiene metadatos y poster y transfiere el
+archivo temporal a Wasabi mediante multipart interno.
 
-El navegador nunca carga el vídeo grande completo en memoria: divide el `File` en
-segmentos con `slice()` y envía cada parte directamente. Node inicia, autoriza,
-completa y verifica la subida, pero calcula el SHA-256 leyendo el objeto como
-stream incremental.
+Este flujo requiere espacio temporal suficiente en el servidor y tarda más que
+una transferencia directa porque todos los bytes pasan por Node. El multipart
+directo anterior, sus endpoints y `orange_photo_uploads` se conservan, pero el
+frontend no los utiliza mientras `direct_backend` sea el modo activo.
 
 ## Duplicados
 

@@ -2,11 +2,14 @@
 /* global require, module */
 const pool = require("../db");
 const fs = require("node:fs/promises");
+const fsNative = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
+const { Transform } = require("node:stream");
+const { pipeline } = require("node:stream/promises");
 const { resolveAuthenticatedFamily } = require("./attachmentsService");
-const { assertOrangePhotosStorageKey, deleteOrangePhotoObject, getSignedOrangePhotoUrl, getOrangePhotoObjectStream, uploadOrangePhotoToWasabi } = require("./wasabiClient");
+const { assertOrangePhotosStorageKey, deleteOrangePhotoObject, getSignedOrangePhotoUrl, getOrangePhotoObjectStream, uploadOrangePhotoFileToWasabi, uploadOrangePhotoToWasabi } = require("./wasabiClient");
 const { probeVideoFile, createVideoPoster, processStoredOrangePhotoVideo } = require("./orangePhotosVideoProcessor");
 const exifr = require("exifr");
 
@@ -74,7 +77,7 @@ async function checkUpload(req, body = {}) {
   if(!filename)return bad(400,"INVALID_METADATA","Nombre original obligatorio.");
   const mode=uploadModeFor(mime,size); if(!mode.ok)return mode;
   const possible=await findPossibleDuplicate(a.familyId,filename,size);
-  return ok({ possible_duplicate:possible, upload_mode:mode.payload.upload_mode, limits:{ max_image_bytes:MAX_IMAGE_BYTES,simple_video_max_bytes:SIMPLE_VIDEO_MAX_BYTES,max_video_bytes:MAX_VIDEO_BYTES,multipart_part_bytes:MULTIPART_PART_BYTES } });
+  return ok({ possible_duplicate:possible, upload_mode:mode.payload.upload_mode==="multipart"?"direct_backend":mode.payload.upload_mode, limits:{ max_image_bytes:MAX_IMAGE_BYTES,simple_video_max_bytes:SIMPLE_VIDEO_MAX_BYTES,max_video_bytes:MAX_VIDEO_BYTES,multipart_part_bytes:MULTIPART_PART_BYTES } });
 }
 
 async function insertPhoto(auth,m,storage,poster=null,warning=null){const client=await pool.connect();try{await client.query('BEGIN');const p=(await client.query(`INSERT INTO public.orange_photos(family_id,owner_user_id,media_type,title,description,original_filename,mime_type,extension,captured_at,captured_at_source,timezone,width,height,duration_seconds,orientation,camera_make,camera_model,lens_model,latitude,longitude,altitude_meters,location_name,location_country,location_region,location_locality,location_source,exif_json,visibility,created_by,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$2,$2) RETURNING *`,[auth.familyId,auth.userId,m.media_type,m.title,m.description,m.original_filename,m.mime_type,m.extension,m.captured_at,m.captured_at_source,m.timezone,m.width,m.height,m.duration_seconds,m.orientation,m.camera_make,m.camera_model,m.lens_model,m.latitude,m.longitude,m.altitude_meters,m.location_name,m.location_country,m.location_region,m.location_locality,m.location_source,m.exif_json,m.visibility])).rows[0];await client.query(`INSERT INTO public.orange_photo_files(family_id,photo_id,variant,provider,bucket,object_key,mime_type,width,height,size_bytes,checksum_sha256,etag) VALUES($1,$2,'original',$3,$4,$5,$6,$7,$8,$9,$10,$11)`,[auth.familyId,p.id,storage.provider||'wasabi',storage.bucket,storage.object_key,storage.mime_type||m.mime_type,m.width,m.height,storage.size_bytes||null,storage.checksum_sha256||null,storage.etag||null]);if(poster)await client.query(`INSERT INTO public.orange_photo_files(family_id,photo_id,variant,provider,bucket,object_key,mime_type,width,height,size_bytes,checksum_sha256,etag) VALUES($1,$2,'poster',$3,$4,$5,'image/jpeg',$6,$7,$8,$9,$10)`,[auth.familyId,p.id,poster.provider||'wasabi',poster.bucket,poster.object_key,poster.width,poster.height,poster.size_bytes||null,poster.checksum_sha256||null,poster.etag||null]);await client.query('COMMIT');return ok({item:p,warning});}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}}
@@ -192,6 +195,58 @@ async function upload(req, file, fields = {}, posterFile = null) {
   }
 }
 
+async function uploadDirect(req) {
+  const auth=resolveAuthenticatedFamily(req);if(!auth.ok)return auth;
+  if(String(req.headers["content-type"]||"").split(";",1)[0].trim().toLowerCase()!=="application/octet-stream")return bad(400,"INVALID_UPLOAD_MODE","Este endpoint requiere un cuerpo binario.");
+  let decodedFilename;
+  try{decodedFilename=decodeURIComponent(String(req.headers["x-orange-filename"]||""));}
+  catch{return bad(400,"INVALID_METADATA","Nombre original no válido.");}
+  const originalFilename=path.basename(decodedFilename.replace(/\\/g,"/")).trim().normalize("NFKC").replace(/\s+/g," ");
+  const mimeType=String(req.headers["x-orange-mime-type"]||"").trim().toLowerCase(),declaredSize=Number(req.headers["x-orange-file-size"]),forceDuplicate=String(req.headers["x-orange-force-duplicate"]||"")==="true";
+  if(!originalFilename||!Number.isSafeInteger(declaredSize)||declaredSize<=0)return bad(400,"EMPTY_FILE","El archivo está vacío.");
+  if(originalFilename.length>500)return bad(400,"INVALID_METADATA","El nombre del archivo es demasiado largo.");
+  if(!MIME_EXT[mimeType]||mimeType.split("/")[0]!=="video")return bad(400,"UNSUPPORTED_FILE_TYPE","Tipo de archivo no permitido.");
+  if(declaredSize<=SIMPLE_VIDEO_MAX_BYTES)return bad(400,"INVALID_UPLOAD_MODE","Este archivo debe utilizar la subida normal.");
+  if(declaredSize>MAX_VIDEO_BYTES)return bad(413,"FILE_TOO_LARGE","El vídeo supera el límite máximo de 10 GB.");
+  let supplied={};
+  try{const header=String(req.headers["x-orange-metadata"]||"");supplied=header?JSON.parse(decodeURIComponent(header)):{};}
+  catch{return bad(400,"INVALID_METADATA","Metadatos JSON no válidos.");}
+  const metadata=normalizeMetadata(supplied,{filename:originalFilename,mimeType});
+  const invalid=validateMetadata(metadata);if(invalid)return invalid;
+  let tempDir=null,stored=null,posterStored=null;
+  const warnings=[];
+  try{
+    tempDir=await fs.mkdtemp(path.join(os.tmpdir(),"orange-photos-direct-"));
+    const inputPath=path.join(tempDir,`original.${metadata.extension}`),posterPath=path.join(tempDir,"poster.jpg"),hash=createHash("sha256");
+    let receivedBytes=0,requestAborted=false;
+    req.once("aborted",()=>{requestAborted=true;});
+    const countingTransform=new Transform({transform(chunk,encoding,callback){receivedBytes+=chunk.length;if(receivedBytes>declaredSize||receivedBytes>MAX_VIDEO_BYTES)return callback(Object.assign(new Error("La transferencia supera el tamaño declarado."),{code:"UPLOAD_INTERRUPTED"}));hash.update(chunk);callback(null,chunk);}});
+    try{await pipeline(req,countingTransform,fsNative.createWriteStream(inputPath));}
+    catch(error){console.error("OrangePhotos direct receive",{message:error.message});return bad(400,"UPLOAD_INTERRUPTED",requestAborted?"La conexión se interrumpió durante la subida.":"La transferencia terminó antes de recibir el archivo completo.");}
+    if(requestAborted||receivedBytes!==declaredSize)return bad(400,"UPLOAD_INTERRUPTED",requestAborted?"La conexión se interrumpió durante la subida.":"La transferencia terminó antes de recibir el archivo completo.");
+    const checksumSha256=hash.digest("hex"),duplicate=await findExactDuplicate(auth.familyId,checksumSha256);
+    if(duplicate&&!forceDuplicate)return bad(409,"DUPLICATE_FILE","Este mismo archivo ya existe en OrangePhotos.",{duplicate});
+    try{const video=await probeVideoFile(inputPath);metadata.duration_seconds=video.duration||metadata.duration_seconds;metadata.width=video.width||metadata.width;metadata.height=video.height||metadata.height;metadata.orientation=video.rotation??metadata.orientation;}
+    catch(error){warnings.push("Metadatos de vídeo pendientes");console.error("OrangePhotos direct video metadata",{message:error.message});}
+    let generatedPoster=null;
+    try{const poster=await createVideoPoster(inputPath,posterPath);generatedPoster={buffer:await fs.readFile(posterPath),width:poster.metadata.width,height:poster.metadata.height};}
+    catch(error){warnings.push("Subido sin miniatura");console.error("OrangePhotos direct video poster",{message:error.message});}
+    try{stored=await uploadOrangePhotoFileToWasabi(inputPath,{familyId:auth.familyId,mimeType,extension:metadata.extension,originalFilename,sizeBytes:declaredSize,checksumSha256});}
+    catch(error){console.error("OrangePhotos direct storage upload",{message:error.message});return bad(502,"STORAGE_UPLOAD_FAILED","No se pudo transferir el archivo al almacenamiento.");}
+    if(generatedPoster){try{posterStored={...(await uploadOrangePhotoToWasabi(generatedPoster.buffer,{familyId:auth.familyId,mimeType:"image/jpeg",extension:"jpg",originalFilename:"poster.jpg",variant:"poster"})),width:generatedPoster.width,height:generatedPoster.height};}catch(error){warnings.push("Subido sin miniatura");console.error("OrangePhotos direct poster upload",{message:error.message});}}
+    let result;
+    try{result=await insertPhoto(auth,metadata,stored,posterStored,[...new Set(warnings)].join(" · ")||null);}
+    catch(error){console.error("OrangePhotos direct database registration",{object_key:stored.object_key,message:error.message});try{await deleteOrangePhotoObject(stored);if(posterStored)await deleteOrangePhotoObject(posterStored);}catch(cleanupError){console.error("OrangePhotos direct database cleanup",{object_key:stored.object_key,message:cleanupError.message});}return bad(500,"DATABASE_REGISTRATION_FAILED","El archivo se transfirió, pero no pudo registrarse en OrangePhotos.");}
+    if(result.ok&&result.payload?.item?.id){const photoId=result.payload.item.id;setImmediate(()=>processStoredOrangePhotoVideo(photoId,{createPoster:false,createPreview:true,updateMetadata:false}).catch(error=>console.error("OrangePhotos direct delayed video preview",{photo_id:photoId,message:error.message,possible_orphans:error.possibleOrphans||[]})));}
+    return result;
+  } catch(error) {
+    console.error("OrangePhotos direct internal",{message:error.message,object_key:stored?.object_key||null});
+    return bad(500,"INTERNAL_ERROR","No se pudo completar la subida.");
+  } finally {
+    if(tempDir)await fs.rm(tempDir,{recursive:true,force:true});
+  }
+}
+
 async function list(req){const a=resolveAuthenticatedFamily(req);if(!a.ok)return a;const q=req.query||{},page=Math.max(1,Number(q.page)||1),per=Math.min(100,Math.max(1,Number(q.per_page)||30)),vals=[a.familyId,a.userId],where=[`p.family_id=$1::uuid`,visibilitySql(),`COALESCE(us.is_hidden,false)=false`];if(!(bool(q.include_trashed)&&String(q.owner_user_id||a.userId)===a.userId))where.push('p.is_trashed=false');const add=(sql,v)=>{vals.push(v);where.push(sql.replace('?',`$${vals.length}`));};if(q.search)add(`(p.title ILIKE ? OR p.description ILIKE ? OR p.original_filename ILIKE ?)`,`%${String(q.search).slice(0,120)}%`),vals.push(vals[vals.length-1],vals[vals.length-1]);if(MEDIA_TYPES.has(q.media_type))add('p.media_type=?',q.media_type);if(uuid(q.owner_user_id))add('p.owner_user_id=?::uuid',q.owner_user_id);if(VISIBILITIES.has(q.visibility))add('p.visibility=?',q.visibility);if(uuid(q.album_id))add('EXISTS(SELECT 1 FROM public.orange_photo_album_items ai WHERE ai.photo_id=p.id AND ai.album_id=?::uuid)',q.album_id);if(uuid(q.tag_id))add('EXISTS(SELECT 1 FROM public.orange_photo_tag_items ti WHERE ti.photo_id=p.id AND ti.tag_id=?::uuid)',q.tag_id);if(Number(q.year))add('EXTRACT(YEAR FROM p.captured_at)=?',Number(q.year));if(Number(q.month))add('EXTRACT(MONTH FROM p.captured_at)=?',Number(q.month));if(q.favorite!=null)add('COALESCE(us.is_favorite,p.is_favorite)=?',bool(q.favorite));const base=`FROM public.orange_photos p LEFT JOIN public.orange_photo_user_settings us ON us.photo_id=p.id AND us.user_id=$2::uuid WHERE ${where.join(' AND ')}`;const total=Number((await pool.query(`SELECT count(*)::int total ${base}`,vals)).rows[0].total);vals.push(per,(page-1)*per);const rows=(await pool.query(`SELECT p.*,COALESCE(NULLIF(btrim(pe.preferred_name),''),btrim(concat_ws(' ',pe.first_name,pe.last_name)),au.email) owner_display_name,(p.owner_user_id=$2::uuid) is_owner,COALESCE(us.is_hidden,false) is_hidden,COALESCE(us.is_favorite,p.is_favorite) is_favorite,(SELECT jsonb_agg(jsonb_build_object('id',a.id,'title',a.title)) FROM public.orange_photo_album_items ai JOIN public.orange_photo_albums a ON a.id=ai.album_id WHERE ai.photo_id=p.id) albums,(SELECT jsonb_agg(jsonb_build_object('id',t.id,'name',t.name,'slug',t.slug)) FROM public.orange_photo_tag_items ti JOIN public.orange_photo_tags t ON t.id=ti.tag_id WHERE ti.photo_id=p.id) tags ${base} JOIN public.auth_users au ON au.id=p.owner_user_id LEFT JOIN public.persons pe ON pe.id=au.person_id ORDER BY p.captured_at DESC NULLS LAST,p.created_at DESC,p.id DESC LIMIT $${vals.length-1} OFFSET $${vals.length}`,vals)).rows;const files=rows.length?(await pool.query(`SELECT photo_id,variant,bucket,object_key FROM public.orange_photo_files WHERE photo_id=ANY($1::uuid[]) AND variant IN ('thumbnail','preview','original','poster')`,[rows.map(r=>r.id)])).rows:[];const by=new Map();for(const f of files){if(!by.has(String(f.photo_id)))by.set(String(f.photo_id),{});by.get(String(f.photo_id))[f.variant]=f;}await Promise.all(rows.map(async r=>{const f=by.get(String(r.id))||{};const thumb=f.thumbnail||f.preview||f.original,preview=f.preview||f.original;if(thumb)r.thumbnail_url=await getSignedOrangePhotoUrl(thumb);if(preview)r.preview_url=await getSignedOrangePhotoUrl(preview);r.albums=r.albums||[];r.tags=r.tags||[];}));return ok({items:rows,page,per_page:per,total,has_more:page*per<total});}
 
 async function detail(req,id,{allowTrash=false}={}){const a=resolveAuthenticatedFamily(req);if(!a.ok)return a;if(!uuid(id))return bad(400,"Identificador no válido.");const r=(await pool.query(`SELECT p.*,(p.owner_user_id=$2::uuid) is_owner,COALESCE(us.is_hidden,false) is_hidden,COALESCE(us.is_favorite,p.is_favorite) is_favorite FROM public.orange_photos p LEFT JOIN public.orange_photo_user_settings us ON us.photo_id=p.id AND us.user_id=$2::uuid WHERE p.id=$3::uuid AND p.family_id=$1::uuid AND ${visibilitySql()} AND (p.is_trashed=false OR ($4 AND p.owner_user_id=$2::uuid))`,[a.familyId,a.userId,id,allowTrash])).rows[0];return r?ok({item:r,auth:a}):bad(404,"Foto no encontrada.");}
@@ -301,4 +356,4 @@ async function aroundDate(req) {
   return listSafe(req, { ...(req.query || {}), before: date.toISOString(), page: 1 });
 }
 
-module.exports={familyMembers,createFromExisting,upload,checkUpload,list:listSafe,timeline,aroundDate,detail,update,trash,purge,emptyTrash,signedUrl,download,share,albums,createAlbum,updateAlbum,addPhoto,shareAlbum,tags,createTag,insertPhoto,normalizeMetadata,validateMetadata,findPossibleDuplicate,findExactDuplicate,normalizeDuplicateFilename,uploadModeFor,ok,bad,bool,MIME_EXT,MAX_IMAGE_BYTES,SIMPLE_VIDEO_MAX_BYTES,MAX_VIDEO_BYTES,MULTIPART_PART_BYTES,MULTIPART_UPLOAD_TTL_HOURS};
+module.exports={familyMembers,createFromExisting,upload,uploadDirect,checkUpload,list:listSafe,timeline,aroundDate,detail,update,trash,purge,emptyTrash,signedUrl,download,share,albums,createAlbum,updateAlbum,addPhoto,shareAlbum,tags,createTag,insertPhoto,normalizeMetadata,validateMetadata,findPossibleDuplicate,findExactDuplicate,normalizeDuplicateFilename,uploadModeFor,ok,bad,bool,MIME_EXT,MAX_IMAGE_BYTES,SIMPLE_VIDEO_MAX_BYTES,MAX_VIDEO_BYTES,MULTIPART_PART_BYTES,MULTIPART_UPLOAD_TTL_HOURS};

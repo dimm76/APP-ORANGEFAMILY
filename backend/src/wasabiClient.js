@@ -1,5 +1,6 @@
 /* global require, module, Buffer */
 const { createHash, randomUUID } = require("node:crypto");
+const fs = require("node:fs/promises");
 
 const {
   AbortMultipartUploadCommand,
@@ -130,6 +131,35 @@ async function abortOrangePhotoMultipartUpload(record) {
   const { client, config } = getS3Client();
   const key = assertOrangePhotosStorageKey(record.object_key);
   return client.send(new AbortMultipartUploadCommand({ Bucket:record.bucket || config.bucket, Key:key, UploadId:record.provider_upload_id }));
+}
+
+async function uploadOrangePhotoFileToWasabi(filePath, { familyId, mimeType, extension, originalFilename, sizeBytes, checksumSha256 } = {}) {
+  const { client, config } = getS3Client();
+  const objectKey = buildOrangePhotoObjectKey(familyId, extension);
+  const created = await client.send(new CreateMultipartUploadCommand({ Bucket:config.bucket, Key:objectKey, ContentType:mimeType }));
+  if (!created.UploadId) throw new Error("Wasabi no devolvió un identificador multipart.");
+  const record={bucket:config.bucket,object_key:objectKey,provider_upload_id:String(created.UploadId)};
+  let handle;
+  try {
+    handle=await fs.open(filePath,"r");
+    const parts=[];let position=0,partNumber=1;
+    while(position<Number(sizeBytes)){
+      const buffer=Buffer.allocUnsafe(Math.min(25*1024*1024,Number(sizeBytes)-position));
+      const {bytesRead}=await handle.read(buffer,0,buffer.length,position);
+      if(!bytesRead)throw new Error("El archivo temporal terminó antes de lo esperado.");
+      const uploaded=await client.send(new UploadPartCommand({Bucket:config.bucket,Key:objectKey,UploadId:record.provider_upload_id,PartNumber:partNumber,Body:buffer.subarray(0,bytesRead),ContentLength:bytesRead}));
+      if(!uploaded.ETag)throw new Error("Wasabi no devolvió el ETag de una parte.");
+      parts.push({PartNumber:partNumber,ETag:uploaded.ETag});position+=bytesRead;partNumber+=1;
+    }
+    const completed=await client.send(new CompleteMultipartUploadCommand({Bucket:config.bucket,Key:objectKey,UploadId:record.provider_upload_id,MultipartUpload:{Parts:parts}}));
+    return {provider:"wasabi",bucket:config.bucket,object_key:objectKey,mime_type:mimeType,original_filename:String(originalFilename||"archivo").slice(0,500),size_bytes:Number(sizeBytes),checksum_sha256:checksumSha256,etag:completed.ETag||null};
+  } catch(error) {
+    try{await client.send(new AbortMultipartUploadCommand({Bucket:config.bucket,Key:objectKey,UploadId:record.provider_upload_id}));}
+    catch(abortError){console.error("OrangePhotos server multipart abort",{object_key:objectKey,message:abortError.message});}
+    throw error;
+  } finally {
+    if(handle)try{await handle.close();}catch(error){console.error("OrangePhotos server multipart file close",{object_key:objectKey,message:error.message});}
+  }
 }
 
 async function getSignedOrangePhotoUrl(record) {
@@ -361,4 +391,5 @@ module.exports = {
   getOrangePhotoUploadPartUrl,
   completeOrangePhotoMultipartUpload,
   abortOrangePhotoMultipartUpload,
+  uploadOrangePhotoFileToWasabi,
 };
