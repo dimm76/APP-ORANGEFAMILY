@@ -2,11 +2,17 @@
 
 - Proveedor: Wasabi mediante el cliente S3 ya compartido por OrangeFamily.
 - Bucket conocido: `orangedesk` (la configuración efectiva procede del entorno backend).
-- Objetos legacy: `family_photos/...`; se referencian sin mover, copiar ni renombrar.
-- Nuevos originales: `family_photos/originals/{family_id}/{yyyy}/{mm}/{uuid}.{extension}`.
-- Derivados previstos: `family_photos/previews/...`, `family_photos/thumbnails/...` y posters.
+- Objetos legacy: `family_photos/...`; se leen sin mover, copiar ni renombrar.
+- Nuevos originales: `<WASABI_ENV_PREFIX>/orange-photos/originals/{family_id}/{yyyy}/{mm}/{uuid}.{extension}`.
+- Nuevos derivados: `<WASABI_ENV_PREFIX>/orange-photos/previews/...` y `<WASABI_ENV_PREFIX>/orange-photos/posters/...`.
+- Prefijo local: `app-orangefamily/local`.
+- Prefijo de producción: `app-orangefamily/production`.
 
-PostgreSQL guarda `provider`, `bucket` y `object_key`, nunca una URL permanente. Node valida el prefijo `family_photos/` y entrega URLs firmadas temporales después de autorizar el recurso. Las credenciales permanecen en el backend.
+PostgreSQL guarda `provider`, `bucket` y `object_key`, nunca una URL permanente. Node acepta para lectura el prefijo actual del entorno y el prefijo legacy `family_photos/`, pero solo escribe y lista objetos nuevos dentro del prefijo actual. Las credenciales permanecen en el backend.
+
+Fuera de producción, el borrado definitivo elimina el registro PostgreSQL pero omite expresamente el borrado físico de objetos legacy `family_photos/`. En producción sí puede borrar físicamente esos objetos después de las validaciones de ownership existentes.
+
+La selección de archivos se prepara en un modal: permite arrastrar, elegir y acumular hasta 100 fotos o vídeos admitidos. La subida, comprobación de duplicados y creación de la cola no comienzan hasta pulsar `Iniciar subida`.
 
 Mover una fotografía o vídeo a la Papelera solo actualiza PostgreSQL y no elimina ningún objeto de Wasabi.
 
@@ -15,7 +21,7 @@ El borrado definitivo sí elimina de Wasabi exclusivamente los objetos registrad
 - familia;
 - ownership;
 - estado `is_trashed = true`;
-- prefijo `family_photos/`;
+- prefijo actual del entorno o prefijo legacy `family_photos/`;
 - `bucket` y `object_key` registrados.
 
 El borrado definitivo puede incluir las variantes registradas `original`, `thumbnail`, `preview` y `poster`.

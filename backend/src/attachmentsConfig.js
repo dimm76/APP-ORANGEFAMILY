@@ -61,6 +61,7 @@ function getAttachmentsConfig() {
     accessKeyId,
     secretAccessKey,
     envPrefix,
+    orangePhotosPrefix: `${envPrefix}/orange-photos`,
     maxImageBytes: maxImageMb * 1024 * 1024,
     allowedMimeTypes,
     signedUrlSeconds: SIGNED_URL_SECONDS,
