@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { IonIcon } from "@ionic/react";
+import { checkmarkOutline } from "ionicons/icons";
 import OrangePhotoCard from "./OrangePhotoCard.jsx";
 
 function aspectRatio(photo) {
@@ -43,7 +45,7 @@ function DaySelectionToggle({ photoIds, selected, selectionMode, onSelectMany })
   const checked = selectedCount === photoIds.length && photoIds.length > 0;
   const indeterminate = selectedCount > 0 && !checked;
   useEffect(() => { if (inputRef.current) inputRef.current.indeterminate = indeterminate; }, [indeterminate]);
-  return <label className={`od-orange-photos__day-selection${selectionMode ? " is-selection-mode" : ""}`}><input ref={inputRef} type="checkbox" checked={checked} onChange={() => onSelectMany(photoIds, !checked)} /><span className="od-orange-photo-card__sr">Seleccionar todas las fotografías del día</span></label>;
+  return <label className={`od-orange-photos__day-selection${checked ? " is-selected" : ""}${selectionMode ? " is-selection-mode" : ""}`}><input ref={inputRef} className="od-orange-photo-card__selection-input" type="checkbox" checked={checked} onChange={() => onSelectMany(photoIds, !checked)} /><span className="od-orange-photo-card__selection-circle" aria-hidden="true">{checked || indeterminate ? <IonIcon icon={checkmarkOutline} /> : null}</span><span className="od-orange-photo-card__sr">Seleccionar todas las fotografías del día</span></label>;
 }
 
 export default function OrangePhotosGrid({
@@ -60,12 +62,16 @@ export default function OrangePhotosGrid({
   const [availableWidth, setAvailableWidth] = useState(960);
 
   useEffect(() => {
-    const element = contentRef.current;
-    if (!element) return undefined;
-    const observer = new ResizeObserver(([entry]) => {
-      setAvailableWidth(Math.max(280, entry.contentRect.width));
-    });
-    observer.observe(element);
+    const content = contentRef.current;
+    const container = content?.parentElement;
+    if (!container) return undefined;
+    const updateWidth = () => {
+      const width = container.getBoundingClientRect().width;
+      if (width > 0) setAvailableWidth(Math.max(280, width));
+    };
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(container);
     return () => observer.disconnect();
   }, []);
 
