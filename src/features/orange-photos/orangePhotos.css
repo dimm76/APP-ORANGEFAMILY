@@ -68,7 +68,7 @@
   width: 100%;
   height: 100%;
 }
-.od-orange-photo-card__media video { width:100%; height:100%; display:block; object-fit:cover; }
+.od-orange-photo-card__media video { display:block; width:100%; height:100%; object-fit:cover; background:#111827; }
 .od-orange-photo-card__video-placeholder { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; background:#1e293b; color:#fff; }
 .od-orange-photo-card__video-placeholder b { font-size:28px; }.od-orange-photo-card__video-placeholder span { font-size:12px; font-weight:600; }
 
@@ -290,4 +290,14 @@
 .od-attachments-lightbox__btn.is-selected { color:#fc4200; background:#fff8f5; }
 .od-orangephotos-empty-trash { min-height:36px; display:inline-flex; align-items:center; gap:6px; padding:0 8px; border:0; border-radius:8px; background:transparent; color:#334155; font:600 12px inherit; cursor:pointer; }
 .od-orangephotos-empty-trash:hover { color:#a63a3a; background:#fff7f7; }
-.od-orange-photos-modal__footer { display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-top:18px; }.od-orange-photos-modal__footer .od-btn { width:auto; min-width:96px; }.od-orange-photos-modal__footer .od-btn-primary { min-width:132px; }
+.od-orange-photos-modal__footer { display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-top:18px; }
+
+.od-btn { display:inline-flex; align-items:center; justify-content:center; min-height:34px; width:auto; padding:0 14px; border:1px solid transparent; border-radius:8px; font-family:inherit; font-size:13px; font-weight:600; line-height:1; cursor:pointer; transition:background-color 120ms ease,border-color 120ms ease,color 120ms ease; }
+.od-btn:disabled { opacity:.5; cursor:default; }
+.od-btn-secondary { border-color:#dce3f5; background:#fff; color:#334155; }
+.od-btn-secondary:hover:not(:disabled) { border-color:#cbd5e1; background:#f8fafc; }
+.od-btn-primary { min-width:126px; border-color:#fc4200; background:#fc4200; color:#fff; }
+.od-btn-primary:hover:not(:disabled) { border-color:#e83d00; background:#e83d00; }
+.od-btn-danger { border-color:#fecaca; background:#fff7f7; color:#b42318; }
+.od-btn-danger:hover:not(:disabled) { border-color:#b42318; background:#b42318; color:#fff; }
+.od-btn:focus-visible { outline:2px solid #94a3b8; outline-offset:2px; }
