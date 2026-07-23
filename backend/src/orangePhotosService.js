@@ -2,7 +2,7 @@
 /* global require, module */
 const pool = require("../db");
 const { resolveAuthenticatedFamily } = require("./attachmentsService");
-const { assertOrangePhotosStorageKey, getSignedOrangePhotoUrl, getOrangePhotoObjectStream, uploadOrangePhotoToWasabi } = require("./wasabiClient");
+const { assertOrangePhotosStorageKey, deleteOrangePhotoObject, getSignedOrangePhotoUrl, getOrangePhotoObjectStream, uploadOrangePhotoToWasabi } = require("./wasabiClient");
 const exifr = require("exifr");
 
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -90,12 +90,50 @@ async function listSafe(req, queryOverride = null) {
 }
 
 async function timeline(req) {
-  const query = { ...(req.query || {}) }; delete query.before; delete query.page; delete query.per_page;
-  const context = buildPhotoQuery(req, query); if (!context.ok) return context;
+  const query = { ...(req.query || {}) };
+  delete query.before;
+  delete query.page;
+  delete query.per_page;
+
+  const context = buildPhotoQuery(req, query);
+  if (!context.ok) return context;
+
   const { values, joins, condition } = context.payload;
-  const rows = (await pool.query(`SELECT EXTRACT(YEAR FROM p.captured_at)::int year,EXTRACT(MONTH FROM p.captured_at)::int month,count(*)::int count,MAX(p.captured_at) first_captured_at ${joins} ${condition} GROUP BY 1,2 ORDER BY 1 DESC NULLS LAST,2 DESC NULLS LAST`, values)).rows;
-  const years = new Map(); for (const row of rows) { const key = row.year == null ? "unknown" : String(row.year); if (!years.has(key)) years.set(key, { year: row.year, months: [] }); years.get(key).months.push({ month: row.month, count: row.count, first_captured_at: row.first_captured_at, cursor: row.first_captured_at }); }
+  const rows = (
+    await pool.query(
+      `SELECT EXTRACT(YEAR FROM p.captured_at)::int AS year, EXTRACT(MONTH FROM p.captured_at)::int AS month, COUNT(*)::int AS count, MAX(p.captured_at) AS first_captured_at ${joins} ${condition} AND p.captured_at IS NOT NULL GROUP BY EXTRACT(YEAR FROM p.captured_at), EXTRACT(MONTH FROM p.captured_at) ORDER BY EXTRACT(YEAR FROM p.captured_at) DESC, EXTRACT(MONTH FROM p.captured_at) DESC`,
+      values
+    )
+  ).rows;
+  const years = new Map();
+  for (const row of rows) {
+    if (!years.has(row.year)) years.set(row.year, { year: row.year, months: [] });
+    years.get(row.year).months.push({ month: row.month, count: row.count, first_captured_at: row.first_captured_at, cursor: row.first_captured_at });
+  }
   return ok({ items: [...years.values()] });
+}
+
+async function purge(req, id) {
+  const detailResult = await detail(req, id, { allowTrash: true });
+  if (!detailResult.ok) return detailResult;
+  const photo = detailResult.payload.item, auth = detailResult.payload.auth;
+  if (!photo.is_owner) return bad(403, "Solo el propietario puede eliminar definitivamente la foto.");
+  if (!photo.is_trashed) return bad(409, "La foto debe estar en la papelera antes de eliminarla definitivamente.");
+  const files = (await pool.query(`SELECT id,bucket,object_key,variant FROM public.orange_photo_files WHERE family_id=$1::uuid AND photo_id=$2::uuid ORDER BY CASE variant WHEN 'thumbnail' THEN 1 WHEN 'preview' THEN 2 WHEN 'poster' THEN 3 WHEN 'original' THEN 4 ELSE 5 END`, [auth.familyId, id])).rows;
+  for (const file of files) await deleteOrangePhotoObject(file);
+  await pool.query(`DELETE FROM public.orange_photos WHERE family_id=$1::uuid AND id=$2::uuid AND owner_user_id=$3::uuid AND is_trashed=true`, [auth.familyId, id, auth.userId]);
+  return ok({ deleted: true, id, deleted_files: files.length });
+}
+
+async function emptyTrash(req) {
+  const auth = resolveAuthenticatedFamily(req); if (!auth.ok) return auth;
+  const ids = (await pool.query(`SELECT id FROM public.orange_photos WHERE family_id=$1::uuid AND owner_user_id=$2::uuid AND is_trashed=true ORDER BY trashed_at ASC,id ASC`, [auth.familyId, auth.userId])).rows.map(row => row.id);
+  let deleted = 0; const failed = [];
+  for (const id of ids) {
+    try { const result = await purge(req, id); if (result.ok) deleted += 1; else failed.push({ id, message: result.reason }); }
+    catch (error) { failed.push({ id, message: error.message }); }
+  }
+  return ok({ total: ids.length, deleted, failed });
 }
 
 async function aroundDate(req) {
@@ -103,4 +141,4 @@ async function aroundDate(req) {
   return listSafe(req, { ...(req.query || {}), before: date.toISOString(), page: 1 });
 }
 
-module.exports={familyMembers,createFromExisting,upload,list:listSafe,timeline,aroundDate,detail,update,trash,signedUrl,download,share,albums,createAlbum,updateAlbum,addPhoto,shareAlbum,tags,createTag,MAX_VIDEO_BYTES};
+module.exports={familyMembers,createFromExisting,upload,list:listSafe,timeline,aroundDate,detail,update,trash,purge,emptyTrash,signedUrl,download,share,albums,createAlbum,updateAlbum,addPhoto,shareAlbum,tags,createTag,MAX_VIDEO_BYTES};

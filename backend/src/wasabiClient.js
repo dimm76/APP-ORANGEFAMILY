@@ -292,11 +292,28 @@ async function deleteObjectFromWasabi(record) {
   );
 }
 
+async function deleteOrangePhotoObject(record) {
+  const { client, config } = getS3Client();
+  const key = assertOrangePhotosStorageKey(record.object_key);
+
+  await sendWithTimeout(
+    client,
+    new DeleteObjectCommand({
+      Bucket: record.bucket || config.bucket,
+      Key: key,
+    }),
+    30000,
+    "DeleteObject",
+    key
+  );
+}
+
 module.exports = {
   uploadImageToWasabi,
   getSignedUrlForStorageKey,
   getObjectBufferFromWasabi,
   deleteObjectFromWasabi,
+  deleteOrangePhotoObject,
   assertOrangePhotosStorageKey,
   uploadOrangePhotoToWasabi,
   getSignedOrangePhotoUrl,

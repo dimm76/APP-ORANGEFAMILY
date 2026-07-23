@@ -41,9 +41,11 @@ function handleOrangePhotosRoutes(app) {
   app.get("/api/orange-photos", safe(req => service.list(req), "No se pudo cargar la biblioteca."));
   app.get("/api/orange-photos/timeline", safe(req => service.timeline(req), "No se pudo cargar la navegación temporal."));
   app.get("/api/orange-photos/around-date", safe(req => service.aroundDate(req), "No se pudo cargar el periodo solicitado."));
+  app.delete("/api/orange-photos/trash", safe(req => service.emptyTrash(req), "No se pudo vaciar la papelera."));
   app.get("/api/orange-photos/:id", safe(req => service.detail(req, req.params.id, { allowTrash: true }), "No se pudo cargar la foto."));
   app.post("/api/orange-photos", async (req, res) => { try { if (String(req.headers["content-type"] || "").startsWith("multipart/form-data")) { const parsed = await multipart(req, service.MAX_VIDEO_BYTES); return send(res, await service.upload(req, parsed.file, parsed.fields, parsed.poster), 201); } return send(res, await service.createFromExisting(req, req.body || {}), 201); } catch (error) { console.error("OrangePhotos upload", error); return res.status(400).json({ ok: false, message: error.message || "Subida no válida." }); } });
   app.patch("/api/orange-photos/:id", safe(req => service.update(req, req.params.id, req.body || {}), "No se pudo actualizar la foto."));
+  app.delete("/api/orange-photos/:id", safe(req => service.purge(req, req.params.id), "No se pudo eliminar definitivamente la foto."));
   app.post("/api/orange-photos/:id/trash", safe(req => service.trash(req, req.params.id), "No se pudo mover a la papelera."));
   app.post("/api/orange-photos/:id/restore", safe(req => service.trash(req, req.params.id, true), "No se pudo restaurar la foto."));
   app.get("/api/orange-photos/:id/url", safe(req => service.signedUrl(req, req.params.id), "No se pudo firmar la URL."));
