@@ -4,7 +4,7 @@ function send(res, result, successStatus = 200) {
   if (!result.ok) return res.status(result.status || 500).json({ ok: false, message: result.reason || "No se pudo completar la operación." });
   return res.status(result.status || successStatus).json({ ok: true, ...result.payload });
 }
-function safe(handler, successStatus) { return async (req, res) => { try { return send(res, await handler(req), successStatus); } catch (error) { console.error("Family members request failed:", error.message); return res.status(500).json({ ok: false, message: "No se pudo completar la operación." }); } }; }
+function safe(handler, successStatus) { return async (req, res) => { try { return send(res, await handler(req), successStatus); } catch (error) { console.error("Family members request failed", { method: req.method, url: req.originalUrl, message: error.message, code: error.code, stack: error.stack }); return res.status(500).json({ ok: false, message: "No se pudo completar la operación." }); } }; }
 
 function handleFamilyMembersRoutes(app) {
   app.get("/api/settings/family-members", safe((req) => service.list(req)));

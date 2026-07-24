@@ -16,7 +16,9 @@ function resolveOwner(req) {
 
 function normalizeInput(body, partial = false) {
   const value = body && typeof body === "object" ? body : {};
-  const allowed = new Set(["first_name", "last_name", "email", "membership_status", "has_access"]);
+  const allowed = new Set(partial
+    ? ["first_name", "last_name", "email", "membership_status", "has_access"]
+    : ["first_name", "last_name", "email"]);
   if (Object.keys(value).some((key) => !allowed.has(key))) return bad(400, "El formulario contiene campos no permitidos.");
   const result = {};
   if (!partial || Object.hasOwn(value, "first_name")) {
@@ -27,7 +29,7 @@ function normalizeInput(body, partial = false) {
     result.last_name = String(value.last_name || "").trim() || null;
     if (result.last_name && result.last_name.length > 160) return bad(400, "Los apellidos no pueden superar 160 caracteres.");
   }
-  if (!partial || Object.hasOwn(value, "has_access")) {
+  if (partial && Object.hasOwn(value, "has_access")) {
     if (typeof value.has_access !== "boolean") return bad(400, "El acceso debe ser verdadero o falso.");
     result.has_access = value.has_access;
   }
@@ -35,11 +37,11 @@ function normalizeInput(body, partial = false) {
     result.email = String(value.email || "").trim().toLowerCase() || null;
     if (result.email && (!emailRe.test(result.email) || result.email.length > 320)) return bad(400, "El email no es válido.");
   }
-  if (Object.hasOwn(value, "membership_status")) {
+  if (partial && Object.hasOwn(value, "membership_status")) {
     if (!["active", "inactive"].includes(value.membership_status)) return bad(400, "El estado del familiar no es válido.");
     result.membership_status = value.membership_status;
   }
-  if (result.has_access === true && !result.email && !partial) return bad(400, "El email es obligatorio para permitir acceso.");
+  if (!partial && !result.email) return bad(400, "El email es obligatorio.");
   return { ok: true, value: result };
 }
 
@@ -74,16 +76,14 @@ function dbError(error) {
 async function create(req, body) {
   const owner = resolveOwner(req); if (!owner.ok) return owner;
   const input = normalizeInput(body); if (!input.ok) return input;
-  const client = await pool.connect(); let token = null; let row;
+  const client = await pool.connect(); let token; let row;
   try {
     await client.query("BEGIN");
     const person = await client.query(`INSERT INTO public.persons(first_name,last_name) VALUES($1,$2) RETURNING id`, [input.value.first_name, input.value.last_name]);
     await client.query(`INSERT INTO public.family_memberships(family_id,person_id,role,status) VALUES($1,$2,'member','active')`, [owner.familyId, person.rows[0].id]);
-    if (input.value.has_access) {
-      const user = await client.query(`INSERT INTO public.auth_users(person_id,email,status,password_hash,email_verified) VALUES($1,$2,'pending',NULL,false) RETURNING id`, [person.rows[0].id, input.value.email]);
-      token = await activationToken(client, user.rows[0].id);
-    }
-    await audit(client, owner, "family_member_created", person.rows[0].id, null, { first_name: input.value.first_name, last_name: input.value.last_name, email: input.value.email, has_access: input.value.has_access });
+    const user = await client.query(`INSERT INTO public.auth_users(person_id,email,status,password_hash,email_verified) VALUES($1,$2,'pending',NULL,false) RETURNING id`, [person.rows[0].id, input.value.email]);
+    token = await activationToken(client, user.rows[0].id);
+    await audit(client, owner, "family_member_created", person.rows[0].id, null, { first_name: input.value.first_name, last_name: input.value.last_name, email: input.value.email });
     row = (await client.query(`${selectMembers} WHERE fm.family_id=$1 AND p.id=$2`, [owner.familyId, person.rows[0].id])).rows[0];
     await client.query("COMMIT");
   } catch (error) { await client.query("ROLLBACK").catch(() => {}); return dbError(error); } finally { client.release(); }

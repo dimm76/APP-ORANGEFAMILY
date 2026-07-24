@@ -11,12 +11,14 @@ Un `owner` con membership activa conserva el acceso completo actual. Un `member`
 Rutas autenticadas y exclusivas del `owner`:
 
 - `GET /api/settings/family-members`: lista los familiares de la familia obtenida de la sesión.
-- `POST /api/settings/family-members`: crea persona, membership `member` y, si se solicita acceso, cuenta pendiente e invitación.
+- `POST /api/settings/family-members`: crea siempre una persona, una membership `member`, una cuenta pendiente y una invitación.
 - `PATCH /api/settings/family-members/:personId`: modifica los campos permitidos, el estado de membership y el acceso.
 - `POST /api/settings/family-members/:personId/resend-invitation`: invalida invitaciones anteriores y genera una nueva.
 - `POST /api/settings/family-members/:personId/send-password-reset`: solicita recuperación para una cuenta activa.
 
 El propietario no puede editarse ni desactivarse desde esta funcionalidad. El backend obtiene usuario, familia y rol exclusivamente de la sesión y comprueba el ownership del recurso.
+
+`Ajustes > Familiares` crea siempre familiares con acceso a OrangeFamily. El alta exige email y genera una cuenta pendiente con su invitación. Las personas sin acceso se crean y administran desde el módulo Personas. El acceso de un familiar ya creado puede desactivarse posteriormente desde su edición.
 
 ## Activación y recuperación
 
