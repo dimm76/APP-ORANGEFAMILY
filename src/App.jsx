@@ -4,6 +4,9 @@ import AppLayout from "./app/AppLayout.jsx";
 import AttachmentsLibraryPage from "./app/AttachmentsLibraryPage.jsx";
 import WikiPage, { WikiPublicPage } from "./features/wiki/WikiPage.jsx";
 import OrangePhotosPage from "./features/orange-photos/OrangePhotosPage.jsx";
+import FamilyMembersPage from "./features/settings/FamilyMembersPage.jsx";
+import AuthActionPage from "./app/AuthActionPage.jsx";
+import { useAuth } from "./app/authContext.js";
 import "./App.css";
 
 const OD_NAV_EVENT = "od-spa-navigate";
@@ -60,6 +63,8 @@ function ModulePlaceholder({ title, description }) {
 
 function AppContent() {
   const [pathname, setPathname] = useState(currentPathname);
+  const { user } = useAuth();
+  const isOwner = user?.families?.some((family) => family.role === "owner");
 
   useEffect(() => {
     const syncPathname = () => setPathname(currentPathname());
@@ -71,12 +76,21 @@ function AppContent() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isOwner && !pathname.startsWith("/app/orangephotos")) {
+      window.history.replaceState({}, "", "/app/orangephotos");
+      window.dispatchEvent(new Event(OD_NAV_EVENT));
+    }
+  }, [isOwner, pathname]);
+
   const route = ROUTES[pathname] || ROUTES["/"];
 
   return (
     <AppLayout>
       {pathname === "/app/settings/attachments" ? (
         <AttachmentsLibraryPage />
+      ) : pathname === "/app/settings/family" ? (
+        <FamilyMembersPage />
       ) : pathname === "/app/wiki" || pathname.startsWith("/app/wiki/") ? (
         <WikiPage />
       ) : pathname.startsWith("/app/orangephotos") || pathname === "/app/orange-photos" ? (
@@ -94,6 +108,8 @@ function App() {
     const token = decodeURIComponent(pathname.slice("/public/wiki/".length)).trim();
     return <WikiPublicPage token={token} />;
   }
+  if (pathname === "/activate") return <AuthActionPage mode="activate" />;
+  if (pathname === "/reset-password") return <AuthActionPage mode="reset" />;
   return (
     <AuthGate>
       <AppContent />

@@ -106,6 +106,10 @@
   font-size: 0.875rem;
 }
 
+.od-login-page__notice { margin: 0 0 12px; padding: 8px 10px; border: 1px solid #bbf7d0; border-radius: 8px; background: #f0fdf4; color: #166534; font-size: 0.875rem; }
+.od-login-page__forgot { display: block; margin: 12px auto 0; padding: 4px; border: 0; background: transparent; color: #475569; font: 600 13px inherit; cursor: pointer; }
+.od-login-page__forgot:hover { color: var(--od-color-primary, #fc4200); }
+
 .od-login-page__submit {
   --background: #fc4200;
   --background-activated: #e03b00;

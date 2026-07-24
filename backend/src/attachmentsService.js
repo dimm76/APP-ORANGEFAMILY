@@ -15,6 +15,9 @@ function resolveAuthenticatedFamily(req) {
   if (!family?.id || !isUuid(family.id)) {
     return { ok: false, status: 403, reason: "El usuario no tiene una familia activa." };
   }
+  if (!["owner", "member"].includes(String(family.role || ""))) {
+    return { ok: false, status: 403, reason: "El rol familiar no tiene acceso a este módulo." };
+  }
   return { ok: true, userId: String(req.user.id), familyId: String(family.id), membership: family, role: family.role || null };
 }
 

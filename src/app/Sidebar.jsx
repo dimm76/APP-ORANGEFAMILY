@@ -9,7 +9,7 @@ import {
   folderOutline,
   homeOutline,
   imagesOutline,
-  attachOutline,
+  settingsOutline,
   logOutOutline,
   peopleOutline,
   walletOutline,
@@ -28,7 +28,7 @@ const NAV_ITEMS = [
   { label: "Wiki", href: "/app/wiki", icon: bookOutline },
   { label: "OrangePhotos", href: "/app/orangephotos", icon: imagesOutline },
   { label: "Notas", href: "/app/notas", icon: documentTextOutline },
-  { label: "Attachments", href: "/app/settings/attachments", icon: attachOutline },
+  { label: "Ajustes", href: "/app/settings/family", icon: settingsOutline },
 ];
 
 function currentPathname() {
@@ -41,7 +41,7 @@ function spaNavigate(href) {
 }
 
 export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [pathname, setPathname] = useState(currentPathname);
 
   useEffect(() => {
@@ -59,7 +59,10 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
     onNavigate?.();
   }
 
-  if (pathname.startsWith("/app/orangephotos")) {
+  const isOwner = user?.families?.some((family) => family.role === "owner");
+  const visibleItems = isOwner ? NAV_ITEMS : NAV_ITEMS.filter((item) => item.href === "/app/orangephotos");
+
+  if (isOwner && pathname.startsWith("/app/orangephotos")) {
     return <OrangePhotosSidebar pathname={pathname} onNavigate={onNavigate} />;
   }
 
@@ -67,10 +70,10 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
     <div className="od-sidebar-inner">
       <nav className="od-sidebar-nav" aria-label="Secciones">
         <IonList lines="none" className="od-sidebar-list">
-          {NAV_ITEMS.map((item) => (
+          {visibleItems.map((item) => (
             <IonItem
               key={item.href}
-              className={`od-main-item ${pathname === item.href || (item.href === "/app/wiki" && pathname.startsWith("/app/wiki/")) ? "od-item-active" : ""}`}
+              className={`od-main-item ${pathname === item.href || (item.href === "/app/wiki" && pathname.startsWith("/app/wiki/")) || (item.href === "/app/settings/family" && pathname.startsWith("/app/settings/")) ? "od-item-active" : ""}`}
               button
               detail={false}
               lines="none"

@@ -1,0 +1,8 @@
+.of-settings-links { display:flex; gap:8px; }
+.of-settings-links a { min-height:32px; display:inline-flex; align-items:center; padding:0 10px; border:1px solid #dce3f5; border-radius:8px; background:#fff; color:#334155; font-size:13px; font-weight:600; text-decoration:none; }
+.of-settings-links a:hover { border-color:#cbd5e1; color:var(--od-color-primary); }
+.of-family-form { padding:14px; border:1px solid #dce3f5; border-radius:10px; background:#fff; }
+.of-family-form__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.of-family-form__check { display:flex; align-items:center; gap:7px; margin-top:12px; color:#334155; font-size:13px; }
+.of-family-actions { display:flex; flex-wrap:wrap; gap:6px; }
+@media (max-width:700px) { .of-family-form__grid { grid-template-columns:1fr; } }

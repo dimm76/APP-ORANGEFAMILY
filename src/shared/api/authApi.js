@@ -59,3 +59,13 @@ export async function postAuthLogout() {
   });
   return data;
 }
+
+async function publicAuthPost(path, body) {
+  const { ok, data } = await authRequest(path, { method: "POST", body: JSON.stringify(body) });
+  if (!ok) throw new Error(data?.message || "No se pudo completar la operación.");
+  return data;
+}
+
+export const postForgotPassword = (email) => publicAuthPost("/api/auth/forgot-password", { email: String(email || "").trim().toLowerCase() });
+export const postActivate = (token, password) => publicAuthPost("/api/auth/activate", { token, password });
+export const postResetPassword = (token, password) => publicAuthPost("/api/auth/reset-password", { token, password });

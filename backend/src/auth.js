@@ -1,7 +1,8 @@
 const { createHash, randomBytes } = require("node:crypto");
 const { isIP } = require("node:net");
 const pool = require("../db");
-const { verifyPassword } = require("./passwordCrypto");
+const { hashPassword, verifyPassword } = require("./passwordCrypto");
+const { sendPasswordResetEmail } = require("./mailService");
 
 const SESSION_COOKIE_NAME = "of_session";
 const MAX_FAILED_LOGINS = 8;
@@ -23,6 +24,10 @@ function cookieSecure() {
 
 function hashSessionToken(token) {
   return createHash("sha256").update(token, "utf8").digest("hex");
+}
+
+function createSecureToken() {
+  return randomBytes(32).toString("base64url");
 }
 
 function parseCookieHeader(req) {
@@ -316,10 +321,92 @@ async function handleAuthMe(req) {
   return { status: 200, body: { ok: true, user: toPublicUser(req.user) } };
 }
 
+function validNewPassword(value) {
+  return typeof value === "string" && value.length >= 10;
+}
+
+async function handleAuthActivate(req) {
+  const token = req.body && typeof req.body.token === "string" ? req.body.token.trim() : "";
+  const password = req.body && req.body.password;
+  if (!token || !validNewPassword(password)) return { status: 400, body: { ok: false, message: "Token y contraseña de al menos 10 caracteres son obligatorios." } };
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const found = await client.query(
+      `SELECT t.id, t.user_id FROM public.auth_activation_tokens t
+       INNER JOIN public.auth_users u ON u.id=t.user_id
+       WHERE t.token_hash=$1 AND t.used_at IS NULL AND t.expires_at>now() AND u.status='pending'
+       FOR UPDATE`,
+      [hashSessionToken(token)]
+    );
+    const row = found.rows[0];
+    if (!row) { await client.query("ROLLBACK"); return { status: 400, body: { ok: false, message: "El enlace de activación no es válido o ha caducado." } }; }
+    await client.query(`UPDATE public.auth_users SET password_hash=$2,status='active',email_verified=true,failed_login_count=0,locked_until=NULL WHERE id=$1`, [row.user_id, hashPassword(password)]);
+    await client.query(`UPDATE public.auth_activation_tokens SET used_at=now() WHERE user_id=$1 AND used_at IS NULL`, [row.user_id]);
+    await client.query("COMMIT");
+    return { status: 200, body: { ok: true } };
+  } catch {
+    await client.query("ROLLBACK").catch(() => {});
+    return { status: 503, body: { ok: false, message: "No se pudo activar la cuenta." } };
+  } finally { client.release(); }
+}
+
+async function createPasswordResetForUser(queryable, userId) {
+  const token = createSecureToken();
+  await queryable.query(`UPDATE public.auth_password_reset_tokens SET used_at=now() WHERE user_id=$1::uuid AND used_at IS NULL`, [userId]);
+  await queryable.query(`INSERT INTO public.auth_password_reset_tokens(user_id,token_hash,expires_at) VALUES($1::uuid,$2,now()+interval '60 minutes')`, [userId, hashSessionToken(token)]);
+  return token;
+}
+
+async function handleAuthForgotPassword(req) {
+  const generic = { status: 200, body: { ok: true, message: "Si existe una cuenta asociada, recibirás un correo." } };
+  const email = normalizeEmail(req.body && req.body.email);
+  if (!email) return generic;
+  try {
+    const found = await pool.query(`SELECT u.id,u.email,p.first_name,p.last_name FROM public.auth_users u LEFT JOIN public.persons p ON p.id=u.person_id WHERE lower(btrim(u.email))=$1 AND u.status='active' AND u.password_hash IS NOT NULL LIMIT 1`, [email]);
+    const user = found.rows[0];
+    if (!user) return generic;
+    const token = await createPasswordResetForUser(pool, user.id);
+    await insertAuditLog(pool, user.id, "password_reset_requested", req);
+    await sendPasswordResetEmail({ to: user.email, displayName: [user.first_name, user.last_name].filter(Boolean).join(" "), token });
+  } catch (error) {
+    console.error("Password reset email failed:", error.message);
+  }
+  return generic;
+}
+
+async function handleAuthResetPassword(req) {
+  const token = req.body && typeof req.body.token === "string" ? req.body.token.trim() : "";
+  const password = req.body && req.body.password;
+  if (!token || !validNewPassword(password)) return { status: 400, body: { ok: false, message: "Token y contraseña de al menos 10 caracteres son obligatorios." } };
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const found = await client.query(`SELECT t.id,t.user_id FROM public.auth_password_reset_tokens t INNER JOIN public.auth_users u ON u.id=t.user_id WHERE t.token_hash=$1 AND t.used_at IS NULL AND t.expires_at>now() AND u.status='active' FOR UPDATE OF t,u`, [hashSessionToken(token)]);
+    const row = found.rows[0];
+    if (!row) { await client.query("ROLLBACK"); return { status: 400, body: { ok: false, message: "El enlace de recuperación no es válido o ha caducado." } }; }
+    await client.query(`UPDATE public.auth_users SET password_hash=$2,status='active',failed_login_count=0,locked_until=NULL WHERE id=$1`, [row.user_id, hashPassword(password)]);
+    await client.query(`UPDATE public.auth_password_reset_tokens SET used_at=now() WHERE user_id=$1 AND used_at IS NULL`, [row.user_id]);
+    await client.query(`UPDATE public.auth_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL`, [row.user_id]);
+    await client.query(`INSERT INTO public.audit_logs(user_id,action,entity_type,entity_id) VALUES($1,'password_reset_completed','auth_user',$1)`, [row.user_id]);
+    await client.query("COMMIT");
+    return { status: 200, body: { ok: true } };
+  } catch {
+    await client.query("ROLLBACK").catch(() => {});
+    return { status: 503, body: { ok: false, message: "No se pudo actualizar la contraseña." } };
+  } finally { client.release(); }
+}
+
 module.exports = {
   SESSION_COOKIE_NAME,
   attachAuthToRequest,
   handleAuthLogin,
   handleAuthLogout,
   handleAuthMe,
+  handleAuthActivate,
+  handleAuthForgotPassword,
+  handleAuthResetPassword,
+  createPasswordResetForUser,
+  createSecureToken,
+  hashToken: hashSessionToken,
 };
