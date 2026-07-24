@@ -29,4 +29,4 @@ Etiquetas: `GET/POST /api/orange-photo-tags`. Miembros seleccionables: `GET /api
 
 ## Limitaciones actuales
 
-No se generan derivados de forma asíncrona: la UI usa thumbnail, preview y finalmente original. Sin dependencias nuevas, se extraen dimensiones básicas de JPEG/PNG/WEBP, pero EXIF completo, HEIC y metadatos de vídeo requieren un procesador futuro. No hay enlaces públicos, geocodificación, reconocimiento, deduplicación, borrado definitivo ni importación legacy.
+No se generan derivados de forma asíncrona: la UI usa thumbnail, preview y finalmente original. Sin dependencias nuevas, se extraen dimensiones básicas de JPEG/PNG/WEBP. OrangePhotos intenta extraer EXIF de HEIC mediante `exifr`, sin garantizar compatibilidad con todos los archivos; si la extracción falla o no contiene una fecha válida, mantiene el fallback a `file_mtime` y después a la fecha de subida. El EXIF completo y los metadatos de vídeo requieren un procesador futuro. No hay enlaces públicos, geocodificación, reconocimiento, deduplicación, borrado definitivo ni importación legacy.
