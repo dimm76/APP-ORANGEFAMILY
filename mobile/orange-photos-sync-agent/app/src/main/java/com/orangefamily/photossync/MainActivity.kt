@@ -38,6 +38,7 @@ import com.orangefamily.photossync.media.MediaPermissions
 import com.orangefamily.photossync.ui.LoginScreen
 import com.orangefamily.photossync.ui.StatusScreen
 import com.orangefamily.photossync.ui.theme.OrangeFamilyPhotosSyncTheme
+import com.orangefamily.photossync.sync.OrangePhotosSyncScheduler
 
 class MainActivity : ComponentActivity() {
     private lateinit var authController: AuthController
@@ -60,6 +61,7 @@ class MainActivity : ComponentActivity() {
         cameraBackupController = CameraBackupController(
             repository = CameraBackupRepository(database),
             scanner = CameraMediaScanner(applicationContext),
+            scheduler = OrangePhotosSyncScheduler(applicationContext),
         )
         mediaPermissionAccess = MediaPermissions.evaluate(this)
         authController.restore(lifecycleScope)
@@ -157,7 +159,7 @@ private fun AuthContent(
                 onRequestMediaPermission = onRequestMediaPermission,
                 onOpenPermissionSettings = onOpenPermissionSettings,
                 onActivate = { cameraBackupController.activate(scope) },
-                onScan = { cameraBackupController.scan(scope) },
+                onScan = { cameraBackupController.syncNow(scope) },
                 onLogout = onLogout,
                 modifier = modifier,
             )

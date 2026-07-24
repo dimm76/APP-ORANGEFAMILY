@@ -41,4 +41,11 @@
     <string name="media_image">Foto</string>
     <string name="media_video">Vídeo</string>
     <string name="pending_status">Pendiente</string>
+    <string name="sync_now">Sincronizar ahora</string>
+    <string name="sync_enqueued">Sincronización encolada…</string>
+    <string name="sync_pending">Pendientes de sincronización</string>
+    <string name="sync_failed">Fallidos</string>
+    <string name="sync_uploaded">Subidos</string>
+    <string name="sync_suppressed">Suprimidos</string>
+    <string name="sync_restore_available">Restauración disponible</string>
 </resources>

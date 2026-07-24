@@ -7,16 +7,20 @@ import com.orangefamily.photossync.data.AgentConfig
 import com.orangefamily.photossync.data.CameraBackupRepository
 import com.orangefamily.photossync.data.LocalMediaItem
 import com.orangefamily.photossync.data.PendingCounts
+import com.orangefamily.photossync.data.SyncCounts
 import com.orangefamily.photossync.media.CameraMediaScanner
 import com.orangefamily.photossync.media.MediaPermissionAccess
+import com.orangefamily.photossync.sync.OrangePhotosSyncScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class CameraBackupController(
     private val repository: CameraBackupRepository,
     private val scanner: CameraMediaScanner,
+    private val scheduler: OrangePhotosSyncScheduler,
 ) {
     var state by mutableStateOf(CameraBackupState())
         private set
@@ -37,8 +41,10 @@ class CameraBackupController(
                 config = snapshot.config,
                 counts = snapshot.counts,
                 latestPending = snapshot.latestPending,
+                syncCounts = snapshot.syncCounts,
                 loading = false,
             )
+            if (snapshot.config?.enabled == true) scheduler.ensurePeriodic(userId)
         }
     }
 
@@ -61,28 +67,25 @@ class CameraBackupController(
             if (outcome.isFailure) {
                 state = state.copy(busy = false, error = SCAN_ERROR)
             } else {
+                scheduler.ensurePeriodic(userId)
+                scheduler.enqueueNow(userId)
                 refresh(userId)
             }
         }
     }
 
-    fun scan(scope: CoroutineScope) {
+    fun syncNow(scope: CoroutineScope) {
         val userId = accountUserId ?: return
         val config = state.config ?: return
         if (!config.enabled || state.permission != MediaPermissionAccess.FULL || state.busy) return
         state = state.copy(busy = true, error = null)
         scope.launch {
-            val outcome = withContext(Dispatchers.IO) {
-                runCatching {
-                    val snapshot = repository.snapshot(userId)
-                    val result = scanner.scan(userId, snapshot.baselines)
-                    repository.recordScan(userId, result, System.currentTimeMillis())
-                }
-            }
+            val outcome = runCatching { scheduler.enqueueNow(userId) }
             if (accountUserId != userId) return@launch
             if (outcome.isFailure) {
                 state = state.copy(busy = false, error = SCAN_ERROR)
             } else {
+                delay(1_500)
                 refresh(userId)
             }
         }
@@ -95,6 +98,7 @@ class CameraBackupController(
             config = snapshot.config,
             counts = snapshot.counts,
             latestPending = snapshot.latestPending,
+            syncCounts = snapshot.syncCounts,
             loading = false,
             busy = false,
             error = null,
@@ -107,6 +111,7 @@ class CameraBackupController(
         val config: AgentConfig? = null,
         val counts: PendingCounts = PendingCounts(0, 0),
         val latestPending: List<LocalMediaItem> = emptyList(),
+        val syncCounts: SyncCounts = SyncCounts(0, 0, 0, 0, 0),
         val loading: Boolean = false,
         val busy: Boolean = false,
         val error: String? = null,

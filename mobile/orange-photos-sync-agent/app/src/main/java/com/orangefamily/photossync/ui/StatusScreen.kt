@@ -17,17 +17,24 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import com.orangefamily.photossync.R
 import com.orangefamily.photossync.auth.AuthUser
 import com.orangefamily.photossync.backup.CameraBackupController.CameraBackupState
 import com.orangefamily.photossync.data.LocalMediaItem
+import com.orangefamily.photossync.data.CameraBackupRepository
+import com.orangefamily.photossync.data.OrangePhotosLocalDatabase
 import com.orangefamily.photossync.media.MediaPermissionAccess
 import java.text.DateFormat
 import java.util.Date
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun StatusScreen(
@@ -102,6 +109,18 @@ private fun CameraBackupCard(
     onScan: () -> Unit,
 ) {
     val config = state.config
+    val context = LocalContext.current
+    val latestFailed by produceState(
+        initialValue = emptyList<LocalMediaItem>(),
+        key1 = state.accountUserId,
+        key2 = state.syncCounts.failed,
+    ) {
+        val accountUserId = state.accountUserId
+        value = if (accountUserId == null) emptyList() else withContext(Dispatchers.IO) {
+            CameraBackupRepository(OrangePhotosLocalDatabase.getInstance(context))
+                .latestFailed(accountUserId)
+        }
+    }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(24.dp)) {
             Text(
@@ -140,6 +159,16 @@ private fun CameraBackupCard(
             StatusValue(stringResource(R.string.pending_videos), state.counts.videoCount.toString())
             Spacer(Modifier.height(8.dp))
             StatusValue(stringResource(R.string.pending_total), state.counts.total.toString())
+            Spacer(Modifier.height(8.dp))
+            StatusValue(stringResource(R.string.sync_pending), state.syncCounts.pending.toString())
+            Spacer(Modifier.height(8.dp))
+            StatusValue(stringResource(R.string.sync_failed), state.syncCounts.failed.toString())
+            Spacer(Modifier.height(8.dp))
+            StatusValue(stringResource(R.string.sync_uploaded), state.syncCounts.uploaded.toString())
+            Spacer(Modifier.height(8.dp))
+            StatusValue(stringResource(R.string.sync_suppressed), state.syncCounts.suppressed.toString())
+            Spacer(Modifier.height(8.dp))
+            StatusValue(stringResource(R.string.sync_restore_available), state.syncCounts.restoreAvailable.toString())
 
             state.error?.let {
                 Spacer(Modifier.height(12.dp))
@@ -162,7 +191,7 @@ private fun CameraBackupCard(
                     Button(onClick = onScan, enabled = !state.busy) {
                         Text(
                             stringResource(
-                                if (state.busy) R.string.scanning_camera else R.string.scan_again,
+                                if (state.busy) R.string.sync_enqueued else R.string.sync_now,
                             ),
                         )
                     }
@@ -192,6 +221,21 @@ private fun CameraBackupCard(
                 state.latestPending.forEachIndexed { index, item ->
                     if (index > 0) HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
                     PendingItemRow(item)
+                }
+            }
+
+            if (latestFailed.isNotEmpty()) {
+                Spacer(Modifier.height(24.dp))
+                Text("Últimos fallos", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(8.dp))
+                latestFailed.forEachIndexed { index, item ->
+                    if (index > 0) HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+                    Text(item.displayName.ifBlank { stringResource(R.string.unnamed_media) })
+                    Text(
+                        item.failureCode ?: "UNKNOWN_ERROR",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
             }
         }

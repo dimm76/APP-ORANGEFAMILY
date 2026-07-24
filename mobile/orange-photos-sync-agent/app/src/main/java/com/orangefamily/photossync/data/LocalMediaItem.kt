@@ -48,10 +48,23 @@ data class LocalMediaItem(
     val detectedAt: Long,
     @ColumnInfo(name = "local_status")
     val localStatus: String = STATUS_PENDING,
+    @ColumnInfo(name = "checksum_sha256")
+    val checksumSha256: String? = null,
+    @ColumnInfo(name = "remote_photo_id")
+    val remotePhotoId: String? = null,
+    @ColumnInfo(name = "last_attempt_at")
+    val lastAttemptAt: Long? = null,
+    @ColumnInfo(name = "failure_code")
+    val failureCode: String? = null,
 ) {
     companion object {
         const val TYPE_IMAGE = "image"
         const val TYPE_VIDEO = "video"
         const val STATUS_PENDING = "pending"
+        const val STATUS_UPLOADING = "uploading"
+        const val STATUS_UPLOADED = "uploaded"
+        const val STATUS_FAILED = "failed"
+        const val STATUS_SUPPRESSED = "suppressed"
+        const val STATUS_RESTORE_AVAILABLE = "restore_available"
     }
 }

@@ -39,23 +39,27 @@ object MediaPermissions {
     }
 
     fun evaluate(activity: Activity): MediaPermissionAccess {
+        return evaluate(activity as Context)
+    }
+
+    fun evaluate(context: Context): MediaPermissionAccess {
         val full = when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
-                granted(activity, Manifest.permission.READ_MEDIA_IMAGES) &&
-                    granted(activity, Manifest.permission.READ_MEDIA_VIDEO)
+                granted(context, Manifest.permission.READ_MEDIA_IMAGES) &&
+                    granted(context, Manifest.permission.READ_MEDIA_VIDEO)
             }
-            else -> granted(activity, Manifest.permission.READ_EXTERNAL_STORAGE)
+            else -> granted(context, Manifest.permission.READ_EXTERNAL_STORAGE)
         }
         if (full) return MediaPermissionAccess.FULL
 
         val partial = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
-            granted(activity, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) ||
+            granted(context, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) ||
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            (granted(activity, Manifest.permission.READ_MEDIA_IMAGES) ||
-                granted(activity, Manifest.permission.READ_MEDIA_VIDEO))
+            (granted(context, Manifest.permission.READ_MEDIA_IMAGES) ||
+                granted(context, Manifest.permission.READ_MEDIA_VIDEO))
         if (partial) return MediaPermissionAccess.PARTIAL
 
-        val requested = activity.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+        val requested = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
             .getBoolean(KEY_REQUESTED, false)
         return if (requested) MediaPermissionAccess.DENIED else MediaPermissionAccess.NOT_REQUESTED
     }

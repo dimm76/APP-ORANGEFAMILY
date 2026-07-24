@@ -23,6 +23,10 @@ data class AgentConfig(
     @ColumnInfo(name = "last_scan_at")
     val lastScanAt: Long?,
     val enabled: Boolean,
+    @ColumnInfo(name = "sync_lock_token")
+    val syncLockToken: String? = null,
+    @ColumnInfo(name = "sync_lock_expires_at")
+    val syncLockExpiresAt: Long? = null,
 )
 
 data class PendingCounts(

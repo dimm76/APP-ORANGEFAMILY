@@ -53,7 +53,21 @@ class CameraBackupRepository(
         baselines = dao.getBaselines(accountUserId),
         counts = dao.getPendingCounts(accountUserId),
         latestPending = dao.getLatestPending(accountUserId),
+        syncCounts = dao.getSyncCounts(accountUserId),
     )
+
+    suspend fun config(accountUserId: String) = dao.getConfig(accountUserId)
+    suspend fun baselines(accountUserId: String) = dao.getBaselines(accountUserId)
+    suspend fun recoverUploading(accountUserId: String) = dao.recoverUploading(accountUserId)
+    suspend fun syncBatch(accountUserId: String, limit: Int) = dao.getSyncBatch(accountUserId, limit)
+    suspend fun latestFailed(accountUserId: String, limit: Int = 10) = dao.getLatestFailed(accountUserId, limit)
+    suspend fun updateChecksum(accountUserId: String, id: Long, checksum: String) = dao.updateChecksum(accountUserId, id, checksum)
+    suspend fun markAttempt(accountUserId: String, id: Long, status: String, at: Long, code: String?) = dao.markAttempt(accountUserId, id, status, at, code)
+    suspend fun markUploaded(accountUserId: String, id: Long, remoteId: String, checksum: String, at: Long) = dao.markUploaded(accountUserId, id, remoteId, checksum, at)
+    suspend fun markSuppressed(accountUserId: String, id: Long, checksum: String, at: Long) = dao.markSuppressed(accountUserId, id, checksum, at)
+    suspend fun markRestoreAvailable(accountUserId: String, id: Long, remoteId: String, checksum: String, at: Long) = dao.markRestoreAvailable(accountUserId, id, remoteId, checksum, at)
+    suspend fun tryAcquireSyncLock(accountUserId: String, token: String, now: Long, expiresAt: Long) = dao.tryAcquireSyncLock(accountUserId, token, now, expiresAt) == 1
+    suspend fun releaseSyncLock(accountUserId: String, token: String) = dao.releaseSyncLock(accountUserId, token)
 }
 
 data class LocalInventorySnapshot(
@@ -61,4 +75,5 @@ data class LocalInventorySnapshot(
     val baselines: List<MediaBaseline>,
     val counts: PendingCounts,
     val latestPending: List<LocalMediaItem>,
+    val syncCounts: SyncCounts,
 )
