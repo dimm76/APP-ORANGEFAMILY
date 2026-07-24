@@ -16,6 +16,8 @@ const exifr = require("exifr");
 
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const VISIBILITIES=new Set(["private","family","selected"]); const MEDIA_TYPES=new Set(["image","video"]);
+const LIBRARY_SCOPES=new Set(["all","owned","shared_with_me","shared_by_me"]);
+const SHARE_SCOPES=new Set(["all","family","selected"]);
 const MIME_EXT={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/heic":"heic","video/mp4":"mp4","video/quicktime":"mov","video/webm":"webm"};
 const MAX_IMAGE_BYTES = 30 * 1024 * 1024;
 const SIMPLE_VIDEO_MAX_BYTES = 500 * 1024 * 1024;
@@ -318,14 +320,20 @@ function buildPhotoQuery(req, queryOverride = null) {
   const q = queryOverride || req.query || {}, values = [auth.familyId, auth.userId], where = [`p.family_id=$1::uuid`, visibilitySql(), `COALESCE(us.is_hidden,false)=false`];
   const add = (sql, value) => { values.push(value); where.push(sql.replaceAll("?", `$${values.length}`)); };
   if (q.trashed != null ? bool(q.trashed) : bool(q.include_trashed) && String(q.owner_user_id || auth.userId) === auth.userId) where.push("p.is_trashed=true"); else where.push("p.is_trashed=false");
-  const parseSet = (raw, allowed) => [...new Set(String(raw || "").split(",").filter(value => allowed.has(value)))], rawMedia = String(q.media_types || "").split(",").filter(Boolean), rawVisibility = String(q.visibilities || "").split(",").filter(Boolean), mediaTypes = parseSet(q.media_types, MEDIA_TYPES), visibilities = parseSet(q.visibilities, VISIBILITIES);
-  if (rawMedia.length !== mediaTypes.length) return bad(400, "Tipo de contenido no válido.");
-  if (rawVisibility.length !== visibilities.length) return bad(400, "Visibilidad no válida.");
-  if (q.media_type_mode && !["include", "exclude"].includes(q.media_type_mode) || q.visibility_mode && !["include", "exclude"].includes(q.visibility_mode)) return bad(400, "Modo de filtro no válido.");
+  const libraryScope=String(q.library_scope||"all"),shareScope=String(q.share_scope||"all"),mediaType=String(q.media_type||"all");
+  if (!LIBRARY_SCOPES.has(libraryScope)) return bad(400, "Alcance de biblioteca no válido.");
+  if (!SHARE_SCOPES.has(shareScope)) return bad(400, "Alcance de compartición no válido.");
+  if (mediaType!=="all"&&!MEDIA_TYPES.has(mediaType)) return bad(400, "Tipo de contenido no válido.");
   if (q.search) add("concat_ws(' ',p.title,p.description,p.original_filename) ILIKE ?", `%${String(q.search).slice(0, 120)}%`);
-  if (mediaTypes.length) add(`${q.media_type_mode === "exclude" ? "NOT " : ""}(p.media_type = ANY(?::text[]))`, mediaTypes); else if (MEDIA_TYPES.has(q.media_type)) add("p.media_type=?", q.media_type);
+  if (mediaType!=="all") add("p.media_type=?", mediaType);
+  if (libraryScope==="owned") where.push("p.owner_user_id=$2::uuid");
+  if (libraryScope==="shared_with_me") where.push(`p.owner_user_id<>$2::uuid AND (p.visibility='family' OR EXISTS(SELECT 1 FROM public.orange_photo_shares ls WHERE ls.photo_id=p.id AND ls.user_id=$2::uuid))`);
+  if (libraryScope==="shared_by_me") {
+    where.push("p.owner_user_id=$2::uuid AND p.visibility IN ('family','selected')");
+    if (shareScope!=="all") add("p.visibility=?",shareScope);
+  }
   if (uuid(q.owner_user_id)) add("p.owner_user_id=?::uuid", q.owner_user_id);
-  if (visibilities.length) add(`${q.visibility_mode === "exclude" ? "NOT " : ""}(p.visibility = ANY(?::text[]))`, visibilities); else if (VISIBILITIES.has(q.visibility)) add("p.visibility=?", q.visibility);
+  if (VISIBILITIES.has(q.visibility)) add("p.visibility=?", q.visibility);
   if (uuid(q.album_id)) add("EXISTS(SELECT 1 FROM public.orange_photo_album_items ai WHERE ai.photo_id=p.id AND ai.album_id=?::uuid)", q.album_id);
   if (q.ids) { const ids=String(q.ids).split(",").filter(uuid).slice(0,100); if(!ids.length)return bad(400,"Identificadores no válidos."); add("p.id=ANY(?::uuid[])",ids); }
   if (uuid(q.tag_id)) add("EXISTS(SELECT 1 FROM public.orange_photo_tag_items ti WHERE ti.photo_id=p.id AND ti.tag_id=?::uuid)", q.tag_id);
@@ -348,7 +356,7 @@ async function listSafe(req, queryOverride = null) {
   const context = buildPhotoQuery(req, queryOverride); if (!context.ok) return context;
   const { q, values, joins, condition } = context.payload, page = Math.max(1, Number(q.page) || 1), per = Math.min(100, Math.max(1, Number(q.per_page) || 30));
   const total = Number((await pool.query(`SELECT count(*)::int total ${joins} ${condition}`, values)).rows[0].total), pagedValues = [...values, per, (page - 1) * per];
-  const rows = (await pool.query(`SELECT p.*,COALESCE(NULLIF(btrim(pe.preferred_name),''),btrim(concat_ws(' ',pe.first_name,pe.last_name)),au.email) owner_display_name,(p.owner_user_id=$2::uuid) is_owner,COALESCE(us.is_hidden,false) is_hidden,COALESCE(us.is_favorite,p.is_favorite) is_favorite,(SELECT jsonb_agg(jsonb_build_object('id',al.id,'title',al.title)) FROM public.orange_photo_album_items ai JOIN public.orange_photo_albums al ON al.id=ai.album_id WHERE ai.photo_id=p.id) albums,(SELECT jsonb_agg(jsonb_build_object('id',t.id,'name',t.name,'slug',t.slug)) FROM public.orange_photo_tag_items ti JOIN public.orange_photo_tags t ON t.id=ti.tag_id WHERE ti.photo_id=p.id) tags ${joins} ${condition} ORDER BY p.captured_at DESC NULLS LAST,p.created_at DESC,p.id DESC LIMIT $${pagedValues.length - 1} OFFSET $${pagedValues.length}`, pagedValues)).rows;
+  const rows = (await pool.query(`SELECT p.*,COALESCE(NULLIF(btrim(pe.preferred_name),''),btrim(concat_ws(' ',pe.first_name,pe.last_name)),au.email) owner_display_name,CASE WHEN p.owner_user_id<>$2::uuid THEN COALESCE(NULLIF(btrim(pe.preferred_name),''),btrim(concat_ws(' ',pe.first_name,pe.last_name)),au.email) END shared_by_display_name,(p.owner_user_id=$2::uuid) is_owner,CASE WHEN p.visibility IN ('family','selected') THEN p.visibility END share_kind,CASE WHEN p.visibility='selected' THEN COALESCE((SELECT jsonb_agg(jsonb_build_object('display_name',COALESCE(NULLIF(btrim(sp.preferred_name),''),btrim(concat_ws(' ',sp.first_name,sp.last_name)),sau.email)) ORDER BY COALESCE(NULLIF(btrim(sp.preferred_name),''),btrim(concat_ws(' ',sp.first_name,sp.last_name)),sau.email)) FROM public.orange_photo_shares s JOIN public.auth_users sau ON sau.id=s.user_id LEFT JOIN public.persons sp ON sp.id=sau.person_id WHERE s.photo_id=p.id),'[]'::jsonb) ELSE '[]'::jsonb END shared_people,COALESCE(us.is_hidden,false) is_hidden,COALESCE(us.is_favorite,p.is_favorite) is_favorite,(SELECT jsonb_agg(jsonb_build_object('id',al.id,'title',al.title)) FROM public.orange_photo_album_items ai JOIN public.orange_photo_albums al ON al.id=ai.album_id WHERE ai.photo_id=p.id) albums,(SELECT jsonb_agg(jsonb_build_object('id',t.id,'name',t.name,'slug',t.slug)) FROM public.orange_photo_tag_items ti JOIN public.orange_photo_tags t ON t.id=ti.tag_id WHERE ti.photo_id=p.id) tags ${joins} ${condition} ORDER BY p.captured_at DESC NULLS LAST,p.created_at DESC,p.id DESC LIMIT $${pagedValues.length - 1} OFFSET $${pagedValues.length}`, pagedValues)).rows;
   await signPhotoFiles(rows); return ok({ items: rows, page, per_page: per, total, has_more: page * per < total });
 }
 

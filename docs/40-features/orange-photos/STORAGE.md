@@ -127,3 +127,11 @@ exacto no forzado, Node intenta eliminar el objeto nuevo. Los fallos posteriores
 de metadatos, poster o preview mantienen el original registrado y se comunican
 como advertencias. El procesamiento aplazado y el reconciliador continúan usando
 el flujo existente de `processStoredOrangePhotoVideo()`.
+
+## Biblioteca, compartición y selección
+
+La biblioteca permite filtrar por tipo de contenido (todos, fotos o vídeos) y por alcance: todas, propias, compartidas conmigo o compartidas por mí. En este último alcance puede limitarse la vista a elementos compartidos con toda la familia o con personas concretas. La vista lateral `Compartidas conmigo` excluye siempre los elementos propios.
+
+Las tarjetas propias compartidas muestran un icono naranja; las recibidas muestran el mismo icono en azul. El título accesible indica si se comparte con toda la familia, con personas concretas o quién es el propietario que la compartió.
+
+Durante el modo de selección, `Shift` más clic selecciona el intervalo lineal desde el último elemento ancla. `Ctrl+A` o `Cmd+A` selecciona únicamente los elementos cargados, salvo que el foco esté en un campo editable. `Escape` limpia la selección y su ancla.

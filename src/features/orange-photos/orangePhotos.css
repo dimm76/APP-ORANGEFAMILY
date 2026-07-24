@@ -107,6 +107,10 @@
   gap:3px;
 }
 .od-orange-photo-card__video ion-icon { width:12px; height:12px; }
+.od-orange-photo-card__share { position:absolute; top:8px; right:8px; z-index:3; display:grid; place-items:center; width:18px; height:18px; pointer-events:none; filter:drop-shadow(0 1px 1px rgba(255,255,255,.9)); }
+.od-orange-photo-card__share ion-icon { width:18px; height:18px; }
+.od-orange-photo-card__share--owned { color:var(--od-color-primary); }
+.od-orange-photo-card__share--received { color:#1d4ed8; }
 
 .od-orange-photo-card__selection-control {
   position: absolute;
