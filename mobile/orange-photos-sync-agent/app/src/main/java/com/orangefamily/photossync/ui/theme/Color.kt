@@ -2,10 +2,12 @@ package com.orangefamily.photossync.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
-
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+val OrangePrimary = Color(0xFFFC4200)
+val OrangePrimaryContainer = Color(0xFFFFF8F5)
+val OrangeOnPrimaryContainer = Color(0xFF9A3412)
+val OrangeBackground = Color(0xFFF4F5F7)
+val OrangeSurface = Color(0xFFFFFFFF)
+val OrangeText = Color(0xFF37374B)
+val OrangeTextMuted = Color(0xFF64748B)
+val OrangeBorder = Color(0xFFDCE3F5)
+val OrangeError = Color(0xFFC62828)

@@ -27,6 +27,10 @@ Etiquetas: `GET/POST /api/orange-photo-tags`. Miembros seleccionables: `GET /api
 
 `OrangePhotosPage` coordina filtros, galería cronológica, selección, álbumes, paginación, subida, visor, detalles y compartición. Los componentes están en `src/features/orange-photos/` y consumen únicamente la API Node.
 
+## Agente Android
+
+El [agente Android privado de sincronización](ANDROID_SYNC_AGENT.md) está en desarrollo. Actualmente solo se ha creado el proyecto base; la sincronización automática todavía no está implementada.
+
 ## Limitaciones actuales
 
 No se generan derivados de forma asíncrona: la UI usa thumbnail, preview y finalmente original. Sin dependencias nuevas, se extraen dimensiones básicas de JPEG/PNG/WEBP. OrangePhotos intenta extraer EXIF de HEIC mediante `exifr`, sin garantizar compatibilidad con todos los archivos; si la extracción falla o no contiene una fecha válida, mantiene el fallback a `file_mtime` y después a la fecha de subida. El EXIF completo y los metadatos de vídeo requieren un procesador futuro. No hay enlaces públicos, geocodificación, reconocimiento, deduplicación, borrado definitivo ni importación legacy.

@@ -1,7 +1,27 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.isFile) {
+        localPropertiesFile.inputStream().use { load(it) }
+    }
+}
+
+fun quotedBuildConfigValue(value: String): String =
+    "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
+val debugApiBaseUrl = localProperties
+    .getProperty("orangeFamily.apiBaseUrl", "http://10.0.2.2:3001/")
+    .trim()
+val releaseApiBaseUrl = providers.gradleProperty("orangeFamily.releaseApiBaseUrl")
+    .orNull
+    ?.trim()
+    .orEmpty()
 
 android {
     namespace = "com.orangefamily.photossync"
@@ -22,7 +42,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "API_BASE_URL", quotedBuildConfigValue(debugApiBaseUrl))
+        }
         release {
+            buildConfigField("String", "API_BASE_URL", quotedBuildConfigValue(releaseApiBaseUrl))
             optimization {
                 enable = false
             }
@@ -33,8 +57,21 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
     buildFeatures {
+        buildConfig = true
         compose = true
     }
+}
+
+val validateReleaseApiBaseUrl by tasks.registering {
+    doLast {
+        check(releaseApiBaseUrl.startsWith("https://")) {
+            "Define -PorangeFamily.releaseApiBaseUrl=https://... antes de generar release."
+        }
+    }
+}
+
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    dependsOn(validateReleaseApiBaseUrl)
 }
 
 dependencies {

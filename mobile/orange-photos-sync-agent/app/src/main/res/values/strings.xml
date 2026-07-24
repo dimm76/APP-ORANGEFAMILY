@@ -1,3 +1,16 @@
 <resources>
     <string name="app_name">OrangeFamily Photos Sync</string>
+    <string name="loading_session">Comprobando sesión…</string>
+    <string name="login_title">OrangeFamily</string>
+    <string name="login_subtitle">Accede al agente privado de Orange Photos</string>
+    <string name="email_label">Email</string>
+    <string name="password_label">Contraseña</string>
+    <string name="login_action">Iniciar sesión</string>
+    <string name="login_loading">Iniciando sesión…</string>
+    <string name="session_active">Sesión activa</string>
+    <string name="family_label">Familia</string>
+    <string name="role_label">Rol</string>
+    <string name="no_family">Sin membresía familiar activa</string>
+    <string name="logout_action">Cerrar sesión</string>
+    <string name="logout_loading">Cerrando sesión…</string>
 </resources>
