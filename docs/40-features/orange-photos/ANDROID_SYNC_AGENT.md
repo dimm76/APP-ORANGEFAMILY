@@ -429,7 +429,7 @@ usuario elimina
 → agente vuelve a subir
 → usuario vuelve a eliminar
 
-será necesario implementar en el backend una política de supresión o tombstone vinculada al propietario.
+el backend conserva una supresión vinculada al propietario durante el purge definitivo.
 
 Esa supresión deberá estar asociada a:
 
@@ -452,11 +452,22 @@ Claudia:
 - activo;
 - privado.
 
-Esta funcionalidad todavía no está implementada.
+Este contrato ya está implementado en el backend; el agente Android todavía no lo consume.
 
 Duplicados y privacidad
 
 La comprobación de duplicados debe respetar la propiedad y privacidad.
+
+El contrato remoto implementado en `POST /api/orange-photos/uploads/check` acepta
+un checksum SHA-256 y limita la deduplicación a `family_id` y al
+`owner_user_id` autenticado. Devuelve `already_owned`, `restore_available`,
+`suppressed` o `upload_required`; `photo_id` solo se incluye para una foto propia.
+Una coincidencia cuyo propietario sea otro usuario, aunque la foto esté compartida,
+se trata como `upload_required` y no revela metadatos.
+
+El purge definitivo conserva una supresión por familia, propietario y checksum.
+Las subidas automáticas del mismo propietario quedan bloqueadas, mientras que una
+reimportación explícita con `force_duplicate=true` elimina la supresión tras el alta.
 
 El backend no debe revelar a un miembro que otro miembro posee una fotografía privada con el mismo contenido.
 
@@ -464,17 +475,14 @@ Ejemplo incorrecto:
 
 Esta foto ya existe y pertenece a Claudia.
 
-La futura deduplicación deberá diferenciar:
+La deduplicación diferencia:
 
 entidad lógica propiedad de un usuario;
 objeto físico almacenado;
 permisos de acceso.
 
-Una opción futura es que dos registros privados apunten al mismo objeto físico, sin compartir propiedad ni visibilidad.
-
-Objeto físico
-├── registro privado de Claudia
-└── registro privado de Diego
+El almacenamiento físico permanece independiente por propietario. No se reutilizan
+objetos Wasabi entre propietarios.
 
 El mismo contenido no implica necesariamente la misma entidad lógica.
 
@@ -574,10 +582,10 @@ el inventario persiste tras cerrar y abrir la app;
 un vídeo nuevo se registra correctamente;
 fotos y vídeos se contabilizan por separado.
 
-Todavía no implementado:
+Todavía no implementado en Android:
 
 hash;
-comprobación remota de duplicados;
+consumo de la comprobación remota de duplicados;
 subida;
 remotePhotoId;
 WorkManager;
@@ -590,9 +598,12 @@ eliminación local;
 sincronización bidireccional;
 importación histórica;
 registro remoto de dispositivos;
-supresión de resincronización tras eliminación remota.
+consumo de la supresión de resincronización tras eliminación remota.
 Próximas fases
 Fase 3: contrato remoto seguro
+
+El contrato backend de checksum, deduplicación por propietario y supresión tras
+purge está implementado. Falta integrarlo en el agente Android.
 
 Antes de subir archivos:
 

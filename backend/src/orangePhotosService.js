@@ -23,6 +23,7 @@ const MAX_VIDEO_BYTES = 10 * 1024 * 1024 * 1024;
 const MULTIPART_PART_BYTES = 25 * 1024 * 1024;
 const MULTIPART_UPLOAD_TTL_HOURS = 24;
 const MAX_ZIP_DOWNLOAD_ITEMS = 500;
+const SHA256_RE=/^[0-9a-f]{64}$/;
 const ok=payload=>({ok:true,payload});
 const bad=(status,code,reason,details=null)=>{
   if(reason==null){reason=code;code=status===404?"UPLOAD_NOT_FOUND":status===413?"FILE_TOO_LARGE":"INVALID_METADATA";}
@@ -52,18 +53,32 @@ function normalizeDuplicateFilename(value) {
   return path.basename(String(value || "").replace(/\\/g, "/")).trim().toLowerCase().normalize("NFKC").replace(/\s+/g, " ");
 }
 
-async function findPossibleDuplicate(familyId, originalFilename, sizeBytes) {
+async function findPossibleDuplicate(familyId, ownerUserId, originalFilename, sizeBytes) {
   const normalized = normalizeDuplicateFilename(originalFilename);
-  if (!normalized || !Number.isSafeInteger(Number(sizeBytes)) || Number(sizeBytes) <= 0) return null;
-  const result = await pool.query(`SELECT p.id photo_id,p.original_filename,f.size_bytes,p.captured_at,p.created_at,p.is_trashed FROM public.orange_photos p JOIN public.orange_photo_files f ON f.photo_id=p.id AND f.family_id=p.family_id AND f.variant='original' WHERE p.family_id=$1::uuid AND lower(p.original_filename)=$2 AND f.size_bytes=$3::bigint ORDER BY p.created_at DESC LIMIT 1`,[familyId,normalized,String(sizeBytes)]);
+  if (!uuid(ownerUserId) || !normalized || !Number.isSafeInteger(Number(sizeBytes)) || Number(sizeBytes) <= 0) return null;
+  const result = await pool.query(`SELECT p.id photo_id,p.original_filename,f.size_bytes,p.captured_at,p.created_at,p.is_trashed FROM public.orange_photos p JOIN public.orange_photo_files f ON f.photo_id=p.id AND f.family_id=p.family_id AND f.variant='original' WHERE p.family_id=$1::uuid AND p.owner_user_id=$2::uuid AND lower(p.original_filename)=$3 AND f.size_bytes=$4::bigint ORDER BY p.created_at DESC LIMIT 1`,[familyId,ownerUserId,normalized,String(sizeBytes)]);
   return result.rows[0] || null;
 }
 
-async function findExactDuplicate(familyId, checksumSha256) {
+async function findExactDuplicate(familyId, ownerUserId, checksumSha256) {
   const checksum = String(checksumSha256 || "").trim().toLowerCase();
-  if (!/^[0-9a-f]{64}$/.test(checksum)) return null;
-  const result = await pool.query(`SELECT p.id photo_id,p.original_filename,f.size_bytes,f.checksum_sha256,p.captured_at,p.created_at,p.is_trashed FROM public.orange_photo_files f JOIN public.orange_photos p ON p.id=f.photo_id AND p.family_id=f.family_id WHERE f.family_id=$1::uuid AND f.variant='original' AND f.checksum_sha256=$2 ORDER BY p.created_at DESC LIMIT 1`,[familyId,checksum]);
+  if (!uuid(ownerUserId) || !SHA256_RE.test(checksum)) return null;
+  const result = await pool.query(`SELECT p.id photo_id,p.original_filename,f.size_bytes,f.checksum_sha256,p.captured_at,p.created_at,p.is_trashed FROM public.orange_photo_files f JOIN public.orange_photos p ON p.id=f.photo_id AND p.family_id=f.family_id WHERE p.family_id=$1::uuid AND p.owner_user_id=$2::uuid AND f.variant='original' AND f.checksum_sha256=$3 ORDER BY p.is_trashed ASC,p.created_at DESC LIMIT 1`,[familyId,ownerUserId,checksum]);
   return result.rows[0] || null;
+}
+
+async function findUploadSuppression(familyId, ownerUserId, checksumSha256) {
+  const checksum=String(checksumSha256||"").trim().toLowerCase();
+  if(!uuid(ownerUserId)||!SHA256_RE.test(checksum))return null;
+  const result=await pool.query(`SELECT checksum_sha256,deleted_at FROM public.orange_photo_upload_suppressions WHERE family_id=$1::uuid AND owner_user_id=$2::uuid AND checksum_sha256=$3`,[familyId,ownerUserId,checksum]);
+  return result.rows[0]||null;
+}
+
+function uploadCheckDecision(duplicate,suppression) {
+  if(duplicate&&!duplicate.is_trashed)return{decision:"already_owned",photo_id:duplicate.photo_id};
+  if(duplicate)return{decision:"restore_available",photo_id:duplicate.photo_id};
+  if(suppression)return{decision:"suppressed"};
+  return{decision:"upload_required"};
 }
 
 function uploadModeFor(mimeType, sizeBytes) {
@@ -80,11 +95,20 @@ async function checkUpload(req, body = {}) {
   const filename=normalizeDuplicateFilename(body.original_filename), size=Number(body.size_bytes), mime=String(body.mime_type||"").toLowerCase();
   if(!filename)return bad(400,"INVALID_METADATA","Nombre original obligatorio.");
   const mode=uploadModeFor(mime,size); if(!mode.ok)return mode;
-  const possible=await findPossibleDuplicate(a.familyId,filename,size);
-  return ok({ possible_duplicate:possible, upload_mode:mode.payload.upload_mode==="multipart"?"direct_backend":mode.payload.upload_mode, limits:{ max_image_bytes:MAX_IMAGE_BYTES,simple_video_max_bytes:SIMPLE_VIDEO_MAX_BYTES,max_video_bytes:MAX_VIDEO_BYTES,multipart_part_bytes:MULTIPART_PART_BYTES } });
+  const uploadMode=mode.payload.upload_mode==="multipart"?"direct_backend":mode.payload.upload_mode;
+  const limits={max_image_bytes:MAX_IMAGE_BYTES,simple_video_max_bytes:SIMPLE_VIDEO_MAX_BYTES,max_video_bytes:MAX_VIDEO_BYTES,multipart_part_bytes:MULTIPART_PART_BYTES};
+  if(Object.prototype.hasOwnProperty.call(body,"checksum_sha256")){
+    const checksum=String(body.checksum_sha256||"").trim().toLowerCase();
+    if(!SHA256_RE.test(checksum))return bad(400,"INVALID_METADATA","Checksum SHA-256 no válido.");
+    const duplicate=await findExactDuplicate(a.familyId,a.userId,checksum);
+    const suppression=duplicate?null:await findUploadSuppression(a.familyId,a.userId,checksum);
+    return ok({...uploadCheckDecision(duplicate,suppression),upload_mode:uploadMode,limits});
+  }
+  const possible=await findPossibleDuplicate(a.familyId,a.userId,filename,size);
+  return ok({possible_duplicate:possible,upload_mode:uploadMode,limits});
 }
 
-async function insertPhoto(auth,m,storage,poster=null,warning=null){const client=await pool.connect();try{await client.query('BEGIN');const p=(await client.query(`INSERT INTO public.orange_photos(family_id,owner_user_id,media_type,title,description,original_filename,mime_type,extension,captured_at,captured_at_source,timezone,width,height,duration_seconds,orientation,camera_make,camera_model,lens_model,latitude,longitude,altitude_meters,location_name,location_country,location_region,location_locality,location_source,exif_json,visibility,created_by,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$2,$2) RETURNING *`,[auth.familyId,auth.userId,m.media_type,m.title,m.description,m.original_filename,m.mime_type,m.extension,m.captured_at,m.captured_at_source,m.timezone,m.width,m.height,m.duration_seconds,m.orientation,m.camera_make,m.camera_model,m.lens_model,m.latitude,m.longitude,m.altitude_meters,m.location_name,m.location_country,m.location_region,m.location_locality,m.location_source,m.exif_json,m.visibility])).rows[0];await client.query(`INSERT INTO public.orange_photo_files(family_id,photo_id,variant,provider,bucket,object_key,mime_type,width,height,size_bytes,checksum_sha256,etag) VALUES($1,$2,'original',$3,$4,$5,$6,$7,$8,$9,$10,$11)`,[auth.familyId,p.id,storage.provider||'wasabi',storage.bucket,storage.object_key,storage.mime_type||m.mime_type,m.width,m.height,storage.size_bytes||null,storage.checksum_sha256||null,storage.etag||null]);if(poster)await client.query(`INSERT INTO public.orange_photo_files(family_id,photo_id,variant,provider,bucket,object_key,mime_type,width,height,size_bytes,checksum_sha256,etag) VALUES($1,$2,'poster',$3,$4,$5,'image/jpeg',$6,$7,$8,$9,$10)`,[auth.familyId,p.id,poster.provider||'wasabi',poster.bucket,poster.object_key,poster.width,poster.height,poster.size_bytes||null,poster.checksum_sha256||null,poster.etag||null]);await client.query('COMMIT');return ok({item:p,warning});}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}}
+async function insertPhoto(auth,m,storage,poster=null,warning=null,clearSuppressionChecksum=null){const client=await pool.connect();try{await client.query('BEGIN');const p=(await client.query(`INSERT INTO public.orange_photos(family_id,owner_user_id,media_type,title,description,original_filename,mime_type,extension,captured_at,captured_at_source,timezone,width,height,duration_seconds,orientation,camera_make,camera_model,lens_model,latitude,longitude,altitude_meters,location_name,location_country,location_region,location_locality,location_source,exif_json,visibility,created_by,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$2,$2) RETURNING *`,[auth.familyId,auth.userId,m.media_type,m.title,m.description,m.original_filename,m.mime_type,m.extension,m.captured_at,m.captured_at_source,m.timezone,m.width,m.height,m.duration_seconds,m.orientation,m.camera_make,m.camera_model,m.lens_model,m.latitude,m.longitude,m.altitude_meters,m.location_name,m.location_country,m.location_region,m.location_locality,m.location_source,m.exif_json,m.visibility])).rows[0];await client.query(`INSERT INTO public.orange_photo_files(family_id,photo_id,variant,provider,bucket,object_key,mime_type,width,height,size_bytes,checksum_sha256,etag) VALUES($1,$2,'original',$3,$4,$5,$6,$7,$8,$9,$10,$11)`,[auth.familyId,p.id,storage.provider||'wasabi',storage.bucket,storage.object_key,storage.mime_type||m.mime_type,m.width,m.height,storage.size_bytes||null,storage.checksum_sha256||null,storage.etag||null]);if(poster)await client.query(`INSERT INTO public.orange_photo_files(family_id,photo_id,variant,provider,bucket,object_key,mime_type,width,height,size_bytes,checksum_sha256,etag) VALUES($1,$2,'poster',$3,$4,$5,'image/jpeg',$6,$7,$8,$9,$10)`,[auth.familyId,p.id,poster.provider||'wasabi',poster.bucket,poster.object_key,poster.width,poster.height,poster.size_bytes||null,poster.checksum_sha256||null,poster.etag||null]);if(SHA256_RE.test(String(clearSuppressionChecksum||"")))await client.query(`DELETE FROM public.orange_photo_upload_suppressions WHERE family_id=$1::uuid AND owner_user_id=$2::uuid AND checksum_sha256=$3`,[auth.familyId,auth.userId,clearSuppressionChecksum]);await client.query('COMMIT');return ok({item:p,warning});}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}}
 async function createFromExisting(req,body){const a=resolveAuthenticatedFamily(req);if(!a.ok)return a;if(a.role!=='owner')return bad(403,"Solo el propietario familiar puede registrar objetos existentes.");const s=body.storage||{};try{assertReadableOrangePhotosStorageKey(s.object_key,getAttachmentsConfig().envPrefix);}catch(e){return bad(400,e.message);}if(s.bucket!=='orangedesk'||s.variant!=='original')return bad(400,"Almacenamiento legacy no válido.");const m=normalizeMetadata(body);const err=validateMetadata(m);if(err)return err;return insertPhoto(a,m,{...s,provider:'wasabi',mime_type:m.mime_type});}
 async function upload(req, file, fields = {}, posterFile = null) {
   const a = resolveAuthenticatedFamily(req);
@@ -105,8 +129,10 @@ async function upload(req, file, fields = {}, posterFile = null) {
   let checksumSha256;
   try { checksumSha256=createHash("sha256").update(file.buffer).digest("hex"); }
   catch(error){ console.error("OrangePhotos hash",{message:error.message}); return bad(500,"HASH_CALCULATION_FAILED","No se pudo verificar el archivo."); }
-  const duplicate=await findExactDuplicate(a.familyId,checksumSha256);
-  if(duplicate && !bool(fields.force_duplicate))return bad(409,"DUPLICATE_FILE","Este archivo ya existe en OrangePhotos.",{duplicate});
+  const forceDuplicate=bool(fields.force_duplicate),duplicate=await findExactDuplicate(a.familyId,a.userId,checksumSha256);
+  if(duplicate && !forceDuplicate)return bad(409,"DUPLICATE_FILE","Este archivo ya existe en OrangePhotos.",{duplicate});
+  const suppression=await findUploadSuppression(a.familyId,a.userId,checksumSha256);
+  if(suppression&&!forceDuplicate)return bad(409,"UPLOAD_SUPPRESSED","Este archivo fue eliminado voluntariamente y no se volverá a subir automáticamente.");
 
   if (m.media_type === "image") {
     const d = imageDimensions(file.buffer, m.mime_type);
@@ -176,7 +202,7 @@ async function upload(req, file, fields = {}, posterFile = null) {
     }
 
     let result;
-    try { result = await insertPhoto(a, m, stored, posterStored, [...new Set(warnings)].join(" · ") || null); }
+    try { result = await insertPhoto(a, m, stored, posterStored, [...new Set(warnings)].join(" · ") || null, forceDuplicate&&suppression?checksumSha256:null); }
     catch(error){
       console.error("OrangePhotos database registration",{object_key:stored.object_key,message:error.message,code:error.code,detail:error.detail,constraint:error.constraint,table:error.table,column:error.column});
       try { await deleteOrangePhotoObject(stored); if(posterStored)await deleteOrangePhotoObject(posterStored); }
@@ -229,8 +255,10 @@ async function uploadDirect(req) {
     try{await pipeline(req,countingTransform,fsNative.createWriteStream(inputPath));}
     catch(error){console.error("OrangePhotos direct receive",{message:error.message});return bad(400,"UPLOAD_INTERRUPTED",requestAborted?"La conexión se interrumpió durante la subida.":"La transferencia terminó antes de recibir el archivo completo.");}
     if(requestAborted||receivedBytes!==declaredSize)return bad(400,"UPLOAD_INTERRUPTED",requestAborted?"La conexión se interrumpió durante la subida.":"La transferencia terminó antes de recibir el archivo completo.");
-    const checksumSha256=hash.digest("hex"),duplicate=await findExactDuplicate(auth.familyId,checksumSha256);
+    const checksumSha256=hash.digest("hex"),duplicate=await findExactDuplicate(auth.familyId,auth.userId,checksumSha256);
     if(duplicate&&!forceDuplicate)return bad(409,"DUPLICATE_FILE","Este mismo archivo ya existe en OrangePhotos.",{duplicate});
+    const suppression=await findUploadSuppression(auth.familyId,auth.userId,checksumSha256);
+    if(suppression&&!forceDuplicate)return bad(409,"UPLOAD_SUPPRESSED","Este archivo fue eliminado voluntariamente y no se volverá a subir automáticamente.");
     try{const video=await probeVideoFile(inputPath);metadata.duration_seconds=video.duration||metadata.duration_seconds;metadata.width=video.width||metadata.width;metadata.height=video.height||metadata.height;metadata.orientation=video.rotation??metadata.orientation;applyVideoCreationTime(video,metadata);}
     catch(error){warnings.push("Metadatos de vídeo pendientes");console.error("OrangePhotos direct video metadata",{message:error.message});}
     let generatedPoster=null;
@@ -240,7 +268,7 @@ async function uploadDirect(req) {
     catch(error){console.error("OrangePhotos direct storage upload",{message:error.message});return bad(502,"STORAGE_UPLOAD_FAILED","No se pudo transferir el archivo al almacenamiento.");}
     if(generatedPoster){try{posterStored={...(await uploadOrangePhotoToWasabi(generatedPoster.buffer,{familyId:auth.familyId,mimeType:"image/jpeg",extension:"jpg",originalFilename:"poster.jpg",variant:"poster"})),width:generatedPoster.width,height:generatedPoster.height};}catch(error){warnings.push("Subido sin miniatura");console.error("OrangePhotos direct poster upload",{message:error.message});}}
     let result;
-    try{result=await insertPhoto(auth,metadata,stored,posterStored,[...new Set(warnings)].join(" · ")||null);}
+    try{result=await insertPhoto(auth,metadata,stored,posterStored,[...new Set(warnings)].join(" · ")||null,forceDuplicate&&suppression?checksumSha256:null);}
     catch(error){console.error("OrangePhotos direct database registration",{object_key:stored.object_key,message:error.message,code:error.code,detail:error.detail,constraint:error.constraint,table:error.table,column:error.column});try{await deleteOrangePhotoObject(stored);if(posterStored)await deleteOrangePhotoObject(posterStored);}catch(cleanupError){console.error("OrangePhotos direct database cleanup",{object_key:stored.object_key,message:cleanupError.message});}return bad(500,"DATABASE_REGISTRATION_FAILED","El archivo se transfirió, pero no pudo registrarse en OrangePhotos.");}
     if(result.ok&&result.payload?.item?.id){const photoId=result.payload.item.id;setImmediate(()=>processStoredOrangePhotoVideo(photoId,{createPoster:false,createPreview:true,updateMetadata:false}).catch(error=>console.error("OrangePhotos direct delayed video preview",{photo_id:photoId,message:error.message,possible_orphans:error.possibleOrphans||[]})));}
     return result;
@@ -354,9 +382,16 @@ async function purge(req, id) {
   const photo = detailResult.payload.item, auth = detailResult.payload.auth;
   if (!photo.is_owner) return bad(403, "Solo el propietario puede eliminar definitivamente la foto.");
   if (!photo.is_trashed) return bad(409, "La foto debe estar en la papelera antes de eliminarla definitivamente.");
-  const files = (await pool.query(`SELECT id,bucket,object_key,variant FROM public.orange_photo_files WHERE family_id=$1::uuid AND photo_id=$2::uuid ORDER BY CASE variant WHEN 'thumbnail' THEN 1 WHEN 'preview' THEN 2 WHEN 'poster' THEN 3 WHEN 'original' THEN 4 ELSE 5 END`, [auth.familyId, id])).rows;
+  const files = (await pool.query(`SELECT id,bucket,object_key,variant,checksum_sha256 FROM public.orange_photo_files WHERE family_id=$1::uuid AND photo_id=$2::uuid ORDER BY CASE variant WHEN 'thumbnail' THEN 1 WHEN 'preview' THEN 2 WHEN 'poster' THEN 3 WHEN 'original' THEN 4 ELSE 5 END`, [auth.familyId, id])).rows;
+  const checksum=String(files.find(file=>file.variant==="original")?.checksum_sha256||"").trim().toLowerCase();
   for (const file of files) await deleteOrangePhotoObject(file);
-  await pool.query(`DELETE FROM public.orange_photos WHERE family_id=$1::uuid AND id=$2::uuid AND owner_user_id=$3::uuid AND is_trashed=true`, [auth.familyId, id, auth.userId]);
+  const client=await pool.connect();
+  try{
+    await client.query("BEGIN");
+    if(SHA256_RE.test(checksum))await client.query(`INSERT INTO public.orange_photo_upload_suppressions(family_id,owner_user_id,checksum_sha256) VALUES($1::uuid,$2::uuid,$3) ON CONFLICT(family_id,owner_user_id,checksum_sha256) DO UPDATE SET deleted_at=now()`,[auth.familyId,auth.userId,checksum]);
+    await client.query(`DELETE FROM public.orange_photos WHERE family_id=$1::uuid AND id=$2::uuid AND owner_user_id=$3::uuid AND is_trashed=true`, [auth.familyId, id, auth.userId]);
+    await client.query("COMMIT");
+  }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
   return ok({ deleted: true, id, deleted_files: files.length });
 }
 
@@ -376,4 +411,4 @@ async function aroundDate(req) {
   return listSafe(req, { ...(req.query || {}), before: date.toISOString(), page: 1 });
 }
 
-module.exports={familyMembers,createFromExisting,upload,uploadDirect,checkUpload,list:listSafe,timeline,aroundDate,detail,update,trash,purge,emptyTrash,signedUrl,download,downloadMany,downloadObject,share,albums,createAlbum,updateAlbum,addPhoto,shareAlbum,tags,createTag,insertPhoto,normalizeMetadata,validateMetadata,findPossibleDuplicate,findExactDuplicate,normalizeDuplicateFilename,uploadModeFor,ok,bad,bool,MIME_EXT,MAX_IMAGE_BYTES,SIMPLE_VIDEO_MAX_BYTES,MAX_VIDEO_BYTES,MULTIPART_PART_BYTES,MULTIPART_UPLOAD_TTL_HOURS};
+module.exports={familyMembers,createFromExisting,upload,uploadDirect,checkUpload,list:listSafe,timeline,aroundDate,detail,update,trash,purge,emptyTrash,signedUrl,download,downloadMany,downloadObject,share,albums,createAlbum,updateAlbum,addPhoto,shareAlbum,tags,createTag,insertPhoto,normalizeMetadata,validateMetadata,findPossibleDuplicate,findExactDuplicate,findUploadSuppression,uploadCheckDecision,normalizeDuplicateFilename,uploadModeFor,ok,bad,bool,MIME_EXT,MAX_IMAGE_BYTES,SIMPLE_VIDEO_MAX_BYTES,MAX_VIDEO_BYTES,MULTIPART_PART_BYTES,MULTIPART_UPLOAD_TTL_HOURS};

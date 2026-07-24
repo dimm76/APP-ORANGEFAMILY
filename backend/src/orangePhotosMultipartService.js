@@ -42,7 +42,7 @@ async function initiate(req, body = {}) {
   if(mode.payload.upload_mode!=="multipart")return photos.bad(400,"INVALID_MULTIPART","La subida multipart solo está disponible para vídeos de más de 500 MB.");
   const metadata=photos.normalizeMetadata({...(body.metadata||{}),original_filename:originalFilename,mime_type:mime,media_type:"video"});
   const invalid=photos.validateMetadata(metadata); if(invalid)return invalid;
-  const duplicate=await photos.findPossibleDuplicate(auth.familyId,originalFilename,size);
+  const duplicate=await photos.findPossibleDuplicate(auth.familyId,auth.userId,originalFilename,size);
   if(duplicate&&body.force_possible_duplicate!==true)return photos.bad(409,"POSSIBLE_DUPLICATE","Existe un archivo con el mismo nombre y tamaño.",{duplicate});
 
   let storage;
@@ -104,15 +104,22 @@ async function complete(req, id, body = {}) {
   let checksum;
   try{const object=await getOrangePhotoObjectStream(upload),hash=createHash("sha256");for await(const chunk of object.Body)hash.update(chunk);checksum=hash.digest("hex");}
   catch(error){log("multipart hash",error,upload);try{await deleteOrangePhotoObject(upload);}catch(cleanupError){log("multipart hash cleanup",cleanupError,upload);}return failUpload(upload,"HASH_CALCULATION_FAILED","No se pudo verificar el contenido del archivo.");}
-  const duplicate=await photos.findExactDuplicate(upload.family_id,checksum), config=upload.metadata_json||{};
+  const duplicate=await photos.findExactDuplicate(upload.family_id,upload.owner_user_id,checksum), config=upload.metadata_json||{};
   if(duplicate&&!config.force_duplicate){
     try{await deleteOrangePhotoObject(upload);}catch(error){log("multipart duplicate cleanup",error,upload);}
     await pool.query(`UPDATE public.orange_photo_uploads SET status='aborted',error_code='DUPLICATE_FILE',error_message=$2 WHERE id=$1::uuid`,[upload.id,"Este archivo ya existe en OrangePhotos."]);
     return photos.bad(409,"DUPLICATE_FILE","Este archivo ya existe en OrangePhotos.",{duplicate});
   }
+  const suppression=await photos.findUploadSuppression(upload.family_id,upload.owner_user_id,checksum);
+  if(suppression&&!config.force_duplicate){
+    try{await deleteOrangePhotoObject(upload);}catch(error){log("multipart suppression cleanup",error,upload);}
+    const message="Este archivo fue eliminado anteriormente y no se volverá a subir automáticamente.";
+    await pool.query(`UPDATE public.orange_photo_uploads SET status='aborted',error_code='UPLOAD_SUPPRESSED',error_message=$2 WHERE id=$1::uuid`,[upload.id,message]);
+    return photos.bad(409,"UPLOAD_SUPPRESSED",message);
+  }
   const metadata=config.metadata||photos.normalizeMetadata({original_filename:upload.original_filename,mime_type:upload.mime_type,media_type:"video"});
   let result;
-  try{result=await photos.insertPhoto(found.payload.auth,metadata,{provider:upload.provider,bucket:upload.bucket,object_key:upload.object_key,mime_type:upload.mime_type,size_bytes:Number(upload.size_bytes),checksum_sha256:checksum,etag:head.etag});}
+  try{result=await photos.insertPhoto(found.payload.auth,metadata,{provider:upload.provider,bucket:upload.bucket,object_key:upload.object_key,mime_type:upload.mime_type,size_bytes:Number(upload.size_bytes),checksum_sha256:checksum,etag:head.etag},null,null,config.force_duplicate&&suppression?checksum:null);}
   catch(error){log("multipart database registration",error,upload);try{await deleteOrangePhotoObject(upload);}catch(cleanupError){log("multipart database cleanup",cleanupError,upload);}await pool.query(`UPDATE public.orange_photo_uploads SET status='failed',error_code='DATABASE_REGISTRATION_FAILED',error_message=$2 WHERE id=$1::uuid`,[upload.id,"El archivo se transfirió, pero no pudo registrarse."]);return photos.bad(500,"DATABASE_REGISTRATION_FAILED","El archivo se transfirió, pero no pudo registrarse.");}
   await pool.query(`UPDATE public.orange_photo_uploads SET status='completed',completed_at=now(),error_code=NULL,error_message=NULL WHERE id=$1::uuid`,[upload.id]);
   const photoId=result.payload.item.id;
