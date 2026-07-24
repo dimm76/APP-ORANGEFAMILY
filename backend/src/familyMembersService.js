@@ -86,7 +86,19 @@ async function create(req, body) {
     await audit(client, owner, "family_member_created", person.rows[0].id, null, { first_name: input.value.first_name, last_name: input.value.last_name, email: input.value.email });
     row = (await client.query(`${selectMembers} WHERE fm.family_id=$1 AND p.id=$2`, [owner.familyId, person.rows[0].id])).rows[0];
     await client.query("COMMIT");
-  } catch (error) { await client.query("ROLLBACK").catch(() => {}); return dbError(error); } finally { client.release(); }
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("Family member creation failed", {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      constraint: error.constraint,
+      table: error.table,
+      column: error.column,
+      stack: error.stack,
+    });
+    return dbError(error);
+  } finally { client.release(); }
   let invitation_sent = null;
   if (token) {
     try { const sent = await sendActivationEmail({ to: row.email, displayName: [row.first_name, row.last_name].filter(Boolean).join(" "), token }); invitation_sent = sent.sent; await audit(pool, owner, "activation_sent", row.person_id, null, { sent: sent.sent }); }
@@ -136,7 +148,19 @@ async function update(req, personId, body) {
     after = await getMember(client, owner, personId);
     await audit(client, owner, "family_member_updated", personId, { first_name: before.first_name, last_name: before.last_name, email: before.email, membership_status: before.membership_status, has_access: before.has_access }, { first_name: after.first_name, last_name: after.last_name, email: after.email, membership_status: after.membership_status, has_access: after.has_access });
     await client.query("COMMIT");
-  } catch (error) { await client.query("ROLLBACK").catch(() => {}); return dbError(error); } finally { client.release(); }
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("Family member update failed", {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      constraint: error.constraint,
+      table: error.table,
+      column: error.column,
+      stack: error.stack,
+    });
+    return dbError(error);
+  } finally { client.release(); }
   let invitation_sent = null;
   if (token) { try { const sent = await sendActivationEmail({ to: after.email, displayName: [after.first_name, after.last_name].filter(Boolean).join(" "), token }); invitation_sent = sent.sent; await audit(pool, owner, "activation_sent", personId, null, { sent: sent.sent }); } catch (error) { invitation_sent = false; console.error("Activation email failed:", error.message); } }
   return ok({ item: publicMember(after), invitation_sent });
