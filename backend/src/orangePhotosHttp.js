@@ -58,9 +58,11 @@ async function streamZip(req,res){
   try {
     const result=await service.downloadMany(req,req.body||{});if(!result.ok)return send(res,result);
     const items=result.payload.items,names=zipEntryNames(items),archive=archiver("zip",{zlib:{level:0}});
-    let current=null,cancelled=false;
-    const cancel=()=>{if(res.writableFinished)return;cancelled=true;current?.destroy();archive.abort();};
-    req.once("aborted",cancel);res.once("close",cancel);
+    let completed=false,current=null,cancelled=false;
+    const cancel=()=>{if(completed||cancelled)return;cancelled=true;current?.destroy();archive.abort();};
+    req.once("aborted",cancel);
+    res.once("finish",()=>{completed=true;});
+    res.once("close",()=>{if(!completed&&!res.writableEnded)cancel();});
     archive.on("warning",error=>console.error("OrangePhotos ZIP warning",{name:error.name,code:error.code||null}));
     archive.on("error",error=>{console.error("OrangePhotos ZIP",{name:error.name,code:error.code||null});if(!res.destroyed)res.destroy(error);});
     const date=new Date().toISOString().slice(0,10),filename=`orange-photos-${date}.zip`;
