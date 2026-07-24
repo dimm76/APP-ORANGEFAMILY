@@ -14,6 +14,7 @@ import com.orangefamily.photossync.sync.OrangePhotosSyncScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -26,6 +27,7 @@ class CameraBackupController(
         private set
 
     private var accountUserId: String? = null
+    private var mediaStoreDebounceJob: Job? = null
 
     fun load(scope: CoroutineScope, userId: String, permission: MediaPermissionAccess) {
         accountUserId = userId
@@ -91,6 +93,35 @@ class CameraBackupController(
         }
     }
 
+    fun onMediaStoreChanged(scope: CoroutineScope) {
+        val userId = accountUserId ?: return
+        if (state.config?.enabled != true || state.permission != MediaPermissionAccess.FULL) return
+        mediaStoreDebounceJob?.cancel()
+        mediaStoreDebounceJob = scope.launch {
+            delay(MEDIA_STORE_DEBOUNCE_MS)
+            if (accountUserId != userId || state.config?.enabled != true || state.permission != MediaPermissionAccess.FULL) return@launch
+            val outcome = withContext(Dispatchers.IO) {
+                runCatching {
+                    val snapshot = repository.snapshot(userId)
+                    val result = scanner.scan(userId, snapshot.baselines)
+                    repository.recordScan(userId, result, System.currentTimeMillis())
+                }
+            }
+            if (accountUserId != userId) return@launch
+            if (outcome.isSuccess) {
+                scheduler.enqueueNow(userId)
+                refresh(userId)
+            } else {
+                state = state.copy(error = SCAN_ERROR)
+            }
+        }
+    }
+
+    fun cancelMediaStoreChanges() {
+        mediaStoreDebounceJob?.cancel()
+        mediaStoreDebounceJob = null
+    }
+
     private suspend fun refresh(userId: String) {
         val snapshot = withContext(Dispatchers.IO) { repository.snapshot(userId) }
         if (accountUserId != userId) return
@@ -118,6 +149,7 @@ class CameraBackupController(
     )
 
     private companion object {
+        const val MEDIA_STORE_DEBOUNCE_MS = 1_500L
         const val SCAN_ERROR = "No se pudo analizar la carpeta Cámara. Revisa el acceso e inténtalo de nuevo."
     }
 }

@@ -1,8 +1,12 @@
 package com.orangefamily.photossync
 
 import android.content.Intent
+import android.database.ContentObserver
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.provider.MediaStore
 import android.provider.Settings
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
@@ -43,6 +47,14 @@ import com.orangefamily.photossync.sync.OrangePhotosSyncScheduler
 class MainActivity : ComponentActivity() {
     private lateinit var authController: AuthController
     private lateinit var cameraBackupController: CameraBackupController
+    private var mediaObserverRegistered = false
+    private val mediaObserver by lazy {
+        object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                cameraBackupController.onMediaStoreChanged(lifecycleScope)
+            }
+        }
+    }
     private var mediaPermissionAccess by mutableStateOf(MediaPermissionAccess.NOT_REQUESTED)
     private val mediaPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -76,7 +88,11 @@ class MainActivity : ComponentActivity() {
                         onLogin = { email, password ->
                             authController.login(lifecycleScope, email, password)
                         },
-                        onLogout = { authController.logout(lifecycleScope) },
+                        onLogout = {
+                            stopMediaObservation()
+                            authController.logout(lifecycleScope)
+                        },
+                        onMediaObservationChanged = ::updateMediaObservation,
                         onRequestMediaPermission = {
                             MediaPermissions.markRequested(this)
                             mediaPermissionLauncher.launch(MediaPermissions.requiredPermissions())
@@ -103,11 +119,42 @@ class MainActivity : ComponentActivity() {
         if (::cameraBackupController.isInitialized) refreshMediaPermission()
     }
 
+    override fun onDestroy() {
+        stopMediaObservation()
+        super.onDestroy()
+    }
+
     private fun refreshMediaPermission() {
         mediaPermissionAccess = MediaPermissions.evaluate(this)
         if (::cameraBackupController.isInitialized) {
             cameraBackupController.updatePermission(mediaPermissionAccess)
         }
+    }
+
+    private fun updateMediaObservation(enabled: Boolean) {
+        if (enabled == mediaObserverRegistered) return
+        if (enabled) {
+            contentResolver.registerContentObserver(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                true,
+                mediaObserver,
+            )
+            contentResolver.registerContentObserver(
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                true,
+                mediaObserver,
+            )
+            mediaObserverRegistered = true
+        } else {
+            stopMediaObservation()
+        }
+    }
+
+    private fun stopMediaObservation() {
+        cameraBackupController.cancelMediaStoreChanges()
+        if (!mediaObserverRegistered) return
+        contentResolver.unregisterContentObserver(mediaObserver)
+        mediaObserverRegistered = false
     }
 }
 
@@ -118,11 +165,20 @@ private fun AuthContent(
     mediaPermissionAccess: MediaPermissionAccess,
     onLogin: (String, String) -> Unit,
     onLogout: () -> Unit,
+    onMediaObservationChanged: (Boolean) -> Unit,
     onRequestMediaPermission: () -> Unit,
     onOpenPermissionSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
+    val authenticatedUserId = (state as? AuthController.AuthState.Authenticated)?.user?.id
+    val observerEnabled = authenticatedUserId != null &&
+        cameraBackupController.state.accountUserId == authenticatedUserId &&
+        cameraBackupController.state.config?.enabled == true &&
+        mediaPermissionAccess == MediaPermissionAccess.FULL
+    LaunchedEffect(authenticatedUserId, observerEnabled) {
+        onMediaObservationChanged(observerEnabled)
+    }
     when (state) {
         AuthController.AuthState.Loading -> LoadingScreen(modifier)
         AuthController.AuthState.LoggingIn -> LoginScreen(
