@@ -1,6 +1,8 @@
 /* global require, module, Buffer */
 const service = require("./orangePhotosService");
 const multipartService = require("./orangePhotosMultipartService");
+const express = require("express");
+const archiver = require("archiver");
 
 function send(res, result, status = 200) { if (!result.ok) return res.status(result.status || 400).json({ ok:false,code:result.code||"INTERNAL_ERROR",message:result.reason||"Petición no válida.",details:result.details??null }); return res.status(status).json({ ok:true,...result.payload }); }
 function requestError(code,message,status=400){return Object.assign(new Error(message),{orangePhotosCode:code,status});}
@@ -38,6 +40,48 @@ async function multipart(req, maxBytes) {
 
 function safe(handler, message, status = 200) { return async (req, res) => { try { return send(res, await handler(req), status); } catch (error) { console.error("OrangePhotos",{message:error.message}); return res.status(500).json({ok:false,code:"INTERNAL_ERROR",message,details:null}); } }; }
 function attachmentName(value) { return String(value || "orange-photo").replace(/[\r\n"\\/]/g, "_").slice(0, 500); }
+function zipEntryNames(items) {
+  const used = new Map();
+  return items.map(item => {
+    const clean = String(item.original_filename || "archivo").replace(/[\u0000-\u001f\u007f\\/]/g, "_").replace(/^\.+$/, "").trim() || "archivo";
+    const dot = clean.lastIndexOf("."), stem = dot > 0 ? clean.slice(0, dot) : clean, extension = dot > 0 ? clean.slice(dot) : "";
+    const key = clean.toLocaleLowerCase(), count = (used.get(key) || 0) + 1;
+    used.set(key, count);
+    if (count === 1) return clean;
+    let candidate = `${stem} (${count})${extension}`, suffix = count;
+    while (used.has(candidate.toLocaleLowerCase())) { suffix += 1; candidate = `${stem} (${suffix})${extension}`; }
+    used.set(candidate.toLocaleLowerCase(), 1);
+    return candidate;
+  });
+}
+async function streamZip(req,res){
+  try {
+    const result=await service.downloadMany(req,req.body||{});if(!result.ok)return send(res,result);
+    const items=result.payload.items,names=zipEntryNames(items),archive=archiver("zip",{zlib:{level:0}});
+    let current=null,cancelled=false;
+    const cancel=()=>{if(res.writableFinished)return;cancelled=true;current?.destroy();archive.abort();};
+    req.once("aborted",cancel);res.once("close",cancel);
+    archive.on("warning",error=>console.error("OrangePhotos ZIP warning",{name:error.name,code:error.code||null}));
+    archive.on("error",error=>{console.error("OrangePhotos ZIP",{name:error.name,code:error.code||null});if(!res.destroyed)res.destroy(error);});
+    const date=new Date().toISOString().slice(0,10),filename=`orange-photos-${date}.zip`;
+    res.setHeader("Content-Type","application/zip");
+    res.setHeader("Content-Disposition",`attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    archive.pipe(res);
+    for(let index=0;index<items.length;index+=1){
+      if(cancelled)break;
+      const download=await service.downloadObject(items[index]);
+      if(cancelled){download.Body.destroy();break;}
+      current=download.Body;archive.append(current,{name:names[index]});
+      await new Promise((resolve,reject)=>{current.once("end",resolve);current.once("close",resolve);current.once("error",reject);});
+      current=null;
+    }
+    if(!cancelled)await archive.finalize();
+  } catch(error) {
+    console.error("OrangePhotos ZIP",{name:error.name,code:error.code||null});
+    if(!res.headersSent)return res.status(502).json({ok:false,code:"INTERNAL_ERROR",message:"No se pudo preparar la descarga.",details:null});
+    if(!res.destroyed)res.destroy(error);
+  }
+}
 function handleOrangePhotosRoutes(app) {
   app.get("/api/orange-photo-members", safe(req => service.familyMembers(req), "No se pudieron cargar los miembros."));
   app.get("/api/orange-photos", safe(req => service.list(req), "No se pudo cargar la biblioteca."));
@@ -60,6 +104,7 @@ function handleOrangePhotosRoutes(app) {
   app.get("/api/orange-photos/:id/url", safe(req => service.signedUrl(req, req.params.id), "No se pudo firmar la URL."));
   app.get("/api/orange-photos/:id/original-url", safe(req => service.signedUrl(req, req.params.id, true), "No se pudo firmar la URL original."));
   app.get("/api/orange-photos/:id/download", async (req, res) => { try { const result = await service.download(req, req.params.id); if (!result.ok) return send(res, result); const { download, filename } = result.payload; res.setHeader("Content-Type", download.ContentType); if (download.ContentLength != null) res.setHeader("Content-Length", String(download.ContentLength)); res.setHeader("Content-Disposition", `attachment; filename="${attachmentName(filename)}"; filename*=UTF-8''${encodeURIComponent(attachmentName(filename))}`); download.Body.on?.("error", error => { console.error("OrangePhotos download", error); if (!res.headersSent) res.status(502).end(); else res.destroy(error); }); return download.Body.pipe(res); } catch (error) { console.error("OrangePhotos download", error); return res.status(502).json({ ok: false, message: "No se pudo descargar el archivo." }); } });
+  app.post("/api/orange-photos/download",(req,res)=>express.urlencoded({extended:false,limit:"64kb",parameterLimit:10})(req,res,error=>error?res.status(error.type==="entity.too.large"?413:400).json({ok:false,code:"INVALID_METADATA",message:error.type==="entity.too.large"?"La selección enviada es demasiado grande.":"La selección enviada no es válida.",details:null}):streamZip(req,res)));
   app.post("/api/orange-photos/:id/share", safe(req => service.share(req, req.params.id, req.body || {}), "No se pudo compartir la foto."));
   app.get("/api/orange-photo-albums", safe(req => service.albums(req), "No se pudieron cargar los álbumes."));
   app.post("/api/orange-photo-albums", safe(req => service.createAlbum(req, req.body || {}), "No se pudo crear el álbum.", 201));

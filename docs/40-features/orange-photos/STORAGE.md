@@ -10,6 +10,12 @@
 
 PostgreSQL guarda `provider`, `bucket` y `object_key`, nunca una URL permanente. Node acepta para lectura el prefijo actual del entorno y el prefijo legacy `family_photos/`, pero solo escribe y lista objetos nuevos dentro del prefijo actual. Las credenciales permanecen en el backend.
 
+## Descargas
+
+La descarga de una sola fotografía o vídeo entrega directamente el original obtenido desde Wasabi y conserva su nombre original. Cuando se seleccionan varios elementos, `POST /api/orange-photos/download` genera un único ZIP en streaming: Node valida previamente la autenticación, la familia, la visibilidad y el acceso a todos los recursos y después encadena secuencialmente sus streams originales hacia la respuesta.
+
+El ZIP no acumula los originales completos en memoria ni crea copias temporales en disco. Los archivos quedan en la raíz con nombres saneados y no colisionantes. No existe un máximo numérico artificial de elementos; la petición queda limitada por el parser local del endpoint y por los límites normales de la infraestructura.
+
 Fuera de producción, el borrado definitivo elimina el registro PostgreSQL pero omite expresamente el borrado físico de objetos legacy `family_photos/`. En producción sí puede borrar físicamente esos objetos después de las validaciones de ownership existentes.
 
 La selección de archivos se prepara en un modal: permite arrastrar, elegir y acumular hasta 100 fotos o vídeos admitidos. La subida, comprobación de duplicados y creación de la cola no comienzan hasta pulsar `Iniciar subida`.
