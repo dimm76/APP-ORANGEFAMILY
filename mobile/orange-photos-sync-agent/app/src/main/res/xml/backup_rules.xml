@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
     <exclude domain="sharedpref" path="orangefamily_secure_session.xml" />
+    <exclude domain="database" path="orange_photos_local.db" />
+    <exclude domain="database" path="orange_photos_local.db-shm" />
+    <exclude domain="database" path="orange_photos_local.db-wal" />
 </full-backup-content>
