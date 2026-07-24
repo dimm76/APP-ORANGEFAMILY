@@ -31,7 +31,7 @@ export default function OrangePhotosUploadPicker({ open, files, onAddFiles, onCa
     <section ref={modalRef} className="od-orangephotos-upload-picker" role="dialog" aria-modal="true" aria-labelledby="orangephotos-upload-picker-title" tabIndex={-1}>
       <header className="od-orangephotos-upload-picker__header"><h2 id="orangephotos-upload-picker-title">Seleccionar archivos</h2></header>
       <div className="od-orangephotos-upload-picker__body">
-        <div className={`od-orangephotos-upload-picker__dropzone${dragActive ? " is-active" : ""}`} onDragEnter={event => { event.preventDefault(); setDragActive(true); }} onDragOver={event => { event.preventDefault(); setDragActive(true); }} onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget)) setDragActive(false); }} onDrop={event => { event.preventDefault(); event.stopPropagation(); setDragActive(false); onAddFiles(event.dataTransfer.files); }}>
+        <div className={`od-orangephotos-upload-picker__dropzone${dragActive ? " is-active" : ""}`} onDragEnter={event => { event.preventDefault(); setDragActive(true); }} onDragOver={event => { event.preventDefault(); setDragActive(true); }} onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget)) setDragActive(false); }} onDrop={event => { event.preventDefault(); event.stopPropagation(); setDragActive(false); const droppedFiles=Array.from(event.dataTransfer.files||[]);onAddFiles(droppedFiles); }}>
           <strong>Arrastra aquí tus fotos y vídeos</strong><span>o usa “Elegir archivos”</span>
         </div>
         <p className="od-orangephotos-upload-picker__file-count">{count} {count === 1 ? "archivo seleccionado" : "archivos seleccionados"}</p>
