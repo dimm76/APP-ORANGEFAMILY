@@ -2,7 +2,7 @@
 const service = require("./orangePhotosService");
 const multipartService = require("./orangePhotosMultipartService");
 const express = require("express");
-const archiver = require("archiver");
+const { ZipArchive } = require("archiver");
 
 function send(res, result, status = 200) { if (!result.ok) return res.status(result.status || 400).json({ ok:false,code:result.code||"INTERNAL_ERROR",message:result.reason||"Petición no válida.",details:result.details??null }); return res.status(status).json({ ok:true,...result.payload }); }
 function requestError(code,message,status=400){return Object.assign(new Error(message),{orangePhotosCode:code,status});}
@@ -55,31 +55,37 @@ function zipEntryNames(items) {
   });
 }
 async function streamZip(req,res){
+  let stage="validate",currentItem=null;
   try {
+    stage="validate";
     const result=await service.downloadMany(req,req.body||{});if(!result.ok)return send(res,result);
-    const items=result.payload.items,names=zipEntryNames(items),archive=archiver("zip",{zlib:{level:0}});
+    stage="create_archive";
+    const items=result.payload.items,names=zipEntryNames(items),archive=new ZipArchive({zlib:{level:0}});
     let completed=false,current=null,cancelled=false;
     const cancel=()=>{if(completed||cancelled)return;cancelled=true;current?.destroy();archive.abort();};
     req.once("aborted",cancel);
     res.once("finish",()=>{completed=true;});
     res.once("close",()=>{if(!completed&&!res.writableEnded)cancel();});
     archive.on("warning",error=>console.error("OrangePhotos ZIP warning",{name:error.name,code:error.code||null}));
-    archive.on("error",error=>{console.error("OrangePhotos ZIP",{name:error.name,code:error.code||null});if(!res.destroyed)res.destroy(error);});
+    archive.on("error",error=>{console.error("OrangePhotos ZIP archive",{name:error?.name||null,code:error?.code||null,message:error?.message||String(error)});if(!res.destroyed)res.destroy(error);});
     const date=new Date().toISOString().slice(0,10),filename=`orange-photos-${date}.zip`;
     res.setHeader("Content-Type","application/zip");
     res.setHeader("Content-Disposition",`attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
     archive.pipe(res);
     for(let index=0;index<items.length;index+=1){
       if(cancelled)break;
+      currentItem={id:items[index].id,object_key:items[index].object_key,bucket:items[index].bucket};
+      stage="get_object";
       const download=await service.downloadObject(items[index]);
       if(cancelled){download.Body.destroy();break;}
+      stage="append_object";
       current=download.Body;archive.append(current,{name:names[index]});
       await new Promise((resolve,reject)=>{current.once("end",resolve);current.once("close",resolve);current.once("error",reject);});
       current=null;
     }
-    if(!cancelled)await archive.finalize();
+    if(!cancelled){stage="finalize";await archive.finalize();}
   } catch(error) {
-    console.error("OrangePhotos ZIP",{name:error.name,code:error.code||null});
+    console.error("OrangePhotos ZIP",{stage,photo_id:currentItem?.id||null,bucket:currentItem?.bucket||null,object_key:currentItem?.object_key||null,name:error?.name||null,code:error?.code||null,message:error?.message||String(error)});
     if(!res.headersSent)return res.status(502).json({ok:false,code:"INTERNAL_ERROR",message:"No se pudo preparar la descarga.",details:null});
     if(!res.destroyed)res.destroy(error);
   }
