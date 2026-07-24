@@ -22,6 +22,7 @@ const SIMPLE_VIDEO_MAX_BYTES = 500 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 10 * 1024 * 1024 * 1024;
 const MULTIPART_PART_BYTES = 25 * 1024 * 1024;
 const MULTIPART_UPLOAD_TTL_HOURS = 24;
+const MAX_ZIP_DOWNLOAD_ITEMS = 500;
 const ok=payload=>({ok:true,payload});
 const bad=(status,code,reason,details=null)=>{
   if(reason==null){reason=code;code=status===404?"UPLOAD_NOT_FOUND":status===413?"FILE_TOO_LARGE":"INVALID_METADATA";}
@@ -266,6 +267,7 @@ async function downloadMany(req,body={}){
   if(!Array.isArray(requested))return bad(400,"INVALID_METADATA","photo_ids debe ser una lista.");
   const ids=[...new Set(requested.map(value=>String(value||"").trim()))];
   if(ids.length<2)return bad(400,"INVALID_METADATA","Selecciona al menos dos elementos.");
+  if(ids.length>MAX_ZIP_DOWNLOAD_ITEMS)return bad(400,"INVALID_METADATA","Puedes descargar un máximo de 500 elementos a la vez.");
   if(ids.some(id=>!uuid(id)))return bad(400,"INVALID_METADATA","Uno o más identificadores no son válidos.");
   const rows=(await pool.query(`SELECT p.id,p.original_filename,f.bucket,f.object_key,f.mime_type,f.size_bytes FROM public.orange_photos p JOIN public.orange_photo_files f ON f.photo_id=p.id AND f.family_id=p.family_id AND f.variant='original' WHERE p.family_id=$1::uuid AND ${visibilitySql()} AND p.is_trashed=false AND p.id=ANY($3::uuid[])`,[a.familyId,a.userId,ids])).rows;
   if(rows.length!==ids.length)return bad(404,"UPLOAD_NOT_FOUND","Una o más fotos no existen, no son accesibles o no tienen original disponible.");
