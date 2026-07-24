@@ -18,7 +18,7 @@ El ZIP no acumula los originales completos en memoria ni crea copias temporales 
 
 Fuera de producción, el borrado definitivo elimina el registro PostgreSQL pero omite expresamente el borrado físico de objetos legacy `family_photos/`. En producción sí puede borrar físicamente esos objetos después de las validaciones de ownership existentes.
 
-La selección de archivos se prepara en un modal: permite arrastrar, elegir y acumular hasta 100 fotos o vídeos admitidos. La subida, comprobación de duplicados y creación de la cola no comienzan hasta pulsar `Iniciar subida`.
+La selección de archivos se prepara en un modal: permite arrastrar, elegir y acumular hasta 500 fotos o vídeos admitidos. El navegador normaliza exclusivamente los formatos soportados cuando el MIME falta o no es reconocido, utilizando la extensión del nombre, e informa los duplicados, formatos incompatibles y archivos excluidos por el límite. La subida, comprobación de duplicados y creación de la cola no comienzan hasta pulsar `Iniciar subida`.
 
 Mover una fotografía o vídeo a la Papelera solo actualiza PostgreSQL y no elimina ningún objeto de Wasabi.
 

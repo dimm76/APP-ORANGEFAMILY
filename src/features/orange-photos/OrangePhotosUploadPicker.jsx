@@ -6,6 +6,15 @@ function formatSize(bytes) {
   return `${(bytes / (1024 * 1024)).toLocaleString("es-ES", { maximumFractionDigits: 1 })} MB`;
 }
 
+function formatSelectionSummary(summary) {
+  if (!summary || !summary.duplicates && !summary.incompatible && !summary.limited) return "";
+  const parts = [`${summary.added} añadidos`];
+  if (summary.duplicates) parts.push(`${summary.duplicates} repetidos`);
+  if (summary.incompatible) parts.push(`${summary.incompatible} no compatibles`);
+  if (summary.limited) parts.push(`${summary.limited} excluidos por límite`);
+  return `${summary.received} seleccionados: ${parts.join(", ")}.`;
+}
+
 export default function OrangePhotosUploadPicker({ open, files, onAddFiles, onCancel, onStart, onBrowse }) {
   const [dragActive, setDragActive] = useState(false);
   const modalRef = useRef(null);
@@ -26,7 +35,7 @@ export default function OrangePhotosUploadPicker({ open, files, onAddFiles, onCa
   }, [open, onCancel]);
 
   if (!open) return null;
-  const count = files.length;
+  const count = files.length, summary=files.selectionSummary, summaryMessage=formatSelectionSummary(summary);
   return <div className="od-orangephotos-upload-picker__backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onCancel(); }}>
     <section ref={modalRef} className="od-orangephotos-upload-picker" role="dialog" aria-modal="true" aria-labelledby="orangephotos-upload-picker-title" tabIndex={-1}>
       <header className="od-orangephotos-upload-picker__header"><h2 id="orangephotos-upload-picker-title">Seleccionar archivos</h2></header>
@@ -35,6 +44,8 @@ export default function OrangePhotosUploadPicker({ open, files, onAddFiles, onCa
           <strong>Arrastra aquí tus fotos y vídeos</strong><span>o usa “Elegir archivos”</span>
         </div>
         <p className="od-orangephotos-upload-picker__file-count">{count} {count === 1 ? "archivo seleccionado" : "archivos seleccionados"}</p>
+        {summaryMessage ? <p className="od-inline-msg">{summaryMessage}</p> : null}
+        {summary?.incompatibleFiles.length ? <ul className="od-orangephotos-upload-picker__file-list">{summary.incompatibleFiles.map((name,index) => <li key={`${name}-${index}`}><span>{name}</span><small>Formato no compatible</small></li>)}</ul> : null}
         {count ? <ul className="od-orangephotos-upload-picker__file-list">{files.map(file => <li key={`${file.name}-${file.size}-${file.lastModified}`}><span>{file.name}</span><small>{formatSize(file.size)}</small></li>)}</ul> : null}
       </div>
       <footer className="od-orangephotos-upload-picker__footer"><button type="button" className="od-btn od-btn-secondary" onClick={onCancel}>Cancelar</button><button type="button" className="od-btn od-btn-secondary" onClick={onBrowse}>Elegir archivos</button><button type="button" className="od-btn od-btn-primary" disabled={!count} onClick={onStart}>Iniciar subida</button></footer>
