@@ -6,7 +6,12 @@ import OrangePhotoCard from "./OrangePhotoCard.jsx";
 function aspectRatio(photo) {
   const width = Number(photo.width);
   const height = Number(photo.height);
-  return width > 0 && height > 0 ? width / height : photo.media_type === "video" ? 16 / 9 : 1;
+
+  if (width > 0 && height > 0) {
+    return Math.min(8, Math.max(0.125, width / height));
+  }
+
+  return photo.media_type === "video" ? 16 / 9 : 1;
 }
 
 function buildJustifiedRows(photos, availableWidth) {
@@ -43,11 +48,20 @@ function buildJustifiedRows(photos, availableWidth) {
   function pushIncompleteRow(rowPhotos) {
     if (!rowPhotos.length) return;
 
+    /*
+     * En móvil todas las filas, incluida la última, deben ocupar
+     * exactamente el ancho disponible. Se aumenta la altura cuando
+     * sea necesario en lugar de dejar espacio vacío a la derecha.
+     *
+     * En tablet y escritorio se conserva la última fila sin estirar.
+     */
     rows.push({
       photos: rowPhotos,
-      height: targetHeight,
+      height: mobile
+        ? calculateRowHeight(rowPhotos)
+        : targetHeight,
       gap,
-      complete: false,
+      complete: mobile,
     });
   }
 

@@ -780,23 +780,30 @@
   z-index: 30;
   width: 78px;
   pointer-events: none;
+  background: transparent;
 }
 
 .od-orange-photos__timeline {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.28;
+  opacity: 0;
+  visibility: hidden;
   transition:
-    opacity 140ms ease,
-    background 140ms ease;
+    opacity 160ms ease,
+    visibility 160ms ease;
 }
 
 .od-orange-photos__timeline.is-visible,
 .od-orange-photos__timeline.is-dragging,
-.od-orange-photos__timeline-layer:hover
+.od-orange-photos__timeline-layer.is-scrubbing
   .od-orange-photos__timeline {
   opacity: 1;
+  visibility: visible;
+}
+
+.od-orange-photos__timeline:not(.is-visible):not(.is-dragging) {
+  background: transparent;
 }
 
 .od-orange-photos__timeline-track {
@@ -1036,13 +1043,12 @@
   }
 
   .od-orange-photos__timeline-layer:not(.is-activated)
-    .od-orange-photos__timeline {
-    opacity: 0;
+    .od-orange-photos__timeline-track {
     pointer-events: none;
   }
 
   .od-orange-photos__timeline-layer.is-activated
-    .od-orange-photos__timeline {
+    .od-orange-photos__timeline-track {
     pointer-events: auto;
   }
 }

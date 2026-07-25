@@ -105,13 +105,33 @@ export default function OrangePhotosTimeline({
 
   useEffect(() => {
     if (draggingRef.current) return;
-    const nextProgress = Number.isFinite(progress)
+
+    const physicalProgress = Number.isFinite(progress)
       ? Math.min(1, Math.max(0, progress))
       : 0;
-    setScrubProgress(nextProgress);
+
+    const activeTimelinePeriod = periods.find(
+      (period) => period.key === activePeriod,
+    );
+
     const current =
-      periods.find((period) => period.key === activePeriod) ||
-      nearestPeriod(periods, nextProgress);
+      activeTimelinePeriod ||
+      nearestPeriod(periods, physicalProgress);
+
+    /*
+     * El scroll del contenido y el timeline usan escalas diferentes.
+     * Cuando conocemos el periodo visible, el tirador debe colocarse
+     * en el centro ponderado de ese periodo, no en el porcentaje físico
+     * de scroll del contenedor.
+     *
+     * physicalProgress se conserva únicamente como fallback inicial,
+     * antes de que IntersectionObserver determine activePeriod.
+     */
+    const timelineProgress = current
+      ? current.center
+      : physicalProgress;
+
+    setScrubProgress(timelineProgress);
     setPreviewPeriod(current || null);
   }, [activePeriod, periods, progress]);
 
