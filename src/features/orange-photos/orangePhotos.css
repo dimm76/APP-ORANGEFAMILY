@@ -369,3 +369,409 @@
 .od-btn-danger { border-color:#fecaca; background:#fff7f7; color:#b42318; }
 .od-btn-danger:hover:not(:disabled) { border-color:#b42318; background:#b42318; color:#fff; }
 .od-btn:focus-visible { outline:2px solid #94a3b8; outline-offset:2px; }
+
+/* Segunda fase móvil de OrangePhotos */
+
+.od-orangephotos-search-mobile-button {
+  display: none;
+}
+
+.od-attachments-lightbox__toolbar-start {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.od-attachments-lightbox__zoom-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.od-attachments-lightbox__more {
+  position: relative;
+  display: inline-flex;
+}
+
+.od-attachments-lightbox__more-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120210;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.od-attachments-lightbox__more-menu {
+  position: fixed;
+  top: 58px;
+  right: 10px;
+  z-index: 120211;
+  display: grid;
+  min-width: 210px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: #111827;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.38);
+}
+
+.od-attachments-lightbox__more-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #f8fafc;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.od-attachments-lightbox__more-item:hover,
+.od-attachments-lightbox__more-item:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.od-attachments-lightbox__more-item ion-icon {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+}
+
+.od-attachments-lightbox__more-item--danger {
+  color: #fca5a5;
+}
+
+.od-orange-photo-details__section {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.od-orange-photo-details__section-icon {
+  display: flex;
+  justify-content: center;
+  padding-top: 2px;
+  color: #cbd5e1;
+}
+
+.od-orange-photo-details__section-icon ion-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.od-orange-photo-details__section-content {
+  min-width: 0;
+}
+
+.od-orange-photo-details__section-content h3 {
+  margin: 0 0 8px;
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.od-orange-photo-details__section-content p {
+  margin: 0;
+}
+
+.od-orange-photo-details__section-content p + p {
+  margin-top: 5px;
+}
+
+.od-orange-photo-details__primary {
+  color: #f8fafc !important;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.od-orange-photo-details__secondary,
+.od-orange-photo-details__section-content small {
+  color: #cbd5e1 !important;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.od-orange-photo-details__field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.od-orange-photo-details__field span {
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.od-orange-photo-details__textarea {
+  min-height: 88px;
+}
+
+.od-orange-photo-details__technical {
+  margin-top: 9px;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.od-orange-photo-details__technical summary {
+  cursor: pointer;
+}
+
+.od-orange-photo-details__save {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 16px;
+}
+
+@media (max-width: 767px) {
+  .od-orangephotos-search-desktop {
+    display: none !important;
+  }
+
+  .od-orangephotos-search-mobile-button {
+    display: inline-grid;
+  }
+
+  .od-orangephotos-header-actions {
+    gap: 2px;
+  }
+
+  .od-orangephotos-header-icon,
+  .od-orangephotos-upload-button {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+  }
+}
+
+@media (max-width: 600px) {
+  .od-orange-photos__library {
+    display: block !important;
+    grid-template-columns: none !important;
+    gap: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .od-orange-photos__scroller {
+    padding: 0 0 20px !important;
+  }
+
+  .od-orange-photos__content,
+  .od-orange-photos__period,
+  .od-orange-photos__day,
+  .od-orange-photos__justified-row {
+    width: 100%;
+    max-width: none;
+  }
+
+  .od-orange-photos__justified-row {
+    margin-bottom: 2px;
+  }
+
+  .od-orange-photos__period {
+    margin-bottom: 18px;
+  }
+
+  .od-orange-photos__day {
+    margin-bottom: 14px;
+  }
+
+  .od-orange-photos__period > h2 {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+
+  .od-orange-photos__day-header {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+
+  .od-orange-photos__timeline-layer {
+    right: 0;
+  }
+
+  .od-attachments-lightbox {
+    height: 100dvh;
+    background: #000;
+  }
+
+  .od-attachments-lightbox__toolbar {
+    min-height: 54px;
+    height: 54px;
+    padding:
+      max(6px, env(safe-area-inset-top))
+      6px
+      6px;
+    gap: 4px;
+    background: rgba(3, 7, 18, 0.92);
+    overflow: visible;
+  }
+
+  .od-attachments-lightbox__toolbar-start {
+    flex: 0 0 auto;
+  }
+
+  .od-attachments-lightbox__title {
+    display: none;
+  }
+
+  .od-attachments-lightbox__controls {
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    min-width: 0;
+    gap: 2px;
+  }
+
+  .od-attachments-lightbox__btn {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .od-attachments-lightbox__btn:hover,
+  .od-attachments-lightbox__btn:focus-visible {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .od-attachments-lightbox__btn ion-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .od-attachments-lightbox__btn--close {
+    order: -1;
+    margin: 0;
+  }
+
+  .od-attachments-lightbox__zoom-actions {
+    display: none;
+  }
+
+  .od-attachments-lightbox__stage {
+    inset: 54px 0 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .od-attachments-lightbox__img {
+    display: block;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    margin: auto;
+    border-radius: 0;
+    box-shadow: none;
+    object-fit: contain;
+  }
+
+  .od-attachments-lightbox__video {
+    width: 100%;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    margin: auto;
+    object-fit: contain;
+  }
+
+  .od-attachments-lightbox__nav {
+    top: 50%;
+    width: 42px;
+    height: 56px;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.66);
+  }
+
+  .od-attachments-lightbox__nav--previous {
+    left: 6px;
+  }
+
+  .od-attachments-lightbox__nav--next {
+    right: 6px;
+  }
+
+  .od-attachments-lightbox.is-info-open
+    .od-attachments-lightbox__stage {
+    inset: 54px 0 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+  }
+
+  .od-attachments-lightbox__info {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 120220;
+    width: 100% !important;
+    max-width: none !important;
+    height: 100dvh !important;
+    overflow-y: auto;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: #111827 !important;
+    color: #f8fafc !important;
+  }
+
+  .od-attachments-lightbox__info > header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    min-height: 54px;
+    padding:
+      max(6px, env(safe-area-inset-top))
+      10px
+      6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    background: #111827;
+  }
+
+  .od-attachments-lightbox__info > header h2 {
+    margin: 0;
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .od-attachments-lightbox__info-close {
+    flex: 0 0 40px;
+  }
+
+  .od-orange-photo-details {
+    gap: 0;
+    padding: 4px 16px 24px;
+  }
+
+  .od-orange-photo-details .od-filter-input {
+    min-height: 44px;
+    width: 100%;
+    font-size: 15px;
+  }
+
+  .od-orange-photo-details textarea.od-filter-input {
+    min-height: 92px;
+  }
+
+  .od-attachments-lightbox__more-menu {
+    top: 54px;
+    right: 6px;
+    width: min(250px, calc(100vw - 12px));
+  }
+}

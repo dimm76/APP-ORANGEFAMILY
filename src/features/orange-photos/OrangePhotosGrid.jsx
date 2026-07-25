@@ -12,24 +12,121 @@ function aspectRatio(photo) {
 function buildJustifiedRows(photos, availableWidth) {
   const mobile = availableWidth < 600;
   const tablet = availableWidth >= 600 && availableWidth < 900;
-  const targetHeight = mobile ? 145 : tablet ? 150 : availableWidth >= 1280 ? 180 : 165;
+
+  const targetHeight = mobile
+    ? 170
+    : tablet
+      ? 155
+      : availableWidth >= 1280
+        ? 180
+        : 165;
+
+  const minimumMobileHeight = 140;
+  const maximumMobileItems = 3;
   const gap = mobile ? 2 : 6;
+
   const rows = [];
   let current = [];
 
+  function calculateRowHeight(rowPhotos) {
+    const ratio = rowPhotos.reduce(
+      (sum, item) => sum + aspectRatio(item),
+      0,
+    );
+
+    return (
+      (availableWidth - gap * Math.max(0, rowPhotos.length - 1)) /
+      Math.max(ratio, 0.01)
+    );
+  }
+
+  function pushIncompleteRow(rowPhotos) {
+    if (!rowPhotos.length) return;
+
+    rows.push({
+      photos: rowPhotos,
+      height: targetHeight,
+      gap,
+      complete: false,
+    });
+  }
+
+  function pushCompleteRow(rowPhotos) {
+    if (!rowPhotos.length) return;
+
+    rows.push({
+      photos: rowPhotos,
+      height: calculateRowHeight(rowPhotos),
+      gap,
+      complete: true,
+    });
+  }
+
   photos.forEach((photo) => {
-    current.push(photo);
-    const ratio = current.reduce((sum, item) => sum + aspectRatio(item), 0);
-    const estimatedWidth = ratio * targetHeight + gap * (current.length - 1);
-    if (estimatedWidth >= availableWidth) {
-      const rowHeight = (availableWidth - gap * (current.length - 1)) / ratio;
-      rows.push({ photos: current, height: rowHeight, gap, complete: true });
+    if (!mobile) {
+      const candidate = [...current, photo];
+      const candidateHeight = calculateRowHeight(candidate);
+
+      current = candidate;
+
+      if (candidateHeight <= targetHeight) {
+        pushCompleteRow(current);
+        current = [];
+      }
+
+      return;
+    }
+
+    /*
+     * En móvil:
+     * - máximo 3 imágenes por fila;
+     * - nunca cerrar una fila si la altura resultante baja de 140 px;
+     * - una panorámica puede ocupar una fila por sí sola;
+     * - la última fila no se estira.
+     */
+
+    if (!current.length) {
+      const singleHeight = calculateRowHeight([photo]);
+
+      if (singleHeight <= targetHeight) {
+        pushCompleteRow([photo]);
+      } else {
+        current = [photo];
+      }
+
+      return;
+    }
+
+    const candidate = [...current, photo];
+    const candidateHeight = calculateRowHeight(candidate);
+
+    if (candidateHeight < minimumMobileHeight) {
+      pushIncompleteRow(current);
+      current = [photo];
+
+      const singleHeight = calculateRowHeight(current);
+
+      if (singleHeight <= targetHeight) {
+        pushCompleteRow(current);
+        current = [];
+      }
+
+      return;
+    }
+
+    current = candidate;
+
+    if (
+      current.length >= maximumMobileItems ||
+      candidateHeight <= targetHeight
+    ) {
+      pushCompleteRow(current);
       current = [];
     }
   });
 
   if (current.length) {
-    rows.push({ photos: current, height: targetHeight, gap, complete: false });
+    pushIncompleteRow(current);
   }
 
   return rows;
@@ -123,7 +220,7 @@ export default function OrangePhotosGrid({
                   {row.photos.map((photo, photoIndex) => (
                     <div
                       className="od-orange-photos__justified-item"
-                      style={{ width: aspectRatio(photo) * row.height, flexBasis: aspectRatio(photo) * row.height, height: row.height }}
+                      style={{ width: aspectRatio(photo) * row.height, flexBasis: aspectRatio(photo) * row.height, height: row.height, maxWidth: "100%" }}
                       key={photo.id}
                     >
                       <OrangePhotoCard

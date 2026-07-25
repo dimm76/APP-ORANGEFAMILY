@@ -412,7 +412,12 @@ ion-app.od-app-root {
 }
 
 @media (max-width: 767px) {
-  .od-app-root--orangephotos-workspace .od-app-header-actions { display: flex; }
+  .od-app-root--orangephotos-workspace .od-app-header-actions {
+    display: flex;
+    align-items: center;
+    width: auto;
+    flex: 0 0 auto;
+  }
   .od-app-header-menu-toggle {
     display: inline-flex;
     flex: 0 0 36px;
@@ -477,14 +482,19 @@ ion-app.od-app-root {
     cursor: pointer;
   }
 
-  .od-app-root--orangephotos-workspace .od-main-ion-content {
+}
+
+@media (max-width: 600px) {
+  .od-app-root--orangephotos-workspace
+    .od-main-ion-content {
     --padding-start: 0;
     --padding-end: 0;
     --padding-top: 0;
     --padding-bottom: 0;
   }
 
-  .od-app-root--orangephotos-workspace .od-main-ion-content::part(scroll) {
+  .od-app-root--orangephotos-workspace
+    .od-main-ion-content::part(scroll) {
     padding: 0;
   }
 }
