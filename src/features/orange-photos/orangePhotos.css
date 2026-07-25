@@ -275,17 +275,7 @@
 .od-orangephotos-upload-info>button:focus-visible { outline:2px solid var(--od-color-primary,#fc4200); outline-offset:2px; }
 .od-orangephotos-upload-info ion-icon { width:17px; height:17px; }
 .od-orangephotos-upload-info__popover { position:absolute; z-index:2; top:calc(100% + 7px); left:0; width:max-content; max-width:min(320px,calc(100vw - 64px)); padding:9px 10px; border:1px solid var(--od-color-border-soft,#dce3f5); border-radius:8px; background:var(--od-color-surface,#fff); box-shadow:0 8px 24px rgba(15,23,42,.12); color:var(--od-color-text,#37374b); font-size:12px; font-weight:400; line-height:1.45; }
-.od-orangephotos-upload-fab { position:fixed; right:max(16px,calc(env(safe-area-inset-right) + 12px)); bottom:max(16px,calc(env(safe-area-inset-bottom) + 12px)); z-index:1100; display:grid; place-items:center; width:52px; height:52px; padding:0; border:1px solid var(--od-color-primary,#fc4200); border-radius:999px; background:var(--od-color-primary,#fc4200); box-shadow:0 8px 20px rgba(15,23,42,.2); color:#fff; cursor:pointer; }
-.od-orangephotos-upload-fab:hover { background:var(--od-color-primary-hover,#e03a00); }
-.od-orangephotos-upload-fab:focus-visible { outline:3px solid var(--od-color-primary-soft,rgba(252,66,0,.25)); outline-offset:3px; }
-.od-orangephotos-upload-fab>ion-icon { width:24px; height:24px; }
-.od-orangephotos-upload-fab__badge { position:absolute; top:-4px; right:-4px; display:grid; place-items:center; min-width:20px; height:20px; padding:0 5px; border:2px solid #fff; border-radius:999px; background:#52525b; color:#fff; font-size:10px; font-weight:700; line-height:1; box-sizing:border-box; }
-.od-orangephotos-upload-fab.has-warning .od-orangephotos-upload-fab__badge { background:#b45309; }
-.od-orangephotos-upload-fab.is-completed .od-orangephotos-upload-fab__badge { background:var(--od-color-success,#15803d); }
-.od-orangephotos-upload-fab.is-active::before { content:""; position:absolute; inset:-5px; border:2px solid var(--od-color-primary,#fc4200); border-radius:inherit; animation:od-orangephotos-upload-pulse 1.6s ease-out infinite; }
-@keyframes od-orangephotos-upload-pulse { 0% { opacity:.65; transform:scale(.92); } 70%,100% { opacity:0; transform:scale(1.18); } }
-@media (max-width:600px) { .od-orangephotos-upload-info__popover { left:auto; right:-8px; max-width:min(280px,calc(100vw - 48px)); }.od-orangephotos-upload-fab { width:46px; height:46px; bottom:max(72px,calc(env(safe-area-inset-bottom) + 60px)); }.od-orangephotos-upload-fab>ion-icon { width:22px; height:22px; } }
-@media (prefers-reduced-motion:reduce) { .od-orangephotos-upload-fab.is-active::before { animation:none; opacity:.45; transform:none; } }
+@media (max-width:600px) { .od-orangephotos-upload-info__popover { left:auto; right:-8px; max-width:min(280px,calc(100vw - 48px)); } }
 .od-orangephotos-upload-progress__minimize { display:grid; place-items:center; flex:0 0 30px; width:30px; height:30px; margin-left:auto; padding:0; border:0; border-radius:8px; background:transparent; color:var(--od-color-text-muted,#64748b); cursor:pointer; }
 .od-orangephotos-upload-progress__minimize:hover,.od-orangephotos-upload-progress__minimize:focus-visible { background:var(--od-color-primary-soft,rgba(252,66,0,.1)); color:var(--od-color-primary,#fc4200); }
 .od-orangephotos-upload-progress__minimize ion-icon { width:20px; height:20px; }
@@ -302,17 +292,19 @@
 .od-orangephotos-upload-progress footer { display:grid; grid-template-columns:minmax(90px,auto) minmax(0,1fr); align-items:center; gap:10px; }
 .od-orangephotos-upload-global-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:6px; }
 .od-orangephotos-upload-global-actions button { width:auto; min-width:0; min-height:34px; padding-inline:11px; white-space:nowrap; }
-.od-orangephotos-upload-fab { overflow:hidden; border:2px solid var(--od-color-primary,#fc4200); background:#fff; color:var(--od-color-primary,#fc4200); }
-.od-orangephotos-upload-fab:hover { background:var(--od-color-primary-soft,rgba(252,66,0,.12)); color:var(--od-color-primary,#fc4200); }
-.od-orangephotos-upload-fab>ion-icon { position:relative; z-index:2; }
-.od-orangephotos-upload-fab__badge { z-index:3; }
-.od-orangephotos-upload-fab.is-transferring { background:var(--od-color-primary,#fc4200); color:#fff; animation:od-orangephotos-upload-glow 1.6s ease-in-out infinite; }
-.od-orangephotos-upload-fab.is-transferring:hover { background:var(--od-color-primary-hover,#e03a00); color:#fff; }
-.od-orangephotos-upload-fab.is-transferring::before { content:""; position:absolute; inset:0; z-index:0; background:linear-gradient(180deg,rgba(255,255,255,.22) 0%,rgba(255,255,255,0) 38%,rgba(216,55,0,.28) 100%); background-size:100% 220%; animation:od-orangephotos-upload-rise 1.5s linear infinite; }
-@keyframes od-orangephotos-upload-rise { from { background-position:0 100%; } to { background-position:0 -120%; } }
-@keyframes od-orangephotos-upload-glow { 0%,100% { box-shadow:0 8px 20px rgba(15,23,42,.2),0 0 0 0 rgba(252,66,0,.28); } 50% { box-shadow:0 8px 20px rgba(15,23,42,.2),0 0 0 7px rgba(252,66,0,0); } }
+.od-orangephotos-upload-fab { position:fixed; right:max(18px,calc(env(safe-area-inset-right) + 14px)); bottom:max(18px,calc(env(safe-area-inset-bottom) + 14px)); z-index:1100; display:grid; place-items:center; width:50px; height:50px; padding:0; overflow:visible; border:1px solid var(--od-color-primary,#fc4200); border-radius:50%; background:#fff; color:var(--od-color-primary,#fc4200); box-shadow:0 6px 18px rgba(15,23,42,.16); cursor:pointer; isolation:isolate; }
+.od-orangephotos-upload-fab:not(.is-transferring):hover { background:var(--od-color-primary-soft,#fff4ef); color:var(--od-color-primary,#fc4200); }
+.od-orangephotos-upload-fab:focus-visible { outline:2px solid var(--od-color-primary-soft,rgba(252,66,0,.25)); outline-offset:2px; }
+.od-orangephotos-upload-fab>ion-icon { position:relative; z-index:2; width:25px; height:25px; }
+.od-orangephotos-upload-fab__badge { position:absolute; top:2px; right:2px; z-index:4; display:grid; place-items:center; min-width:18px; height:18px; padding:0 4px; border:1.5px solid #fff; border-radius:999px; background:#52525b; color:#fff; font-size:9px; font-weight:700; line-height:1; box-sizing:border-box; }
+.od-orangephotos-upload-fab.has-warning .od-orangephotos-upload-fab__badge { background:#b45309; }
+.od-orangephotos-upload-fab.is-completed .od-orangephotos-upload-fab__badge { background:var(--od-color-success,#15803d); }
+.od-orangephotos-upload-fab.is-transferring { background:var(--od-color-primary,#fc4200); color:#fff; }
+.od-orangephotos-upload-fab.is-transferring::before { content:""; position:absolute; inset:1px; z-index:0; border-radius:50%; background:linear-gradient(180deg,rgba(255,255,255,.42) 0%,rgba(255,255,255,.1) 22%,rgba(252,66,0,0) 45%,rgba(194,48,0,.34) 100%); background-size:100% 240%; animation:od-orangephotos-upload-rise 1.35s linear infinite; pointer-events:none; }
+@keyframes od-orangephotos-upload-rise { from { background-position:0 115%; } to { background-position:0 -125%; } }
 @media (max-width:600px) { .od-orangephotos-upload-progress footer { grid-template-columns:1fr; }.od-orangephotos-upload-global-actions { justify-content:flex-start; } }
-@media (prefers-reduced-motion:reduce) { .od-orangephotos-upload-fab.is-transferring,.od-orangephotos-upload-fab.is-transferring::before { animation:none; } }
+@media (max-width:600px) { .od-orangephotos-upload-fab { width:46px; height:46px; right:max(14px,calc(env(safe-area-inset-right) + 10px)); bottom:max(72px,calc(env(safe-area-inset-bottom) + 60px)); }.od-orangephotos-upload-fab>ion-icon { width:23px; height:23px; }.od-orangephotos-upload-fab__badge { top:1px; right:1px; } }
+@media (prefers-reduced-motion:reduce) { .od-orangephotos-upload-fab.is-transferring::before { animation:none; background-position:0 50%; } }
 .od-orangephotos-upload-progress footer .od-orangephotos-upload-pending-nav { display:flex; align-items:center; gap:5px; white-space:nowrap; }
 .od-orangephotos-upload-pending-nav .od-button-secondary { width:28px; min-width:28px; padding:0; }
 @media (max-width:600px) { .od-orangephotos-upload-progress__list { max-height:50vh; }.od-orangephotos-upload-progress footer { align-items:flex-start; flex-wrap:wrap; } }
