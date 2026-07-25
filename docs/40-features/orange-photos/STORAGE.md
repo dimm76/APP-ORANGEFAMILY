@@ -79,22 +79,30 @@ El navegador no proporciona la fecha de creación del sistema de archivos. `File
 
 ## Límites y modos de subida
 
-- Imágenes: máximo 30 MB mediante la subida simple a la API Node.
-- Vídeo simple: hasta 500 MB mediante la subida actual a la API Node.
-- Vídeo grande: más de 500 MB y hasta 10 GB mediante stream binario del navegador a Node.
-- Parte multipart interna desde Node a Wasabi: 25 MB.
-- Concurrencia de la transferencia interna: 1.
+Todos los originales nuevos de OrangePhotos web utilizan multipart directo del
+navegador a Wasabi, tanto para imágenes como para vídeos admitidos. Node autentica
+y autoriza al usuario, crea la sesión, firma temporalmente cada parte, comprueba
+el resultado y registra el objeto final. Las credenciales permanecen exclusivamente
+en backend y las URLs firmadas no se persisten.
 
-En el flujo activo el navegador nunca accede directamente a Wasabi, por lo que
-no se necesita permitir `PUT` por CORS ni exponer `ETag`. Node recibe el cuerpo
-sin cargarlo completo en memoria, calcula SHA-256 incrementalmente y lo escribe
-en un directorio temporal. Después obtiene metadatos y poster y transfiere el
-archivo temporal a Wasabi mediante multipart interno.
+- Wasabi conserva un único objeto original final.
+- Tamaño de parte: 25 MB.
+- Máximo de partes simultáneas por archivo: 2.
+- Máximo de archivos transfiriéndose simultáneamente: 3.
+- Máximo de archivos por selección: 500.
+- Imágenes: máximo 30 MB.
+- Vídeos: máximo 10 GB.
 
-Este flujo requiere espacio temporal suficiente en el servidor y tarda más que
-una transferencia directa porque todos los bytes pasan por Node. El multipart
-directo anterior, sus endpoints y `orange_photo_uploads` se conservan, pero el
-frontend no los utiliza mientras `direct_backend` sea el modo activo.
+IndexedDB conserva la cola y los archivos cuando el navegador permite clonar el
+`File` o `Blob`. Al reanudar, OrangeFamily consulta las partes ya presentes en
+Wasabi y transfiere únicamente las que faltan. Cerrar o suspender el navegador
+puede detener la ejecución; al volver, el usuario puede continuar sin repetir
+las partes confirmadas. La PWA y Background Sync son una ayuda complementaria,
+no una garantía de ejecución con el navegador cerrado.
+
+La futura aplicación Android utilizará la misma API multipart. Los endpoints de
+subida simple y `direct_backend` permanecen temporalmente por compatibilidad,
+pero OrangePhotos web ya no los selecciona.
 
 ## Duplicados
 
@@ -116,6 +124,7 @@ EMPTY_FILE, INVALID_MULTIPART, INVALID_METADATA, UNSUPPORTED_FILE_TYPE,
 FILE_TOO_LARGE, INVALID_POSTER, POSSIBLE_DUPLICATE, DUPLICATE_FILE,
 UPLOAD_NOT_FOUND, UPLOAD_NOT_OWNED, UPLOAD_EXPIRED, UPLOAD_INVALID_STATUS,
 UPLOAD_PART_INVALID, UPLOAD_INTERRUPTED, UPLOAD_ABORT_FAILED,
+UPLOAD_CLIENT_KEY_CONFLICT, UPLOAD_FILE_MISSING, UPLOAD_PERSISTENCE_FAILED,
 STORAGE_INIT_FAILED, STORAGE_SIGN_FAILED, STORAGE_UPLOAD_FAILED,
 STORAGE_COMPLETE_FAILED, STORAGE_VERIFY_FAILED, HASH_CALCULATION_FAILED,
 DATABASE_REGISTRATION_FAILED, VIDEO_METADATA_FAILED, VIDEO_POSTER_FAILED,

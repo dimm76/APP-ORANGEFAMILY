@@ -9,6 +9,7 @@ const {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListPartsCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
@@ -140,6 +141,27 @@ async function abortOrangePhotoMultipartUpload(record) {
   const { client, config } = getS3Client();
   const key = assertReadableOrangePhotosStorageKey(record.object_key, config.envPrefix);
   return client.send(new AbortMultipartUploadCommand({ Bucket:record.bucket || config.bucket, Key:key, UploadId:record.provider_upload_id }));
+}
+
+async function listOrangePhotoMultipartParts(upload) {
+  const { client, config } = getS3Client();
+  const parts = [];
+  let partNumberMarker;
+  do {
+    const result = await client.send(new ListPartsCommand({
+      Bucket: upload.bucket || config.bucket,
+      Key: upload.object_key,
+      UploadId: upload.provider_upload_id,
+      ...(partNumberMarker ? { PartNumberMarker: partNumberMarker } : {}),
+    }));
+    for (const part of result.Parts || []) parts.push({
+      part_number: Number(part.PartNumber),
+      etag: String(part.ETag),
+      size_bytes: Number(part.Size),
+    });
+    partNumberMarker = result.IsTruncated ? result.NextPartNumberMarker : undefined;
+  } while (partNumberMarker);
+  return parts.sort((a, b) => a.part_number - b.part_number);
 }
 
 async function uploadOrangePhotoFileToWasabi(filePath, { familyId, mimeType, extension, originalFilename, sizeBytes, checksumSha256 } = {}) {
@@ -407,5 +429,6 @@ module.exports = {
   getOrangePhotoUploadPartUrl,
   completeOrangePhotoMultipartUpload,
   abortOrangePhotoMultipartUpload,
+  listOrangePhotoMultipartParts,
   uploadOrangePhotoFileToWasabi,
 };

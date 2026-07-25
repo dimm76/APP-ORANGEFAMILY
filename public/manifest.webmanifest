@@ -1,0 +1,8 @@
+{
+  "name": "OrangeFamily",
+  "short_name": "OrangeFamily",
+  "start_url": "/app/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff"
+}
