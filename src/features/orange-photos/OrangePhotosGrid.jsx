@@ -12,23 +12,19 @@ function aspectRatio(photo) {
 function buildJustifiedRows(photos, availableWidth) {
   const mobile = availableWidth < 600;
   const tablet = availableWidth >= 600 && availableWidth < 900;
-  const targetHeight = mobile ? 120 : tablet ? 145 : availableWidth >= 1280 ? 180 : 165;
-  const gap = mobile ? 3 : 6;
+  const targetHeight = mobile ? 145 : tablet ? 150 : availableWidth >= 1280 ? 180 : 165;
+  const gap = mobile ? 2 : 6;
   const rows = [];
   let current = [];
-  let currentWidth = 0;
 
   photos.forEach((photo) => {
-    const itemWidth = aspectRatio(photo) * targetHeight;
-    const nextWidth = currentWidth + (current.length ? gap : 0) + itemWidth;
-    if (current.length && nextWidth > availableWidth) {
-      const ratio = current.reduce((sum, item) => sum + aspectRatio(item), 0);
-      rows.push({ photos: current, height: Math.min(targetHeight * 1.15, (availableWidth - gap * (current.length - 1)) / ratio), gap, complete: true });
-      current = [photo];
-      currentWidth = itemWidth;
-    } else {
-      current.push(photo);
-      currentWidth = nextWidth;
+    current.push(photo);
+    const ratio = current.reduce((sum, item) => sum + aspectRatio(item), 0);
+    const estimatedWidth = ratio * targetHeight + gap * (current.length - 1);
+    if (estimatedWidth >= availableWidth) {
+      const rowHeight = (availableWidth - gap * (current.length - 1)) / ratio;
+      rows.push({ photos: current, height: rowHeight, gap, complete: true });
+      current = [];
     }
   });
 

@@ -415,10 +415,24 @@ ion-app.od-app-root {
   .od-app-root--orangephotos-workspace .od-app-header-actions { display: flex; }
   .od-app-header-menu-toggle {
     display: inline-flex;
+    flex: 0 0 36px;
+  }
+
+  .od-app-header-brand-link {
+    margin-left: 4px;
+    margin-right: 8px;
   }
 
   .od-app-header-search {
     margin-left: 10px;
+  }
+
+  .od-app-root--orangephotos-workspace .od-app-header-search {
+    flex: 1 1 auto;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    justify-content: flex-end;
   }
 
   .od-app-header-actions {
@@ -461,6 +475,17 @@ ion-app.od-app-root {
     border: none;
     background: rgba(15, 23, 42, 0.35);
     cursor: pointer;
+  }
+
+  .od-app-root--orangephotos-workspace .od-main-ion-content {
+    --padding-start: 0;
+    --padding-end: 0;
+    --padding-top: 0;
+    --padding-bottom: 0;
+  }
+
+  .od-app-root--orangephotos-workspace .od-main-ion-content::part(scroll) {
+    padding: 0;
   }
 }
 

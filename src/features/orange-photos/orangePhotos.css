@@ -332,6 +332,34 @@
 .od-orangephotos-empty-trash:hover { color:#a63a3a; background:#fff7f7; }
 .od-orange-photos-modal__footer { display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-top:18px; }
 
+.od-orangephotos-search-desktop { display:block; }
+.od-orangephotos-search-mobile-button { display:none; place-items:center; flex:0 0 36px; width:36px; height:36px; padding:0; border:0; border-radius:8px; background:transparent; color:#334155; cursor:pointer; }
+.od-orangephotos-search-mobile-button:hover,.od-orangephotos-search-mobile-button:focus-visible { background:var(--od-surface-hover,#f8fafc); }
+.od-orangephotos-search-mobile-button ion-icon { width:20px; height:20px; }
+.od-orangephotos-search-modal { width:calc(100vw - 24px); max-width:480px; }
+.od-orangephotos-search-modal__body { padding:16px; }
+.od-orangephotos-search-modal__input { width:100%; min-height:44px; box-sizing:border-box; }
+
+@media (max-width: 767px) {
+  .od-orangephotos-search-desktop { display:none; }
+  .od-orangephotos-search-mobile-button { display:grid; }
+}
+
+@media (max-width: 600px) {
+  .od-orange-photos__library { display:block; padding-right:0; }
+  .od-orange-photos__scroller { padding:0 0 20px; }
+  .od-orange-photos__content,
+  .od-orange-photos__period,
+  .od-orange-photos__day,
+  .od-orange-photos__justified-row { width:100%; max-width:none; }
+  .od-orange-photos__justified-row { margin-bottom:2px; }
+  .od-orange-photos__period > h2,
+  .od-orange-photos__day-header { margin-left:12px; margin-right:12px; }
+  .od-orange-photos__period { margin-bottom:18px; }
+  .od-orange-photos__day { margin-bottom:14px; }
+  .od-orange-photos__timeline-layer { right:0; }
+}
+
 .od-btn { display:inline-flex; align-items:center; justify-content:center; min-height:34px; width:auto; padding:0 14px; border:1px solid transparent; border-radius:8px; font-family:inherit; font-size:13px; font-weight:600; line-height:1; cursor:pointer; transition:background-color 120ms ease,border-color 120ms ease,color 120ms ease; }
 .od-btn:disabled { opacity:.5; cursor:default; }
 .od-btn-secondary { border-color:#dce3f5; background:#fff; color:#334155; }
