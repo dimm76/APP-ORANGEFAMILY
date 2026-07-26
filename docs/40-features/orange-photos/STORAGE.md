@@ -145,6 +145,12 @@ Las tarjetas propias compartidas muestran un icono naranja; las recibidas muestr
 
 Durante el modo de selección, `Shift` más clic selecciona el intervalo lineal desde el último elemento ancla. `Ctrl+A` o `Cmd+A` selecciona únicamente los elementos cargados, salvo que el foco esté en un campo editable. `Escape` limpia la selección y su ancla.
 
+## Álbumes
+
+Los álbumes pueden crearse tanto desde el botón global `+` como desde la cabecera de la vista de álbumes. El propietario puede cambiar su nombre, compartirlos con toda la familia o con miembros concretos, y elegir manualmente como portada una imagen que pertenezca al propio álbum.
+
+Al añadir la primera imagen a un álbum que todavía no tiene portada, Node la asigna automáticamente sin reemplazar posteriormente una portada existente. Archivar un álbum lo retira del listado, pero conserva intactas sus fotos en la biblioteca y no elimina manualmente sus relaciones desde el frontend.
+
 ## Gestión de la cola web
 
 La selección previa permite retirar archivos antes de iniciar la subida. En la cola persistente, una subida activa puede cancelarse y retirarse: el navegador aborta las transferencias en curso y, cuando existe una sesión multipart, solicita su aborto mediante `DELETE /api/orange-photos/uploads/:uploadId` antes de eliminar la entrada local.
