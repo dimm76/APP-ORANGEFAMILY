@@ -571,7 +571,19 @@ aislamiento por auth_users.id;
 detección manual de nuevos elementos;
 prevención de duplicados locales;
 contadores de fotos y vídeos pendientes;
-persistencia tras reiniciar la aplicación.
+persistencia tras reiniciar la aplicación;
+SHA-256 de cada original;
+comprobación remota de duplicados y supresiones;
+subida simple y directa mediante la API Node;
+confirmación mediante `remotePhotoId`;
+estados `pending`, `uploading`, `uploaded`, `failed`, `suppressed` y `restore_available`;
+WorkManager con ejecución inmediata y periódica;
+ContentObserver y sincronización automática;
+reintentos exponenciales para errores transitorios;
+identificador UUID estable de instalación, sin identificadores del dispositivo;
+cabeceras `x-orange-client: android_sync` y `x-orange-installation-id`;
+notificaciones agrupadas de éxito y elementos sin copia;
+trazabilidad remota del origen y del ciclo de vida en `orange_photo_events`.
 
 Validado manualmente en dispositivo físico:
 
@@ -582,42 +594,27 @@ el inventario persiste tras cerrar y abrir la app;
 un vídeo nuevo se registra correctamente;
 fotos y vídeos se contabilizan por separado.
 
-Todavía no implementado en Android:
+Todavía no implementado:
 
-hash;
-consumo de la comprobación remota de duplicados;
-subida;
-remotePhotoId;
-WorkManager;
-ContentObserver;
-sincronización automática;
-ejecución en segundo plano;
-reintentos;
-notificaciones;
+presencia actual del archivo en el móvil;
 eliminación local;
 sincronización bidireccional;
 importación histórica;
-registro remoto de dispositivos;
-consumo de la supresión de resincronización tras eliminación remota.
+registro remoto completo de dispositivos;
+agente de escritorio y verificación de discos;
+galería Android;
+telemetría de visualizaciones y accesos públicos.
+
+La instalación se identifica localmente mediante un UUID aleatorio persistido en
+preferencias privadas y excluido de backup. Puede cambiar al desinstalar o borrar
+datos. No existe todavía una entidad remota de dispositivo.
+
+`orange_photo_events` conserva subidas, decisiones de duplicado/supresión,
+descargas completadas, compartición, papelera, restauración, purge, cambios de
+metadatos y pertenencia a álbumes. No registra thumbnails, previews, URLs firmadas,
+detalle, timeline, vistas ni accesos públicos.
+
 Próximas fases
-Fase 3: contrato remoto seguro
-
-El contrato backend de checksum, deduplicación por propietario y supresión tras
-purge está implementado. Falta integrarlo en el agente Android.
-
-Antes de subir archivos:
-
-revisar la comprobación actual de duplicados;
-limitar cualquier respuesta al contexto autorizado;
-impedir filtraciones entre propietarios;
-definir el registro del dispositivo;
-definir la política de eliminación y resincronización;
-documentar el contrato API.
-Fase 4: subida manual desde pendientes
-calcular hash;
-consultar el backend;
-subir elementos pendientes;
-recibir el identificador remoto;
 introducir estados locales de sincronización;
 mantener la ejecución manual.
 Fase 5: automatización

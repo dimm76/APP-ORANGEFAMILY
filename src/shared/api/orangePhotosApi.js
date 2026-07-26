@@ -7,6 +7,7 @@ export function listOrangePhotos(filters={},options={}){return request(`/api/ora
 export function listOrangePhotosTimeline(filters={},options={}){return request(`/api/orange-photos/timeline?${photoQuery(filters,["page","per_page","before"])}`,{signal:options.signal});}
 export function listOrangePhotosAroundDate(date,filters={},options={}){const q=photoQuery(filters,["page","before"]);q.set("date",date);return request(`/api/orange-photos/around-date?${q}`,{signal:options.signal});}
 export const getOrangePhoto=id=>request(`/api/orange-photos/${encodeURIComponent(id)}`);
+export function getOrangePhotoEvents(photoId,options={}){return request(`/api/orange-photos/${encodeURIComponent(photoId)}/events`,{signal:options.signal});}
 export const updateOrangePhoto=(id,body)=>request(`/api/orange-photos/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify(body)});
 export const trashOrangePhoto=id=>request(`/api/orange-photos/${encodeURIComponent(id)}/trash`,{method:'POST',body:'{}'});
 export const restoreOrangePhoto=id=>request(`/api/orange-photos/${encodeURIComponent(id)}/restore`,{method:'POST',body:'{}'});

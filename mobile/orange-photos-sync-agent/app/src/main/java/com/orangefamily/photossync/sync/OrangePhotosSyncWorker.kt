@@ -11,6 +11,7 @@ import com.orangefamily.photossync.auth.SecureSessionStore
 import com.orangefamily.photossync.data.CameraBackupRepository
 import com.orangefamily.photossync.data.LocalMediaItem
 import com.orangefamily.photossync.data.OrangePhotosLocalDatabase
+import com.orangefamily.photossync.device.InstallationIdStore
 import com.orangefamily.photossync.media.CameraMediaScanner
 import com.orangefamily.photossync.media.MediaPermissionAccess
 import com.orangefamily.photossync.media.MediaPermissions
@@ -23,7 +24,7 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
         Log.d(TAG, "Worker started")
         val sessionStore = SecureSessionStore(applicationContext)
         val sessionToken = sessionStore.load(BuildConfig.API_BASE_URL) ?: return success()
-        val api = OrangePhotosSyncApi(BuildConfig.API_BASE_URL, sessionToken)
+        val api = OrangePhotosSyncApi(BuildConfig.API_BASE_URL, sessionToken, InstallationIdStore(applicationContext).getOrCreate())
         val user = when (val current = runCatching { api.currentUser() }.getOrElse { error ->
             Log.e(TAG, "Worker exception=${error.javaClass.simpleName} message=${error.message}", error)
             return retry()
@@ -59,6 +60,7 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
 
             repository.recoverUploading(accountUserId)
             var transientFailure = false
+            var uploadedThisRun = 0
             for (item in repository.syncBatch(accountUserId, BATCH_SIZE)) {
             if (item.failureCode in NON_RETRYABLE_CODES) continue
             Log.d(TAG, "Processing item=${item.id} name=${item.displayName}")
@@ -82,6 +84,7 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
                             else -> throw ItemFailure("INVALID_UPLOAD_MODE")
                         }
                         repository.markUploaded(accountUserId, item.id, remoteId, checksum, attemptedAt)
+                        uploadedThisRun += 1
                     }
                     else -> throw ItemFailure("INVALID_UPLOAD_DECISION")
                 }
@@ -95,7 +98,7 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
                 val code = error.code.ifBlank { "HTTP_${error.status}" }
                 repository.markAttempt(accountUserId, item.id, LocalMediaItem.STATUS_FAILED, attemptedAt, code)
                 Log.e(TAG, "Item failed id=${item.id} code=$code", error)
-                if (error.status == 429 || error.status >= 500 || code in TRANSIENT_CODES) transientFailure = true
+                if (OrangePhotosSyncPolicy.isTransient(error.status, code)) transientFailure = true
             } catch (error: ItemFailure) {
                 repository.markAttempt(accountUserId, item.id, LocalMediaItem.STATUS_FAILED, attemptedAt, error.code)
                 Log.e(TAG, "Item failed id=${item.id} code=${error.code} exception=${error.javaClass.simpleName} message=${error.message}", error)
@@ -111,6 +114,7 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
                 transientFailure = true
             }
             }
+            OrangePhotosSyncNotifier(applicationContext).notifyResult(uploadedThisRun, repository.syncCounts(accountUserId).failed)
             return if (transientFailure) retry() else success()
         } finally {
             repository.releaseSyncLock(accountUserId, lockToken)
@@ -130,7 +134,7 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    private fun requireRemoteId(value: String?) = value ?: throw ItemFailure("INVALID_UPLOAD_RESPONSE")
+    private fun requireRemoteId(value: String?) = OrangePhotosSyncPolicy.confirmedRemoteId(value) ?: throw ItemFailure("INVALID_UPLOAD_RESPONSE")
     private fun success(): Result { Log.d(TAG, "Worker result=success"); return Result.success() }
     private fun retry(): Result { Log.d(TAG, "Worker result=retry"); return Result.retry() }
     private class ItemFailure(val code: String) : Exception()
@@ -140,6 +144,5 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
         const val LOCK_TTL_MS = 24 * 60 * 60 * 1000L
         const val TAG = "OrangePhotosSync"
         val NON_RETRYABLE_CODES = setOf("LOCAL_FILE_UNAVAILABLE", "INVALID_METADATA", "UNSUPPORTED_FILE_TYPE", "FILE_TOO_LARGE", "UNSUPPORTED_MULTIPART", "UPLOAD_SUPPRESSED")
-        val TRANSIENT_CODES = setOf("STORAGE_UPLOAD_FAILED", "DATABASE_REGISTRATION_FAILED")
     }
 }

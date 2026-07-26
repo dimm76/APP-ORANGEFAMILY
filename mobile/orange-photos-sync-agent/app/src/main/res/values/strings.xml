@@ -48,4 +48,14 @@
     <string name="sync_uploaded">Subidos</string>
     <string name="sync_suppressed">Suprimidos</string>
     <string name="sync_restore_available">Restauración disponible</string>
+    <string name="notification_title">OrangeFamily</string>
+    <string name="sync_notification_channel">Sincronización de Orange Photos</string>
+    <plurals name="sync_failed_notification">
+        <item quantity="one">%d archivo todavía no tiene copia.</item>
+        <item quantity="other">%d archivos todavía no tienen copia.</item>
+    </plurals>
+    <plurals name="sync_success_notification">
+        <item quantity="one">%d archivo guardado correctamente.</item>
+        <item quantity="other">%d archivos guardados correctamente.</item>
+    </plurals>
 </resources>

@@ -28,6 +28,7 @@ export default function AttachmentsImageLightbox({
   hasPrevious = false,
   hasNext = false,
   renderInfo,
+  renderInfoHeaderActions,
   infoOpen = false,
   onToggleInfo,
   renderExtraActions,
@@ -281,15 +282,19 @@ export default function AttachmentsImageLightbox({
       {infoOpen && renderInfo ? (
         <aside className="od-attachments-lightbox__info">
           <header>
-            <button
-              type="button"
-              className="od-attachments-lightbox__btn od-attachments-lightbox__info-close"
-              aria-label="Cerrar información"
-              title="Cerrar información"
-              onClick={onToggleInfo}
-            >
-              <IonIcon icon={closeOutline} />
-            </button>
+            <div className="od-attachments-lightbox__info-header-actions">
+              <button
+                type="button"
+                className="od-attachments-lightbox__btn od-attachments-lightbox__info-close"
+                aria-label="Cerrar información"
+                title="Cerrar información"
+                onClick={onToggleInfo}
+              >
+                <IonIcon icon={closeOutline} />
+              </button>
+
+              {renderInfoHeaderActions?.()}
+            </div>
 
             <h2>Información</h2>
           </header>

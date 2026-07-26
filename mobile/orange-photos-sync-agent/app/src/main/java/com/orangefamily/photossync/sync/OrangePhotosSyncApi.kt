@@ -11,7 +11,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
 
-class OrangePhotosSyncApi(apiBaseUrl: String, private val sessionToken: String) {
+class OrangePhotosSyncApi(apiBaseUrl: String, private val sessionToken: String, private val installationId: String) {
     private val authApi = OrangeFamilyAuthApi(apiBaseUrl)
     private val baseUrl = authApi.baseUrl
 
@@ -97,6 +97,7 @@ class OrangePhotosSyncApi(apiBaseUrl: String, private val sessionToken: String) 
             connection.setRequestProperty("Accept", "application/json")
             connection.setRequestProperty("Cookie", "of_session=$sessionToken")
             connection.setRequestProperty("Content-Type", contentType)
+            syncHeaders(installationId).forEach(connection::setRequestProperty)
             headers.forEach(connection::setRequestProperty)
             if (fixedBody != null) connection.setFixedLengthStreamingMode(fixedBody.size)
             else connection.setChunkedStreamingMode(BUFFER_SIZE)
@@ -142,5 +143,6 @@ class OrangePhotosSyncApi(apiBaseUrl: String, private val sessionToken: String) 
     companion object {
         const val BUFFER_SIZE = 64 * 1024
         const val TAG = "OrangePhotosSync"
+        fun syncHeaders(installationId: String) = mapOf("x-orange-client" to "android_sync", "x-orange-installation-id" to installationId)
     }
 }

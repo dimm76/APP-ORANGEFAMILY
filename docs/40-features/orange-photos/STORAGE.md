@@ -144,3 +144,20 @@ La biblioteca permite filtrar por tipo de contenido (todos, fotos o vídeos) y p
 Las tarjetas propias compartidas muestran un icono naranja; las recibidas muestran el mismo icono en azul. El título accesible indica si se comparte con toda la familia, con personas concretas o quién es el propietario que la compartió.
 
 Durante el modo de selección, `Shift` más clic selecciona el intervalo lineal desde el último elemento ancla. `Ctrl+A` o `Cmd+A` selecciona únicamente los elementos cargados, salvo que el foco esté en un campo editable. `Escape` limpia la selección y su ancla.
+
+## Trazabilidad
+
+PostgreSQL es la fuente oficial de verdad y `orange_photo_events` conserva las
+acciones significativas del ciclo de vida. Wasabi conserva el objeto y Room actúa
+solo como memoria operativa reconstruible del agente Android. El origen Android
+se distingue mediante el tipo de cliente y un UUID aleatorio de instalación.
+
+Una descarga se registra únicamente cuando finaliza la respuesta, pero no confirma
+que el archivo siga existiendo posteriormente en el disco local o en el móvil.
+Las visualizaciones, previews, thumbnails, URLs firmadas y accesos públicos no se
+registran en esta fase.
+
+El propietario puede consultar este historial bajo demanda desde el panel
+`Información` del lightbox. El historial permanece protegido por la API y no se
+muestra a otros miembros, incluido el administrador familiar cuando no sea el
+propietario de la foto. La consulta no registra eventos de visualización.

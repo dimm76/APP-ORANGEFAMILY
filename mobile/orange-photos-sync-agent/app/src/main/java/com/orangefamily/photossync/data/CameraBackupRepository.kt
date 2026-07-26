@@ -61,6 +61,7 @@ class CameraBackupRepository(
     suspend fun recoverUploading(accountUserId: String) = dao.recoverUploading(accountUserId)
     suspend fun syncBatch(accountUserId: String, limit: Int) = dao.getSyncBatch(accountUserId, limit)
     suspend fun latestFailed(accountUserId: String, limit: Int = 10) = dao.getLatestFailed(accountUserId, limit)
+    suspend fun syncCounts(accountUserId: String) = dao.getSyncCounts(accountUserId)
     suspend fun updateChecksum(accountUserId: String, id: Long, checksum: String) = dao.updateChecksum(accountUserId, id, checksum)
     suspend fun markAttempt(accountUserId: String, id: Long, status: String, at: Long, code: String?) = dao.markAttempt(accountUserId, id, status, at, code)
     suspend fun markUploaded(accountUserId: String, id: Long, remoteId: String, checksum: String, at: Long) = dao.markUploaded(accountUserId, id, remoteId, checksum, at)

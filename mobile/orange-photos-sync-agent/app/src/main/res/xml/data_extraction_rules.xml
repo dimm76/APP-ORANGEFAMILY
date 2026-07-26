@@ -2,12 +2,14 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="sharedpref" path="orangefamily_secure_session.xml" />
+        <exclude domain="sharedpref" path="orange_photos_installation.xml" />
         <exclude domain="database" path="orange_photos_local.db" />
         <exclude domain="database" path="orange_photos_local.db-shm" />
         <exclude domain="database" path="orange_photos_local.db-wal" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="orangefamily_secure_session.xml" />
+        <exclude domain="sharedpref" path="orange_photos_installation.xml" />
         <exclude domain="database" path="orange_photos_local.db" />
         <exclude domain="database" path="orange_photos_local.db-shm" />
         <exclude domain="database" path="orange_photos_local.db-wal" />

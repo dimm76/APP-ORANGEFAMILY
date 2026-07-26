@@ -7,12 +7,14 @@ import {
   heart,
   heartOutline,
   shareSocialOutline,
+  timeOutline,
 } from "ionicons/icons";
 import AttachmentsImageLightbox from "../../shared/components/AttachmentsImageLightbox.jsx";
 import { orangePhotoDownloadUrl } from "../../shared/api/orangePhotosApi.js";
 import { OD_ICONS } from "../../shared/ui/odIcons.js";
 import OrangePhotoDetailsPanel from "./OrangePhotoDetailsPanel.jsx";
 import OrangePhotoShareModal from "./OrangePhotoShareModal.jsx";
+import OrangePhotoEventsModal from "./OrangePhotoEventsModal.jsx";
 
 export default function OrangePhotoViewer({
   photo,
@@ -37,9 +39,13 @@ export default function OrangePhotoViewer({
   const [shareOpen, setShareOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [feedback, setFeedback] = useState("");
+  const [eventsPhotoId, setEventsPhotoId] = useState(null);
 
   const shareButtonRef = useRef(null);
   const moreButtonRef = useRef(null);
+  const eventsButtonRef = useRef(null);
+
+  const eventsOpen = eventsPhotoId === photo.id;
 
   const displayTitle =
     photo.title?.trim() ||
@@ -109,6 +115,18 @@ export default function OrangePhotoViewer({
             feedback={feedback}
           />
         )}
+        renderInfoHeaderActions={photo.is_owner ? () => (
+          <button
+            ref={eventsButtonRef}
+            type="button"
+            className="od-attachments-lightbox__btn od-attachments-lightbox__info-history"
+            aria-label="Ver historial de la foto"
+            title="Ver historial de la foto"
+            onClick={() => setEventsPhotoId(photo.id)}
+          >
+            <IonIcon icon={timeOutline} />
+          </button>
+        ) : undefined}
         renderExtraActions={() => (
           <>
             {!trashMode ? (
@@ -233,6 +251,14 @@ export default function OrangePhotoViewer({
             setShareOpen(false);
             notify("Compartición actualizada");
           }}
+        />
+      ) : null}
+
+      {eventsOpen && photo.is_owner ? (
+        <OrangePhotoEventsModal
+          photo={photo}
+          returnFocusRef={eventsButtonRef}
+          onClose={() => setEventsPhotoId(null)}
         />
       ) : null}
     </>
