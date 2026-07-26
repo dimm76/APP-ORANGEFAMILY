@@ -145,6 +145,14 @@ Las tarjetas propias compartidas muestran un icono naranja; las recibidas muestr
 
 Durante el modo de selección, `Shift` más clic selecciona el intervalo lineal desde el último elemento ancla. `Ctrl+A` o `Cmd+A` selecciona únicamente los elementos cargados, salvo que el foco esté en un campo editable. `Escape` limpia la selección y su ancla.
 
+## Gestión de la cola web
+
+La selección previa permite retirar archivos antes de iniciar la subida. En la cola persistente, una subida activa puede cancelarse y retirarse: el navegador aborta las transferencias en curso y, cuando existe una sesión multipart, solicita su aborto mediante `DELETE /api/orange-photos/uploads/:uploadId` antes de eliminar la entrada local.
+
+Las filas completadas y fallidas pueden retirarse individualmente. La acción **Limpiar** elimina exclusivamente el historial terminal (`completed`, `cancelled`, `error`, `missing_file` y `duplicate_pending`) y conserva los trabajos activos o pendientes. Retirar una fila completada o limpiar el historial no elimina la fotografía ya creada ni su objeto remoto.
+
+Los fallos recuperables permiten reintento individual y global. El reintento individual actúa solo sobre la fila elegida; **Reintentar todo** procesa los errores recuperables sin alterar completados ni errores definitivos.
+
 ## Trazabilidad
 
 PostgreSQL es la fuente oficial de verdad y `orange_photo_events` conserva las

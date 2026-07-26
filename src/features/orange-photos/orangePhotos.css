@@ -233,9 +233,12 @@
 .od-orangephotos-upload-picker__dropzone span { font-size:14px; }
 .od-orangephotos-upload-picker__file-count { margin:0; font-weight:600; }
 .od-orangephotos-upload-picker__file-list { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
-.od-orangephotos-upload-picker__file-list li { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:8px 10px; border-radius:8px; background:var(--od-color-bg); }
+.od-orangephotos-upload-picker__file-list li { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; background:var(--od-color-bg); }
 .od-orangephotos-upload-picker__file-list span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .od-orangephotos-upload-picker__file-list small { flex:none; color:var(--od-color-text-muted); }
+.od-orangephotos-upload-picker__remove { display:grid; place-items:center; width:32px; height:32px; padding:0; border:0; border-radius:8px; background:transparent; color:var(--od-color-text-muted); cursor:pointer; }
+.od-orangephotos-upload-picker__remove:hover,.od-orangephotos-upload-picker__remove:focus-visible { background:var(--od-color-primary-soft); color:var(--od-color-primary); }
+.od-orangephotos-upload-picker__remove ion-icon { width:18px; height:18px; }
 .od-orangephotos-upload-picker__footer { display:flex; justify-content:flex-end; gap:8px; padding:14px 22px 20px; border-top:1px solid var(--od-color-border); }
 
 @media (max-width:480px) {
@@ -284,7 +287,7 @@
 .od-orangephotos-upload-row__main { min-width:0; display:grid; gap:3px; }
 .od-orangephotos-upload-row__main strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .od-orangephotos-upload-row__main small { color:#64748b; }
-.od-orangephotos-upload-row__cancel-icon { display:grid; place-items:center; width:30px; height:30px; padding:0; border:0; border-radius:8px; background:transparent; color:#64748b; cursor:pointer; }
+.od-orangephotos-upload-row__cancel-icon { display:grid; place-items:center; flex:none; width:32px; height:32px; padding:0; border:0; border-radius:8px; background:transparent; color:#64748b; cursor:pointer; }
 .od-orangephotos-upload-row__cancel-icon:hover,.od-orangephotos-upload-row__cancel-icon:focus-visible { background:#fff1ed; color:var(--od-color-primary,#fc4200); }
 .od-orangephotos-upload-row__cancel-icon ion-icon { width:19px; height:19px; }
 .od-orangephotos-upload-row__retry { justify-self:start; margin-top:3px; }
@@ -306,7 +309,7 @@
 @media (prefers-reduced-motion:reduce) { .od-orangephotos-upload-fab.is-transferring::before { animation:none; top:1px; transform:none; } }
 .od-orangephotos-upload-progress footer .od-orangephotos-upload-pending-nav { display:flex; align-items:center; gap:5px; white-space:nowrap; }
 .od-orangephotos-upload-pending-nav .od-button-secondary { width:28px; min-width:28px; padding:0; }
-@media (max-width:600px) { .od-orangephotos-upload-progress__list { max-height:50vh; }.od-orangephotos-upload-progress footer { align-items:flex-start; flex-wrap:wrap; } }
+@media (max-width:600px) { .od-orangephotos-upload-progress__list { max-height:50vh; }.od-orangephotos-upload-progress footer { align-items:flex-start; flex-wrap:wrap; }.od-orangephotos-upload-picker__file-list li { grid-template-columns:minmax(0,1fr) auto; }.od-orangephotos-upload-picker__file-list small { grid-column:1; }.od-orangephotos-upload-picker__remove { grid-column:2; grid-row:1 / span 2; } }
 @media (max-width:480px) { .od-orangephotos-upload-duplicate__actions { grid-template-columns:1fr 1fr; }.od-orangephotos-upload-duplicate__actions>:last-child { grid-column:1 / -1; } }
 .od-attachments-lightbox__stage { inset:56px 0 0 !important; align-items:flex-start !important; justify-content:flex-start !important; padding:24px !important; overflow:auto !important; }.od-attachments-lightbox__img { max-width:none !important; max-height:none !important; flex:0 0 auto; margin:auto; }.od-orange-photo-share-backdrop { isolation:isolate; }
 .od-attachments-lightbox__stage:has(.od-attachments-lightbox__video) { align-items:center !important; justify-content:center !important; overflow:auto !important; }

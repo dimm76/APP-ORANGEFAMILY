@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { IonIcon } from "@ionic/react";
+import { closeOutline } from "ionicons/icons";
 
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -15,7 +17,7 @@ function formatSelectionSummary(summary) {
   return `${summary.received} seleccionados: ${parts.join(", ")}.`;
 }
 
-export default function OrangePhotosUploadPicker({ open, files, onAddFiles, onCancel, onStart, onBrowse }) {
+export default function OrangePhotosUploadPicker({ open, files, onAddFiles, onRemoveFile, onCancel, onStart, onBrowse }) {
   const [dragActive, setDragActive] = useState(false);
   const modalRef = useRef(null);
 
@@ -46,7 +48,7 @@ export default function OrangePhotosUploadPicker({ open, files, onAddFiles, onCa
         <p className="od-orangephotos-upload-picker__file-count">{count} {count === 1 ? "archivo seleccionado" : "archivos seleccionados"}</p>
         {summaryMessage ? <p className="od-inline-msg">{summaryMessage}</p> : null}
         {summary?.incompatibleFiles.length ? <ul className="od-orangephotos-upload-picker__file-list">{summary.incompatibleFiles.map((name,index) => <li key={`${name}-${index}`}><span>{name}</span><small>Formato no compatible</small></li>)}</ul> : null}
-        {count ? <ul className="od-orangephotos-upload-picker__file-list">{files.map(file => <li key={`${file.name}-${file.size}-${file.lastModified}`}><span>{file.name}</span><small>{formatSize(file.size)}</small></li>)}</ul> : null}
+        {count ? <ul className="od-orangephotos-upload-picker__file-list">{files.map(file => <li key={`${file.name}\u0000${file.size}\u0000${file.lastModified}`}><span>{file.name}</span><small>{formatSize(file.size)}</small><button type="button" className="od-orangephotos-upload-picker__remove" aria-label={`Quitar ${file.name} de la selección`} title="Quitar de la selección" onClick={()=>onRemoveFile(file)}><IonIcon icon={closeOutline} aria-hidden="true"/></button></li>)}</ul> : null}
       </div>
       <footer className="od-orangephotos-upload-picker__footer"><button type="button" className="od-btn od-btn-secondary" onClick={onCancel}>Cancelar</button><button type="button" className="od-btn od-btn-secondary" onClick={onBrowse}>Elegir archivos</button><button type="button" className="od-btn od-btn-primary" disabled={!count} onClick={onStart}>Iniciar subida</button></footer>
     </section>
