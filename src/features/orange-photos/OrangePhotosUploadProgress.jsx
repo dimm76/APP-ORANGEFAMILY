@@ -21,7 +21,20 @@ export default function OrangePhotosUploadProgress({queue,visible,running,onHide
   const selectMissing=item=>{missingRef.current=item;if(onSelectMissingFile)onSelectMissingFile(item);else fileRef.current?.click();};
   const remove=item=>{const filename=item.filename||item.file?.name||"Archivo";if(CONFIRM_REMOVE.has(item.status)&&!window.confirm(`Se cancelará la subida de "${filename}" y se eliminará de la cola.`))return;void onRemove(item);};
   const details=[];if(transferringCount)details.push(`${transferringCount} activos`);if(waitingCount)details.push(`${waitingCount} pendientes`);if(failed)details.push(`${failed} fallidos`);if(pending.length)details.push(`${pending.length} pendientes de decisión`);if(missing)details.push(`${missing} sin archivo`);
-  if(!visible)return queue.length?<button type="button" className={fabClasses} aria-label={fabLabel} title={fabLabel} onClick={()=>emit("orangephotos:open-panel")}><IonIcon icon={cloudUploadOutline} aria-hidden="true"/>{badgeCount>0?<span className="od-orangephotos-upload-fab__badge">{badgeCount>99?"99+":badgeCount}</span>:null}</button>:null;
+  if(!visible)return <button
+    type="button"
+    className={fabClasses}
+    aria-label={fabLabel}
+    title={fabLabel}
+    onClick={()=>emit("orangephotos:open-panel")}
+  >
+    <IonIcon icon={cloudUploadOutline} aria-hidden="true"/>
+    {badgeCount>0
+      ? <span className="od-orangephotos-upload-fab__badge">
+          {badgeCount>99?"99+":badgeCount}
+        </span>
+      : null}
+  </button>;
   return <section className="od-orangephotos-upload-progress" role="status" aria-live="polite">
     <input ref={fileRef} className="od-orangephotos-file-input" type="file" onChange={event=>{const file=event.target.files?.[0];if(file)emit("orangephotos:missing-file",{item:missingRef.current,file});event.target.value="";}}/>
     <header><div className="od-orangephotos-upload-progress__title-row"><h2>Importando elementos</h2><span ref={infoRef} className="od-orangephotos-upload-info"><button type="button" aria-label="Información sobre las subidas" title={UPLOAD_INFO} aria-describedby={infoOpen?"od-orangephotos-upload-info-text":undefined} onClick={()=>setInfoOpen(open=>!open)}><IonIcon icon={informationCircleOutline} aria-hidden="true"/></button>{infoOpen?<span id="od-orangephotos-upload-info-text" className="od-orangephotos-upload-info__popover" role="tooltip">{UPLOAD_INFO}</span>:null}</span><button type="button" className="od-orangephotos-upload-progress__minimize" aria-label="Minimizar panel de subidas" title="Minimizar" onClick={minimize}><IonIcon icon={removeOutline} aria-hidden="true"/></button></div></header>
