@@ -24,14 +24,14 @@ class OrangePhotosSyncNotifier(private val context: Context) {
         val decision = OrangePhotosSyncPolicy.notification(uploaded, failed, preferences.getInt(KEY_LAST_FAILED, -1))
         if (failed > 0) {
             if (decision.showError) {
-                manager.notify(ERROR_NOTIFICATION_ID, notification(context.resources.getQuantityString(R.plurals.sync_failed_notification, failed, failed)))
+                manager.notify(STATUS_NOTIFICATION_ID, notification(context.resources.getQuantityString(R.plurals.sync_failed_notification, failed, failed)))
                 preferences.edit().putInt(KEY_LAST_FAILED, failed).apply()
             }
             return
         }
-        if (decision.cancelError) manager.cancel(ERROR_NOTIFICATION_ID)
+        if (decision.cancelError) manager.cancel(STATUS_NOTIFICATION_ID)
         preferences.edit().putInt(KEY_LAST_FAILED, 0).apply()
-        if (decision.showSuccess) manager.notify(SUCCESS_NOTIFICATION_ID, notification(context.resources.getQuantityString(R.plurals.sync_success_notification, uploaded, uploaded)))
+        if (decision.showSuccess) manager.notify(STATUS_NOTIFICATION_ID, notification(context.resources.getQuantityString(R.plurals.sync_success_notification, uploaded, uploaded)))
     }
 
     private fun notification(message: String) = NotificationCompat.Builder(context, CHANNEL_ID)
@@ -50,8 +50,7 @@ class OrangePhotosSyncNotifier(private val context: Context) {
 
     companion object {
         const val CHANNEL_ID = "orange_photos_sync_status"
-        const val ERROR_NOTIFICATION_ID = 4101
-        const val SUCCESS_NOTIFICATION_ID = 4102
+        const val STATUS_NOTIFICATION_ID = 4101
         private const val PREFERENCES_NAME = "orange_photos_sync_notifications"
         private const val KEY_LAST_FAILED = "last_failed_count"
     }

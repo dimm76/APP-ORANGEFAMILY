@@ -644,6 +644,34 @@ Importación histórica automática.
 Compartición desde el agente.
 Visualización de fotos privadas de otros miembros.
 Ejecución automática en segundo plano.
+## Release privada
+
+La URL release de la API es:
+
+```text
+https://family.orangedesk.net/
+```
+
+La APK release se genera desde `mobile/orange-photos-sync-agent` con:
+
+```powershell
+gradlew.bat clean assembleRelease ^
+  -PorangeFamily.releaseApiBaseUrl=https://family.orangedesk.net/ ^
+  -PorangeFamily.keystoreFile=RUTA_KEYSTORE ^
+  -PorangeFamily.keystorePassword=CONTRASEÑA_KEYSTORE ^
+  -PorangeFamily.keyAlias=orangefamily ^
+  -PorangeFamily.keyPassword=CONTRASEÑA_CLAVE
+```
+
+La APK resultante se encuentra en:
+
+```text
+app\build\outputs\apk\release\app-release.apk
+```
+
+Las versiones futuras deben conservar el `applicationId`, el keystore y el alias,
+y aumentar `versionCode`.
+
 Documentos relacionados
 Orange Photos.
 Almacenamiento de Orange Photos.
@@ -666,3 +694,169 @@ Después añade también el documento:
 
 ```powershell
 git add docs/40-features/orange-photos/ANDROID_SYNC_AGENT.md
+```
+
+## Desarrollo, firma y distribución de la APK
+
+### Variantes
+
+Debug:
+
+- se usa para desarrollo y pruebas desde Android Studio;
+- Android Studio la firma automáticamente con la clave debug;
+- no utiliza el keystore release;
+- lee `orangeFamily.apiBaseUrl` desde
+  `mobile/orange-photos-sync-agent/local.properties`;
+- para emulador Android, el localhost del PC se alcanza mediante
+  `http://10.0.2.2:<puerto>/`;
+- para móvil físico en la misma red, debe usarse la IP local del PC y el backend
+  debe aceptar conexiones desde la red.
+
+Release:
+
+- se usa para instalar la APK estable en los móviles familiares;
+- apunta a `https://family.orangedesk.net/`;
+- no debe usarse `https://family.orangedesk.net/api/`;
+- utiliza el keystore definitivo;
+- la misma APK sirve para todos los familiares;
+- cada usuario inicia sesión con sus propias credenciales;
+- identidad, familia y ownership proceden de la sesión autenticada.
+
+### Keystore definitivo
+
+Ruta local actual:
+
+```text
+C:\Users\dimm7\orangefamily-secrets\orangefamily-release.jks
+```
+
+Alias:
+
+```text
+orangefamily
+```
+
+Application ID:
+
+```text
+com.orangefamily.photossync
+```
+
+- El keystore se crea una sola vez y se reutiliza en todas las versiones futuras.
+- No debe regenerarse ni guardarse en Git.
+- Debe conservarse junto con sus contraseñas en copias seguras.
+- Perder el keystore impide actualizar una APK ya instalada.
+- La contraseña del almacén y la contraseña de la clave son conceptos distintos,
+  aunque actualmente pueden tener el mismo valor.
+- Nunca deben documentarse las contraseñas reales.
+
+### Propiedades privadas de Gradle
+
+Las propiedades están almacenadas fuera del repositorio en:
+
+```text
+C:\Users\dimm7\.gradle\gradle.properties
+```
+
+Propiedades utilizadas:
+
+```text
+orangeFamily.releaseApiBaseUrl
+orangeFamily.keystoreFile
+orangeFamily.keystorePassword
+orangeFamily.keyAlias
+orangeFamily.keyPassword
+```
+
+No deben copiarse valores secretos al repositorio.
+
+### Generación de release
+
+Desde:
+
+```text
+C:\Users\dimm7\local-sites\APP-ORANGEFAMILY\mobile\orange-photos-sync-agent
+```
+
+Comando habitual:
+
+```powershell
+.\gradlew.bat clean assembleRelease --no-configuration-cache
+```
+
+Si `JAVA_HOME` no está configurado para la sesión:
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+$env:Path = "$env:JAVA_HOME\bin;$env:Path"
+```
+
+APK generada:
+
+```text
+app\build\outputs\apk\release\app-release.apk
+```
+
+El aviso `Unable to strip ... libandroidx.graphics.path.so` no bloqueó la
+generación de la APK y puede considerarse informativo mientras el build termine
+con `BUILD SUCCESSFUL`.
+
+### Primera instalación y actualizaciones
+
+Primera instalación:
+
+- una antigua APK debug puede tener el mismo `applicationId` pero otra firma;
+- Android no permite instalar la release encima;
+- en ese caso debe desinstalarse una sola vez la versión debug;
+- se pierden únicamente los datos locales de esa instalación;
+- PostgreSQL y Wasabi no se ven afectados.
+
+Actualizaciones futuras:
+
+- mantener el mismo `applicationId`;
+- mantener el mismo keystore;
+- mantener el mismo alias;
+- aumentar siempre `versionCode`;
+- `versionName` debe reflejar la versión visible;
+- generar una nueva release;
+- Android la instalará encima conservando sesión, Room y preferencias.
+
+Ejemplo:
+
+```kotlin
+versionCode = 2
+versionName = "1.1"
+```
+
+### Pruebas habituales con Android Studio
+
+1. Abrir `mobile/orange-photos-sync-agent` en Android Studio.
+2. Seleccionar la variante `debug`.
+3. Configurar `local.properties`.
+4. Conectar emulador o móvil físico.
+5. Pulsar **Run**.
+6. Android Studio compila, firma e instala automáticamente.
+
+No se necesita:
+
+- crear otro keystore;
+- introducir credenciales release;
+- ejecutar `assembleRelease`;
+- desinstalar la release, salvo que debug y release compartan `applicationId` y
+  se intente alternar entre ambas.
+
+### Recomendación pendiente
+
+Como mejora posterior, añadir en `buildTypes.debug`:
+
+```kotlin
+applicationIdSuffix = ".debug"
+```
+
+Objetivo:
+
+- permitir tener instalada simultáneamente la app de producción y la app debug;
+- evitar conflictos de firma;
+- mantener completamente separadas las pruebas locales y producción.
+
+Este cambio no está implementado en esta tarea.

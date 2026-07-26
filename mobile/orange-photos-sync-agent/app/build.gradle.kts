@@ -1,3 +1,4 @@
+import java.io.File
 import java.util.Properties
 
 plugins {
@@ -23,6 +24,11 @@ val releaseApiBaseUrl = providers.gradleProperty("orangeFamily.releaseApiBaseUrl
     .orNull
     ?.trim()
     .orEmpty()
+val keystoreFile = providers.gradleProperty("orangeFamily.keystoreFile").orNull?.trim().orEmpty()
+val keystorePassword = providers.gradleProperty("orangeFamily.keystorePassword").orNull.orEmpty()
+val releaseKeyAlias = providers.gradleProperty("orangeFamily.keyAlias").orNull?.trim().orEmpty()
+val releaseKeyPassword = providers.gradleProperty("orangeFamily.keyPassword").orNull.orEmpty()
+val resolvedKeystorePath = keystoreFile.takeIf(String::isNotEmpty)?.let { rootProject.file(it).absolutePath }.orEmpty()
 
 android {
     namespace = "com.orangefamily.photossync"
@@ -42,12 +48,23 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            if (keystoreFile.isNotEmpty()) {
+                storeFile = rootProject.file(keystoreFile)
+            }
+            storePassword = keystorePassword
+            keyAlias = releaseKeyAlias
+            keyPassword = releaseKeyPassword
+        }
+    }
     buildTypes {
         debug {
             buildConfigField("String", "API_BASE_URL", quotedBuildConfigValue(debugApiBaseUrl))
         }
         release {
             buildConfigField("String", "API_BASE_URL", quotedBuildConfigValue(releaseApiBaseUrl))
+            signingConfig = signingConfigs.getByName("release")
             optimization {
                 enable = false
             }
@@ -63,16 +80,49 @@ android {
     }
 }
 
-val validateReleaseApiBaseUrl by tasks.registering {
+val validateReleaseConfiguration by tasks.registering {
+    inputs.property("releaseApiBaseUrl", releaseApiBaseUrl)
+    inputs.property("keystoreFile", keystoreFile)
+    inputs.property("resolvedKeystorePath", resolvedKeystorePath)
+    inputs.property("keystorePassword", keystorePassword)
+    inputs.property("releaseKeyAlias", releaseKeyAlias)
+    inputs.property("keyPassword", releaseKeyPassword)
     doLast {
-        check(releaseApiBaseUrl.startsWith("https://")) {
-            "Define -PorangeFamily.releaseApiBaseUrl=https://... antes de generar release."
+        val releaseUrl = inputs.properties.getValue("releaseApiBaseUrl") as String
+        val configuredKeystoreFile = inputs.properties.getValue("keystoreFile") as String
+        val keystorePath = inputs.properties.getValue("resolvedKeystorePath") as String
+        val configuredKeystorePassword = inputs.properties.getValue("keystorePassword") as String
+        val configuredKeyAlias = inputs.properties.getValue("releaseKeyAlias") as String
+        val configuredKeyPassword = inputs.properties.getValue("keyPassword") as String
+        check(releaseUrl.isNotEmpty()) {
+            "Falta -PorangeFamily.releaseApiBaseUrl."
+        }
+        check(releaseUrl.startsWith("https://")) {
+            "orangeFamily.releaseApiBaseUrl debe comenzar por https://."
+        }
+        check(releaseUrl.endsWith("/")) {
+            "orangeFamily.releaseApiBaseUrl debe terminar en /."
+        }
+        check(configuredKeystoreFile.isNotEmpty()) {
+            "Falta -PorangeFamily.keystoreFile."
+        }
+        check(File(keystorePath).isFile) {
+            "No existe el fichero indicado por orangeFamily.keystoreFile."
+        }
+        check(configuredKeystorePassword.isNotEmpty()) {
+            "Falta -PorangeFamily.keystorePassword."
+        }
+        check(configuredKeyAlias.isNotEmpty()) {
+            "Falta -PorangeFamily.keyAlias."
+        }
+        check(configuredKeyPassword.isNotEmpty()) {
+            "Falta -PorangeFamily.keyPassword."
         }
     }
 }
 
 tasks.matching { it.name == "preReleaseBuild" }.configureEach {
-    dependsOn(validateReleaseApiBaseUrl)
+    dependsOn(validateReleaseConfiguration)
 }
 
 dependencies {
