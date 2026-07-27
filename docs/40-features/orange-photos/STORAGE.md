@@ -87,18 +87,21 @@ en backend y las URLs firmadas no se persisten.
 
 - Wasabi conserva un único objeto original final.
 - Tamaño de parte: 25 MB.
-- Máximo de partes simultáneas por archivo: 2.
+- Máximo de partes simultáneas por archivo: 2; en web se utiliza 1 para archivos de 1 GB o más.
 - Máximo de archivos transfiriéndose simultáneamente: 3.
 - Máximo de archivos por selección: 500.
 - Imágenes: máximo 30 MB.
 - Vídeos: máximo 10 GB.
 
-IndexedDB conserva la cola y los archivos cuando el navegador permite clonar el
-`File` o `Blob`. Al reanudar, OrangeFamily consulta las partes ya presentes en
-Wasabi y transfiere únicamente las que faltan. Cerrar o suspender el navegador
-puede detener la ejecución; al volver, el usuario puede continuar sin repetir
-las partes confirmadas. La PWA y Background Sync son una ayuda complementaria,
-no una garantía de ejecución con el navegador cerrado.
+La web divide los archivos grandes en partes de 25 MB. IndexedDB conserva la cola
+y los archivos de hasta 100 MB cuando el navegador permite clonar el `File` o
+`Blob`; para tamaños superiores no intenta persistir localmente el archivo
+completo. La sesión remota y las partes terminadas permanecen disponibles para
+reanudar, pero después de cerrar o recargar el navegador el usuario puede tener
+que seleccionar de nuevo el mismo archivo. OrangeFamily consulta las partes ya
+presentes en Wasabi y transfiere únicamente las que faltan. Wake Lock se solicita
+de forma opcional durante subidas de 1 GB o más, pero, igual que PWA y Background
+Sync, no garantiza la ejecución en segundo plano ni con el navegador cerrado.
 
 La futura aplicación Android utilizará la misma API multipart. Los endpoints de
 subida simple y `direct_backend` permanecen temporalmente por compatibilidad,
