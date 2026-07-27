@@ -76,7 +76,7 @@
   overflow: hidden;
   background: transparent;
 }
-.od-orange-photo-card.is-selected { background:#ffd8cc; box-shadow:inset 0 0 0 2px rgba(252,66,0,.22); }
+.od-orange-photo-card.is-selected { background:#ffd8cc; }
 
 .od-orange-photo-card__media {
   display: block;
