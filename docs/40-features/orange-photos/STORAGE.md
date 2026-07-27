@@ -115,6 +115,8 @@ por defecto, incluso cuando el elemento existente está en la papelera. El usuar
 puede forzar expresamente una nueva copia; por ello el checksum tiene un índice no
 único.
 
+Las coincidencias preventivas por nombre y tamaño y los duplicados exactos se mantienen como decisiones pendientes, no como fallos de subida, aunque se detecten al iniciar o completar una sesión multipart restaurada. El detalle individual devuelve URLs firmadas de miniatura y visualización con las mismas prioridades que el listado, permitiendo abrir elementos existentes aunque su periodo no esté cargado.
+
 ## Errores y limpieza
 
 OrangePhotos devuelve códigos estables sin exponer errores internos:
@@ -136,6 +138,8 @@ exacto no forzado, Node intenta eliminar el objeto nuevo. Los fallos posteriores
 de metadatos, poster o preview mantienen el original registrado y se comunican
 como advertencias. El procesamiento aplazado y el reconciliador continúan usando
 el flujo existente de `processStoredOrangePhotoVideo()`.
+
+El propietario puede solicitar desde el visor la generación de un póster cuando un vídeo conserva su original pero no dispone de variante `poster` ni `thumbnail`. La operación crea exclusivamente el póster; no genera preview, no altera metadatos y no permite regenerar o sustituir una variante existente.
 
 ## Biblioteca, compartición y selección
 

@@ -6,6 +6,7 @@ import {
   ellipsisVerticalOutline,
   heart,
   heartOutline,
+  imageOutline,
   shareSocialOutline,
   timeOutline,
 } from "ionicons/icons";
@@ -25,6 +26,7 @@ export default function OrangePhotoViewer({
   onToggleFavorite,
   onClose,
   onSave,
+  onGeneratePoster,
   onShareSave,
   onTrash,
   onRestore,
@@ -40,6 +42,8 @@ export default function OrangePhotoViewer({
   const [moreOpen, setMoreOpen] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [eventsPhotoId, setEventsPhotoId] = useState(null);
+  const [posterBusy,setPosterBusy]=useState(false);
+  const [posterError,setPosterError]=useState("");
 
   const shareButtonRef = useRef(null);
   const moreButtonRef = useRef(null);
@@ -86,6 +90,8 @@ export default function OrangePhotoViewer({
     closeMore();
     onPurge();
   };
+
+  const handleGeneratePoster=async()=>{setPosterBusy(true);setPosterError("");try{await onGeneratePoster();notify("Miniatura generada");closeMore();}catch(error){setPosterError(error.message);}finally{setPosterBusy(false);}};
 
   return (
     <>
@@ -187,6 +193,8 @@ export default function OrangePhotoViewer({
                   />
 
                   <div className="od-attachments-lightbox__more-menu" role="menu">
+                    {photo.media_type==="video"&&photo.is_owner&&!photo.poster_url?<button className="od-attachments-lightbox__more-item" type="button" role="menuitem" disabled={posterBusy} onClick={handleGeneratePoster}><IonIcon icon={imageOutline}/><span>{posterBusy?"Generando miniatura…":"Generar miniatura"}</span></button>:null}
+                    {posterError?<small className="od-status-line od-status-line--error">{posterError}</small>:null}
                     {!trashMode ? (
                       <a
                         className="od-attachments-lightbox__more-item"
