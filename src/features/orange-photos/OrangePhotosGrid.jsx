@@ -14,7 +14,7 @@ function aspectRatio(photo) {
   return photo.media_type === "video" ? 16 / 9 : 1;
 }
 
-function buildJustifiedRows(photos, availableWidth) {
+function buildJustifiedRows(photos, availableWidth, albumMode = false) {
   const mobile = availableWidth < 600;
   const tablet = availableWidth >= 600 && availableWidth < 900;
 
@@ -22,6 +22,8 @@ function buildJustifiedRows(photos, availableWidth) {
     ? 170
     : tablet
       ? 155
+      : albumMode
+        ? 200
       : availableWidth >= 1280
         ? 180
         : 165;
@@ -164,6 +166,7 @@ export default function OrangePhotosGrid({
   onSelectMany,
   onOpen,
   onActivePeriodChange,
+  albumMode = false,
 }) {
   const contentRef = useRef(null);
   const [availableWidth, setAvailableWidth] = useState(960);
@@ -225,7 +228,7 @@ export default function OrangePhotosGrid({
           {period.days.map((day) => (
             <section className="od-orange-photos__day" key={day.key}>
               <header className="od-orange-photos__day-header"><DaySelectionToggle photoIds={day.photos.map(photo => photo.id)} selected={selected} selectionMode={selectionMode} onSelectMany={onSelectMany} /><h3>{day.label}</h3></header>
-              {buildJustifiedRows(day.photos, availableWidth).map((row, rowIndex) => (
+              {buildJustifiedRows(day.photos, availableWidth, albumMode).map((row, rowIndex) => (
                 <div
                   className="od-orange-photos__justified-row"
                   style={{ height: row.height, gap: row.gap }}

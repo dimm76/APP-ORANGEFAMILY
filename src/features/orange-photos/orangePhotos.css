@@ -107,7 +107,7 @@
   gap:3px;
 }
 .od-orange-photo-card__video ion-icon { width:12px; height:12px; }
-.od-orange-photo-card__share { position:absolute; top:8px; right:8px; z-index:3; display:grid; place-items:center; width:18px; height:18px; pointer-events:none; filter:drop-shadow(0 1px 1px rgba(255,255,255,.9)); }
+.od-orange-photo-card__share { position:absolute; top:8px; right:8px; z-index:4; display:grid; place-items:center; width:18px; height:18px; pointer-events:auto; filter:drop-shadow(0 1px 1px rgba(255,255,255,.9)); }
 .od-orange-photo-card__share ion-icon { width:18px; height:18px; }
 .od-orange-photo-card__share--owned { color:var(--od-color-primary); }
 .od-orange-photo-card__share--received { color:#1d4ed8; }
@@ -324,14 +324,32 @@
 .od-attachments-lightbox__action { min-height:32px; display:inline-flex; align-items:center; padding:0 8px; border:1px solid rgba(248,250,252,.35); border-radius:8px; background:rgba(30,41,59,.95); color:#fff; font:600 12px inherit; text-decoration:none; cursor:pointer; }
 .od-orangephotos-album-header,.od-orange-albums-view>header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }.od-orangephotos-album-header { justify-content:flex-start; }.od-orangephotos-album-header p,.od-orange-albums-view header p { color:#64748b; font-size:13px; }
 .od-orange-albums-view__create { flex:0 0 auto; }
-.od-orange-albums-view__filters { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:14px; }.od-orange-albums-view__grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:12px; }.od-orange-album-card { position:relative; overflow:visible; display:flex; flex-direction:column; align-items:stretch; border:1px solid #dce3f5; border-radius:8px; background:#fff; color:#1e293b; text-align:left; cursor:pointer; }.od-orange-album-card__cover,.od-orange-album-card img,.od-orange-album-card__placeholder { width:100%; height:150px; }.od-orange-album-card img,.od-orange-album-card__placeholder { object-fit:cover; display:grid; place-items:center; border-radius:7px 7px 0 0; background:#e2e8f0; color:#64748b; }.od-orange-album-card__footer { display:flex; align-items:center; gap:8px; min-height:54px; padding:8px 8px 8px 10px; }.od-orange-album-card__text { min-width:0; flex:1; display:grid; gap:4px; }.od-orange-album-card__text strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.od-orange-album-card__text small { display:flex; align-items:center; gap:4px; color:#64748b; }
-.od-orange-album-card__share { display:inline-grid; place-items:center; flex:0 0 auto; width:16px; height:16px; }.od-orange-album-card__share ion-icon { width:16px; height:16px; }
+.od-orange-albums-view { width:100%; }
+.od-orange-albums-view__filters { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:14px; }.od-orange-albums-view__grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:20px; align-items:start; }.od-orange-album-card { position:relative; overflow:visible; display:flex; flex-direction:column; align-items:stretch; width:100%; max-width:360px; border:1px solid #dce3f5; border-radius:8px; background:#fff; color:#1e293b; text-align:left; cursor:pointer; }.od-orange-album-card__cover { position:relative; }.od-orange-album-card__cover,.od-orange-album-card img,.od-orange-album-card__placeholder { width:100%; height:150px; }.od-orange-album-card img,.od-orange-album-card__placeholder { object-fit:cover; display:grid; place-items:center; border-radius:7px 7px 0 0; background:#e2e8f0; color:#64748b; }.od-orange-album-card__footer { display:flex; align-items:center; gap:8px; min-height:54px; padding:8px 8px 8px 10px; }.od-orange-album-card__text { min-width:0; flex:1; display:grid; gap:4px; }.od-orange-album-card__text strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.od-orange-album-card__text small { display:flex; align-items:center; gap:4px; color:#64748b; }
+.od-orange-album-card__share { position:absolute; top:10px; right:10px; z-index:2; display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; }.od-orange-album-card__share ion-icon { width:18px; height:18px; }
 .od-orange-album-card__menu-wrap { position:relative; z-index:2; flex:0 0 auto; margin-left:auto; }
 .od-orange-album-card__menu-button { display:grid; place-items:center; width:32px; height:32px; padding:0; border:1px solid #dce3f5; border-radius:8px; background:#fff; color:#37374b; cursor:pointer; }
 .od-orange-album-card__menu { position:absolute; top:36px; right:0; z-index:3; min-width:210px; padding:6px; border:1px solid #dce3f5; border-radius:8px; background:#fff; box-shadow:0 4px 12px rgba(17,18,41,.12); }
 .od-orange-album-card__menu .od-action-menu-item { width:100%; text-align:left; }
 .od-orange-album-card__menu-danger { color:#a63a3a; }
-.od-orangephotos-cover-selection { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 0 10px; padding:10px 12px; border:1px solid var(--od-color-primary, #fc4200); border-radius:8px; background:var(--od-color-primary-soft, rgba(252,66,0,.12)); color:#37374b; font-weight:600; }
+.od-orange-album-share__permission-help { margin:0; color:#64748b; font-size:12px; }
+.od-orange-album-share-modal__body { display:grid; gap:20px; }
+.od-orange-album-share-modal__section { display:grid; gap:10px; }
+.od-orange-album-detail-header { position:relative; display:grid; grid-template-columns:36px minmax(0,1fr) 36px; align-items:center; gap:12px; margin-bottom:14px; padding:10px 0; border-bottom:1px solid #dce3f5; }
+.od-orange-album-detail-header__back { display:grid; place-items:center; width:32px; height:32px; padding:0; border:0; border-radius:8px; background:transparent; color:#475569; cursor:pointer; }
+.od-orange-album-detail-header__identity { min-width:0; grid-column:2; display:grid; justify-items:center; gap:3px; text-align:center; }
+.od-orange-album-detail-header__identity h1 { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.od-orange-album-detail-header__meta { display:flex; align-items:center; justify-content:center; gap:5px; color:#64748b; font-size:12px; }
+.od-orange-album-detail-header__share { display:grid; place-items:center; flex:0 0 auto; }
+.od-orange-album-header-actions__menu-wrap { position:relative; }
+.od-orange-album-header-actions__menu { position:absolute; top:40px; right:0; z-index:30; min-width:220px; padding:6px; border:1px solid #dce3f5; border-radius:8px; background:#fff; box-shadow:0 4px 12px rgba(17,18,41,.12); }
+.od-orange-album-header-actions__menu .od-action-menu-item { width:100%; text-align:left; }
+.od-orangephotos-cover-header-actions { display:flex; align-items:center; gap:10px; color:#37374b; }
+#od-orangephotos-actions-host:has(.od-orange-album-header-actions) > .od-orangephotos-header-actions:not(.od-orange-album-header-actions),#od-orangephotos-actions-host:has(.od-orangephotos-cover-header-actions) > .od-orangephotos-header-actions { display:none; }
+#od-orangephotos-actions-host:has(.od-orangephotos-selection-actions) .od-orange-album-header-actions,#od-orangephotos-actions-host:has(.od-orangephotos-selection-actions) .od-orangephotos-cover-header-actions { display:none; }
+.od-orangephotos-header-actions:has(.od-orangephotos-selection-actions) > .od-orangephotos-header-icon,.od-orangephotos-header-actions:has(.od-orangephotos-selection-actions) > .od-orangephotos-upload-button { display:none; }
+.od-orangephotos-add-to-album { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; padding:10px 12px; border:1px solid var(--od-color-primary); border-radius:8px; background:var(--od-color-primary-soft); color:#37374b; font-weight:600; }.od-orangephotos-add-to-album>div { display:flex; gap:6px; }
+.od-orangephotos-cover-selection { display:none; }
 .od-orangephotos-cover-selection__grid .od-orange-photo-card:has(.od-orange-photo-card__video) { opacity:.48; cursor:not-allowed; }
 .od-orangephotos-cover-selection__grid .od-orange-photo-card:has(.od-orange-photo-card__video) button { cursor:not-allowed; }
 .od-orangephotos-cover-selection__grid .od-orange-photo-card__selection-control,.od-orangephotos-cover-selection__grid .od-orange-photos__day-selection { display:none; }
@@ -361,6 +379,13 @@
     margin-bottom: 3px;
   }
   .od-orange-photo-card.is-selected { padding:5px; }
+}
+
+@media (max-width: 640px) {
+  .od-orange-albums-view__grid { grid-template-columns:1fr; gap:14px; }
+  .od-orange-album-card { max-width:none; }
+  .od-orange-album-detail-header { grid-template-columns:32px minmax(0,1fr) 32px; gap:8px; }
+  .od-orangephotos-add-to-album { align-items:stretch; flex-direction:column; }
 }
 
 .od-orange-photos__library { display:grid; grid-template-columns:minmax(0,1fr) 22px; gap:6px; padding-right:0; }

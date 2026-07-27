@@ -157,6 +157,10 @@ El permiso del álbum puede ser **Solo ver** o **Puede añadir fotos y vídeos**
 
 La migración `20260726130000_orange_photo_album_contributions.sql` añade `orange_photo_albums.allow_contributions` para álbumes familiares y `orange_photo_album_shares.can_contribute` para destinatarios concretos. Debe aplicarse antes de desplegar el backend que consulta estos campos.
 
+Cada álbum dispone de una cabecera interna centrada con título, estado de compartición y contador. Sus acciones de compartir, añadir contenido, actividad y menú de opciones se muestran en el host global derecho de la barra superior, con prioridad para los modos de papelera, selección múltiple y elección de portada. El alta de contenido abre la biblioteca global en modo selección, conserva identificados los elementos ya incluidos y vuelve al álbum al confirmar. La elección de portada solo admite imágenes pertenecientes al álbum y se activa mediante la ruta `?selectCover=1`. El modal de compartición es común al listado y a la cabecera, agrupa visualmente visibilidad y permisos, y explica dinámicamente si otras personas pueden añadir fotos y vídeos.
+
+Los iconos sobre fotografías y portadas de álbum indican mediante tooltip si el contenido fue compartido con la familia, con miembros concretos, por otra persona o mediante un álbum. La actividad persistida, comentarios, likes, notificaciones, compartir mediante enlace, presentación y descarga completa del álbum quedan aplazados.
+
 ## Gestión de la cola web
 
 La selección previa permite retirar archivos antes de iniciar la subida. En la cola persistente, una subida activa puede cancelarse y retirarse: el navegador aborta las transferencias en curso y, cuando existe una sesión multipart, solicita su aborto mediante `DELETE /api/orange-photos/uploads/:uploadId` antes de eliminar la entrada local.
