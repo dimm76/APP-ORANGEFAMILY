@@ -148,13 +148,13 @@ function buildJustifiedRows(photos, availableWidth, albumMode = false) {
   return rows;
 }
 
-function DaySelectionToggle({ photoIds, selected, selectionMode, onSelectMany }) {
+function DaySelectionToggle({ dayKey, photoIds, selected, selectionMode, onSelectMany }) {
   const inputRef = useRef(null);
   const selectedCount = photoIds.filter(id => selected.has(id)).length;
   const checked = selectedCount === photoIds.length && photoIds.length > 0;
   const indeterminate = selectedCount > 0 && !checked;
   useEffect(() => { if (inputRef.current) inputRef.current.indeterminate = indeterminate; }, [indeterminate]);
-  return <label className={`od-orange-photos__day-selection${checked ? " is-selected" : ""}${selectionMode ? " is-selection-mode" : ""}`}><input ref={inputRef} className="od-orange-photo-card__selection-input" type="checkbox" checked={checked} onChange={() => onSelectMany(photoIds, !checked)} /><span className="od-orange-photo-card__selection-circle" aria-hidden="true">{checked || indeterminate ? <IonIcon icon={checkmarkOutline} /> : null}</span><span className="od-orange-photo-card__sr">Seleccionar todas las fotografías del día</span></label>;
+  return <label className={`od-orange-photos__day-selection${checked ? " is-selected" : ""}${selectionMode ? " is-selection-mode" : ""}`}><input ref={inputRef} className="od-orange-photo-card__selection-input" type="checkbox" checked={checked} onChange={() => onSelectMany(dayKey, photoIds, !checked)} /><span className="od-orange-photo-card__selection-circle" aria-hidden="true">{checked || indeterminate ? <IonIcon icon={checkmarkOutline} /> : null}</span><span className="od-orange-photo-card__sr">Seleccionar todas las fotografías del día</span></label>;
 }
 
 export default function OrangePhotosGrid({
@@ -227,7 +227,7 @@ export default function OrangePhotosGrid({
           <h2>{period.label}</h2>
           {period.days.map((day) => (
             <section className="od-orange-photos__day" key={day.key}>
-              <header className="od-orange-photos__day-header"><DaySelectionToggle photoIds={day.photos.map(photo => photo.id)} selected={selected} selectionMode={selectionMode} onSelectMany={onSelectMany} /><h3>{day.label}</h3></header>
+              <header className="od-orange-photos__day-header"><DaySelectionToggle dayKey={day.key} photoIds={day.photos.map(photo => photo.id)} selected={selected} selectionMode={selectionMode} onSelectMany={onSelectMany} /><h3>{day.label}</h3></header>
               {buildJustifiedRows(day.photos, availableWidth, albumMode).map((row, rowIndex) => (
                 <div
                   className="od-orange-photos__justified-row"

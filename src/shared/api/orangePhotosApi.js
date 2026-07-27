@@ -5,7 +5,12 @@ const LEGACY_FILTERS=new Set(["media_types","media_type_mode","visibilities","vi
 function photoQuery(filters={},excluded=[]){const q=new URLSearchParams(),skip=new Set(excluded);Object.entries(filters).forEach(([k,v])=>{if(skip.has(k)||LEGACY_FILTERS.has(k)||v==="all")return;if(Array.isArray(v)){if(v.length)q.set(k,v.join(","));}else if(v!==""&&v!=null&&v!==false)q.set(k,String(v));});return q;}
 export function listOrangePhotos(filters={},options={}){return request(`/api/orange-photos?${photoQuery(filters)}`,{signal:options.signal});}
 export function listOrangePhotosTimeline(filters={},options={}){return request(`/api/orange-photos/timeline?${photoQuery(filters,["page","per_page","before"])}`,{signal:options.signal});}
-export function listOrangePhotosAroundDate(date,filters={},options={}){const q=photoQuery(filters,["page","before"]);q.set("date",date);return request(`/api/orange-photos/around-date?${q}`,{signal:options.signal});}
+export function listOrangePhotosAroundDate(date, filters = {}, options = {}) {
+  const q = photoQuery(filters, ["page", "before"]);
+  q.set("date", date);
+  if (options.direction) q.set("direction", options.direction);
+  return request(`/api/orange-photos/around-date?${q}`, { signal: options.signal });
+}
 export const getOrangePhoto=id=>request(`/api/orange-photos/${encodeURIComponent(id)}`);
 export function getOrangePhotoEvents(photoId,options={}){return request(`/api/orange-photos/${encodeURIComponent(photoId)}/events`,{signal:options.signal});}
 export const updateOrangePhoto=(id,body)=>request(`/api/orange-photos/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify(body)});
