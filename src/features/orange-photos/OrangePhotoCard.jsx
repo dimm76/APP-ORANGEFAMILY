@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { IonIcon } from "@ionic/react";
 import { checkmarkOutline, peopleOutline, searchCircleOutline } from "ionicons/icons";
 import { OD_ICONS } from "../../shared/ui/odIcons.js";
@@ -12,14 +12,14 @@ function formatDuration(value) {
   return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}` : `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-export default function OrangePhotoCard({ photo, selectionMode, selected, onSelect, onOpen, eager = false }) {
+function OrangePhotoCard({ photo, selectionMode, selected, onSelect, onOpen, eager = false }) {
   const [previewing, setPreviewing] = useState(false), [hoverDuration,setHoverDuration]=useState(null), timerRef = useRef(null), videoRef = useRef(null), cardRef = useRef(null);
   const label = photo.title?.trim() || photo.original_filename?.trim() || "Sin título";
   const poster = photo.poster_url || photo.thumbnail_url || photo.preview_url;
   const storedDuration=Number(photo.duration_seconds);
   const effectiveDuration=Number.isFinite(storedDuration)&&storedDuration>0?storedDuration:Number.isFinite(hoverDuration)&&hoverDuration>0?hoverDuration:null;
   const previewUrl=photo.media_type==="video"?photo.video_preview_url:null;
-  const gridUrl = photo.media_type === "video" ? poster : photo.preview_url || (Number(photo.thumbnail_width) >= 700 ? photo.thumbnail_url : photo.original_url) || photo.thumbnail_url;
+  const gridUrl = photo.media_type === "video" ? poster : photo.thumbnail_url || photo.preview_url || photo.original_url;
   const stop = () => {
     window.clearTimeout(timerRef.current);
     const video = videoRef.current;
@@ -69,3 +69,5 @@ export default function OrangePhotoCard({ photo, selectionMode, selected, onSele
   const handleMediaClick = event => { if (selectionMode) { onSelect(photo.id,event); return; } onOpen(photo); };
   return <article ref={cardRef} className={`od-orange-photo-card${selected ? " is-selected" : ""}${selectionMode ? " is-selection-mode" : ""}`} onMouseEnter={start} onMouseLeave={stop}><button type="button" className="od-orange-photo-card__media" onClick={handleMediaClick} aria-label={`Abrir ${label}`}>{previewing ? <video key={previewUrl} ref={videoRef} src={previewUrl} muted autoPlay playsInline preload="auto" controls={false} disablePictureInPicture disableRemotePlayback controlsList="nodownload noplaybackrate noremoteplayback" onLoadedMetadata={event=>{const video=event.currentTarget;const duration=Number(video.duration);if((!Number(photo.duration_seconds)||Number(photo.duration_seconds)<=0)&&Number.isFinite(duration)&&duration>0)setHoverDuration(duration);video.currentTime=0;video.play().catch(error=>{console.warn("OrangePhotos preview play",{photo_id:photo.id,name:error?.name||null,message:error?.message||null});});}} onPlaying={()=>{console.debug("OrangePhotos preview playing",{photo_id:photo.id});}} onTimeUpdate={event=>{if(event.currentTarget.currentTime>=3)stop();}} onEnded={stop} onError={event=>{const video=event.currentTarget;console.warn("OrangePhotos preview error",{photo_id:photo.id,media_error_code:video.error?.code||null,media_error_message:video.error?.message||null,ready_state:video.readyState,network_state:video.networkState,has_preview_url:Boolean(previewUrl)});stop();}} /> : gridUrl ? <img src={gridUrl} alt={label} title={label} loading={eager ? "eager" : "lazy"} decoding="async" fetchPriority={eager ? "auto" : "low"} width={photo.width || undefined} height={photo.height || undefined} /> : <span className="od-orange-photo-card__video-placeholder"><IonIcon icon={OD_ICONS.timerRestart} /></span>}{photo.media_type === "video" ? <span className="od-orange-photo-card__video"><IonIcon icon={OD_ICONS.timerRestart} />{effectiveDuration ? formatDuration(effectiveDuration) : null}</span> : null}</button>{effectivelyShared&&shareTitle?<span className={`od-orange-photo-card__share od-orange-photo-card__share--${photo.is_owner?"owned":"received"}`} title={shareTitle} aria-label={shareTitle}><IonIcon icon={peopleOutline}/></span>:null}<label className={`od-orange-photo-card__selection-control${selected ? " is-selected" : ""}`} onClick={event => {event.stopPropagation();onSelect(photo.id,event);}}><input className="od-orange-photo-card__selection-input" type="checkbox" checked={selected} onChange={()=>{}} /><span className="od-orange-photo-card__selection-circle" aria-hidden="true">{selected ? <IonIcon icon={checkmarkOutline} /> : null}</span><span className="od-orange-photo-card__sr">Seleccionar</span></label><button type="button" className="od-orange-photo-card__inspect" aria-label={`Abrir ${label}`} title="Abrir" onClick={event => { event.stopPropagation(); onOpen(photo); }}><IonIcon icon={searchCircleOutline} /></button></article>;
 }
+
+export default memo(OrangePhotoCard);

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { IonIcon } from "@ionic/react";
 import { checkmarkOutline } from "ionicons/icons";
 import OrangePhotoCard from "./OrangePhotoCard.jsx";
@@ -157,7 +157,7 @@ function DaySelectionToggle({ dayKey, photoIds, selected, selectionMode, onSelec
   return <label className={`od-orange-photos__day-selection${checked ? " is-selected" : ""}${selectionMode ? " is-selection-mode" : ""}`}><input ref={inputRef} className="od-orange-photo-card__selection-input" type="checkbox" checked={checked} onChange={() => onSelectMany(dayKey, photoIds, !checked)} /><span className="od-orange-photo-card__selection-circle" aria-hidden="true">{checked || indeterminate ? <IonIcon icon={checkmarkOutline} /> : null}</span><span className="od-orange-photo-card__sr">Seleccionar todas las fotografías del día</span></label>;
 }
 
-export default function OrangePhotosGrid({
+function OrangePhotosGrid({
   groups,
   loading,
   selected,
@@ -172,6 +172,19 @@ export default function OrangePhotosGrid({
   const measuredWidthRef = useRef(0);
   const resizeFrameRef = useRef(null);
   const [availableWidth, setAvailableWidth] = useState(960);
+  const layout = useMemo(() => {
+    let globalIndex = 0;
+    return groups.map(period => ({
+      ...period,
+      days: period.days.map(day => ({
+        ...day,
+        rows: buildJustifiedRows(day.photos, availableWidth, albumMode).map(row => ({
+          ...row,
+          photos: row.photos.map(photo => ({ photo, globalIndex: globalIndex++ })),
+        })),
+      })),
+    }));
+  }, [groups, availableWidth, albumMode]);
 
   useEffect(() => {
     const content = contentRef.current;
@@ -230,7 +243,7 @@ export default function OrangePhotosGrid({
 
   return (
     <div className="od-orange-photos__content" ref={contentRef}>
-      {groups.map((period) => (
+      {layout.map((period) => (
         <section
           className="od-orange-photos__period"
           id={`orange-photos-period-${period.key}`}
@@ -241,15 +254,16 @@ export default function OrangePhotosGrid({
           {period.days.map((day) => (
             <section className="od-orange-photos__day" key={day.key}>
               <header className="od-orange-photos__day-header"><DaySelectionToggle dayKey={day.key} photoIds={day.photos.map(photo => photo.id)} selected={selected} selectionMode={selectionMode} onSelectMany={onSelectMany} /><h3>{day.label}</h3></header>
-              {buildJustifiedRows(day.photos, availableWidth, albumMode).map((row, rowIndex) => (
+              {day.rows.map((row) => (
                 <div
                   className="od-orange-photos__justified-row"
                   style={{ height: row.height, gap: row.gap }}
-                  key={`${day.key}:${row.photos.map(photo => photo.id).join(",")}`}
+                  key={`${day.key}:${row.photos.map(item => item.photo.id).join(",")}`}
                 >
-                  {row.photos.map((photo, photoIndex) => (
+                  {row.photos.map(({ photo, globalIndex }) => (
                     <div
                       className="od-orange-photos__justified-item"
+                      data-photo-id={photo.id}
                       style={{ width: aspectRatio(photo) * row.height, flexBasis: aspectRatio(photo) * row.height, height: row.height, maxWidth: "100%" }}
                       key={photo.id}
                     >
@@ -259,7 +273,7 @@ export default function OrangePhotosGrid({
                         selected={selected.has(photo.id)}
                         onSelect={onSelect}
                         onOpen={onOpen}
-                        eager={rowIndex === 0 && photoIndex < 4}
+                        eager={globalIndex < 8}
                       />
                     </div>
                   ))}
@@ -272,3 +286,5 @@ export default function OrangePhotosGrid({
     </div>
   );
 }
+
+export default memo(OrangePhotosGrid);
