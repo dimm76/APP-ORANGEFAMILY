@@ -151,6 +151,12 @@ Los álbumes pueden crearse tanto desde el botón global `+` como desde la cabec
 
 Al añadir la primera imagen a un álbum que todavía no tiene portada, Node la asigna automáticamente sin reemplazar posteriormente una portada existente. Archivar un álbum lo retira del listado, pero conserva intactas sus fotos en la biblioteca y no elimina manualmente sus relaciones desde el frontend.
 
+Compartir un álbum concede acceso efectivo y reversible a todas las fotos y vídeos que contiene, sin cambiar `orange_photos.visibility` ni crear filas en `orange_photo_shares`. Para el destinatario, esos elementos aparecen tanto en **Todas las fotos** como en **Compartidas conmigo**; al dejar de compartir el álbum o retirar un elemento, desaparece ese acceso salvo que exista otra compartición directa o mediante otro álbum. Las tarjetas propias compartidas por álbum usan el icono naranja y las recibidas el azul.
+
+El permiso del álbum puede ser **Solo ver** o **Puede añadir fotos y vídeos**. Los colaboradores únicamente pueden añadir contenido propio y retirar relaciones que ellos mismos hayan creado; el propietario conserva la gestión del álbum y puede retirar cualquier elemento. Esta fase no ofrece **Guardar copia en mi biblioteca** y no duplica objetos en Wasabi.
+
+La migración `20260726130000_orange_photo_album_contributions.sql` añade `orange_photo_albums.allow_contributions` para álbumes familiares y `orange_photo_album_shares.can_contribute` para destinatarios concretos. Debe aplicarse antes de desplegar el backend que consulta estos campos.
+
 ## Gestión de la cola web
 
 La selección previa permite retirar archivos antes de iniciar la subida. En la cola persistente, una subida activa puede cancelarse y retirarse: el navegador aborta las transferencias en curso y, cuando existe una sesión multipart, solicita su aborto mediante `DELETE /api/orange-photos/uploads/:uploadId` antes de eliminar la entrada local.
