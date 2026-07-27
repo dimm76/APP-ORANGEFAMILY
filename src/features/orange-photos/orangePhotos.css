@@ -16,6 +16,7 @@
 }
 
 .od-orange-photos__content {
+  overflow-anchor: none;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -82,9 +83,12 @@
   border: 0;
   background: #f1f5f9;
   cursor: pointer;
-  transition: border-radius 120ms ease;
+  transition:
+    transform 120ms ease,
+    border-radius 120ms ease;
+  transform-origin: center;
 }
-.od-orange-photo-card.is-selected .od-orange-photo-card__media { transform:none; width:100%; height:100%; border-radius:8px; overflow:hidden; }
+.od-orange-photo-card.is-selected .od-orange-photo-card__media { transform:scale(0.94); border-radius:8px; overflow:hidden; }
 
 .od-orange-photo-card__media img {
   display: block;

@@ -169,6 +169,8 @@ export default function OrangePhotosGrid({
   albumMode = false,
 }) {
   const contentRef = useRef(null);
+  const measuredWidthRef = useRef(0);
+  const resizeFrameRef = useRef(null);
   const [availableWidth, setAvailableWidth] = useState(960);
 
   useEffect(() => {
@@ -176,13 +178,24 @@ export default function OrangePhotosGrid({
     const container = content?.parentElement;
     if (!container) return undefined;
     const updateWidth = () => {
-      const width = container.getBoundingClientRect().width;
-      if (width > 0) setAvailableWidth(Math.max(280, width));
+      cancelAnimationFrame(resizeFrameRef.current);
+      resizeFrameRef.current = requestAnimationFrame(() => {
+        const measured = Math.max(
+          280,
+          Math.round(container.getBoundingClientRect().width),
+        );
+        if (Math.abs(measured - measuredWidthRef.current) < 2) return;
+        measuredWidthRef.current = measured;
+        setAvailableWidth(measured);
+      });
     };
     updateWidth();
     const observer = new ResizeObserver(updateWidth);
     observer.observe(container);
-    return () => observer.disconnect();
+    return () => {
+      cancelAnimationFrame(resizeFrameRef.current);
+      observer.disconnect();
+    };
   }, []);
 
   useEffect(() => {

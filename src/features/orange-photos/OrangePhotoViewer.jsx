@@ -11,7 +11,7 @@ import {
   timeOutline,
 } from "ionicons/icons";
 import AttachmentsImageLightbox from "../../shared/components/AttachmentsImageLightbox.jsx";
-import { orangePhotoDownloadUrl } from "../../shared/api/orangePhotosApi.js";
+import { generateOrangePhotoPoster, orangePhotoDownloadUrl } from "../../shared/api/orangePhotosApi.js";
 import { OD_ICONS } from "../../shared/ui/odIcons.js";
 import OrangePhotoDetailsPanel from "./OrangePhotoDetailsPanel.jsx";
 import OrangePhotoShareModal from "./OrangePhotoShareModal.jsx";
@@ -50,6 +50,7 @@ export default function OrangePhotoViewer({
   const eventsButtonRef = useRef(null);
 
   const eventsOpen = eventsPhotoId === photo.id;
+  const hasPoster = Boolean(photo.poster_url || photo.thumbnail_url);
 
   const displayTitle =
     photo.title?.trim() ||
@@ -91,7 +92,7 @@ export default function OrangePhotoViewer({
     onPurge();
   };
 
-  const handleGeneratePoster=async()=>{setPosterBusy(true);setPosterError("");try{await onGeneratePoster();notify("Miniatura generada");closeMore();}catch(error){setPosterError(error.message);}finally{setPosterBusy(false);}};
+  const handleGeneratePoster=async()=>{if(hasPoster&&!window.confirm("Se sustituirá la miniatura actual del vídeo. El vídeo original no se modificará."))return;setPosterBusy(true);setPosterError("");try{if(hasPoster)await generateOrangePhotoPoster(photo.id,true);else await onGeneratePoster(false);notify("Miniatura generada");closeMore();}catch(error){setPosterError(error.message);}finally{setPosterBusy(false);}};
 
   return (
     <>
@@ -193,7 +194,7 @@ export default function OrangePhotoViewer({
                   />
 
                   <div className="od-attachments-lightbox__more-menu" role="menu">
-                    {photo.media_type==="video"&&photo.is_owner&&!photo.poster_url?<button className="od-attachments-lightbox__more-item" type="button" role="menuitem" disabled={posterBusy} onClick={handleGeneratePoster}><IonIcon icon={imageOutline}/><span>{posterBusy?"Generando miniatura…":"Generar miniatura"}</span></button>:null}
+                    {photo.media_type==="video"&&photo.is_owner?<button className="od-attachments-lightbox__more-item" type="button" role="menuitem" disabled={posterBusy} onClick={handleGeneratePoster}><IonIcon icon={imageOutline}/><span>{posterBusy?"Generando miniatura…":hasPoster?"Recrear miniatura":"Generar miniatura"}</span></button>:null}
                     {posterError?<small className="od-status-line od-status-line--error">{posterError}</small>:null}
                     {!trashMode ? (
                       <a

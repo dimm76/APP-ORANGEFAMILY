@@ -71,8 +71,8 @@ async function register(row, metadata, derivatives, updateMetadata, possibleOrph
 }
 
 async function processStoredOrangePhotoVideo(photoId, options = {}) {
-  const createPoster = options.createPoster !== false, createPreview = options.createPreview !== false, updateMetadata = options.updateMetadata !== false, dryRun = options.dryRun === true;
-  const row = await loadPhoto(photoId), needsPoster = createPoster && !row.poster_key && !row.thumbnail_key, needsPreview = createPreview && !row.preview_key;
+  const createPoster = options.createPoster !== false, createPreview = options.createPreview !== false, updateMetadata = options.updateMetadata !== false, dryRun = options.dryRun === true, replacePoster = options.replacePoster === true;
+  const row = await loadPhoto(photoId), needsPoster = createPoster && (replacePoster || (!row.poster_key && !row.thumbnail_key)), needsPreview = createPreview && !row.preview_key;
   const actions = { update_metadata:updateMetadata&&(!(Number(row.duration_seconds)>0)||!row.width||!row.height||["upload_date","file_mtime","unknown"].includes(row.captured_at_source)),create_poster:needsPoster,create_preview:needsPreview };
   if (dryRun && !options.validateDerivatives) return { photo:row,actions,metadata:null,created:[],possible_orphans:[] };
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "orange-photos-video-")), extension = path.extname(row.original_filename || row.object_key) || ".video", inputPath = path.join(tempDir, `original${extension}`), posterPath = path.join(tempDir, "poster.jpg"), previewPath = path.join(tempDir, "preview.mp4"), possibleOrphans = [];
@@ -89,13 +89,13 @@ async function processStoredOrangePhotoVideo(photoId, options = {}) {
         const buffer = await fs.readFile(item.path), upload = await uploadOrangePhotoToWasabi(buffer, { familyId:row.family_id,mimeType:item.mime_type,extension:item.extension,originalFilename:`${row.original_filename || row.id}-${item.variant}.${item.extension}`,variant:item.variant });
         derivatives.push({ ...item, upload });
       }
-      await register(row,metadata,derivatives,updateMetadata,possibleOrphans);
+      if (!replacePoster) await register(row,metadata,derivatives,updateMetadata,possibleOrphans);
     } catch (error) {
       const uploadedKeys = derivatives.map(item => item.upload.object_key);
       error.possibleOrphans = [...new Set([...possibleOrphans, ...uploadedKeys])];
       throw error;
     }
-    return { photo:row,actions,metadata,created:derivatives.map(item=>({variant:item.variant,object_key:item.upload.object_key,size:item.upload.size_bytes,width:item.metadata.width,height:item.metadata.height})),possible_orphans:[] };
+    return { photo:row,actions,metadata,created:derivatives.map(item=>({variant:item.variant,provider:item.upload.provider,bucket:item.upload.bucket,object_key:item.upload.object_key,mime_type:item.mime_type,size_bytes:item.upload.size_bytes,checksum_sha256:item.upload.checksum_sha256,etag:item.upload.etag||null,width:item.metadata.width,height:item.metadata.height})),possible_orphans:[] };
   } finally { await fs.rm(tempDir,{recursive:true,force:true}); }
 }
 

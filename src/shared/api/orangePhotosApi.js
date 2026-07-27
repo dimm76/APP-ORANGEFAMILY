@@ -12,7 +12,7 @@ export function listOrangePhotosAroundDate(date, filters = {}, options = {}) {
   return request(`/api/orange-photos/around-date?${q}`, { signal: options.signal });
 }
 export const getOrangePhoto=id=>request(`/api/orange-photos/${encodeURIComponent(id)}`);
-export const generateOrangePhotoPoster=id=>request(`/api/orange-photos/${encodeURIComponent(id)}/poster`,{method:'POST',body:'{}'});
+export const generateOrangePhotoPoster=(id,replaceExisting=false)=>request(`/api/orange-photos/${encodeURIComponent(id)}/poster`,{method:'POST',body:JSON.stringify({replace_existing:replaceExisting})});
 export function getOrangePhotoEvents(photoId,options={}){return request(`/api/orange-photos/${encodeURIComponent(photoId)}/events`,{signal:options.signal});}
 export const updateOrangePhoto=(id,body)=>request(`/api/orange-photos/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify(body)});
 export const trashOrangePhoto=id=>request(`/api/orange-photos/${encodeURIComponent(id)}/trash`,{method:'POST',body:'{}'});
