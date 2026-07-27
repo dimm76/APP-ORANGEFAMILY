@@ -139,7 +139,7 @@ de metadatos, poster o preview mantienen el original registrado y se comunican
 como advertencias. El procesamiento aplazado y el reconciliador continúan usando
 el flujo existente de `processStoredOrangePhotoVideo()`.
 
-El propietario puede solicitar desde el visor la generación de un póster cuando un vídeo conserva su original pero no dispone de variante `poster` ni `thumbnail`. La operación crea exclusivamente el póster; no genera preview, no altera metadatos y no permite regenerar o sustituir una variante existente.
+El propietario puede solicitar desde el visor **Generar miniatura** cuando un vídeo conserva su original pero no dispone de variante `poster`, y **Recrear miniatura** cuando ya existe. La recreación sustituye exclusivamente la variante `poster` de forma segura y transaccional: el original no se modifica, el póster anterior se conserva si la operación falla antes del commit y su objeto se elimina de Wasabi únicamente después del commit. Esta operación no permite sustituir las variantes `original`, `preview` ni `thumbnail`.
 
 ## Biblioteca, compartición y selección
 

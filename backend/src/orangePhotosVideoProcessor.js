@@ -1,17 +1,30 @@
 /* global require, module */
 const fs = require("node:fs/promises");
+const fsNative = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { pipeline } = require("node:stream/promises");
 const { execFile } = require("node:child_process");
 const { promisify } = require("node:util");
 const ffmpegPath = require("ffmpeg-static");
 const ffprobePath = require("ffprobe-static").path;
 const pool = require("../db");
-const { getOrangePhotoObjectBuffer, uploadOrangePhotoToWasabi } = require("./wasabiClient");
+const { getOrangePhotoObjectStream, uploadOrangePhotoToWasabi } = require("./wasabiClient");
 
 const execFileAsync = promisify(execFile);
 const QUERY_TIMEOUT = 15000;
 const validDateIso = value => { if (value == null || value === "") return null; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString(); };
+async function videoPhase(row, phase, failureMessage, work) {
+  const started = Date.now();
+  try {
+    const result = await work();
+    console.info("OrangePhotos video processing", { photo_id:row.id,phase,duration_ms:Date.now()-started,object_key:row.object_key,message:"completed" });
+    return result;
+  } catch (error) {
+    console.error("OrangePhotos video processing", { photo_id:row.id,phase,duration_ms:Date.now()-started,object_key:row.object_key,message:error?.message||failureMessage });
+    throw new Error(failureMessage, { cause:error });
+  }
+}
 
 async function query(text, values = [], client = pool) {
   return client.query({ text, values, query_timeout: QUERY_TIMEOUT });
@@ -77,19 +90,19 @@ async function processStoredOrangePhotoVideo(photoId, options = {}) {
   if (dryRun && !options.validateDerivatives) return { photo:row,actions,metadata:null,created:[],possible_orphans:[] };
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "orange-photos-video-")), extension = path.extname(row.original_filename || row.object_key) || ".video", inputPath = path.join(tempDir, `original${extension}`), posterPath = path.join(tempDir, "poster.jpg"), previewPath = path.join(tempDir, "preview.mp4"), possibleOrphans = [];
   try {
-    await fs.writeFile(inputPath, await getOrangePhotoObjectBuffer(row.object_key));
-    const metadata = await probeVideoFile(inputPath); if (!metadata.duration || !metadata.width || !metadata.height) throw new Error("ffprobe no devolvió metadatos válidos.");
+    await videoPhase(row,"download_original","No se pudo descargar el vídeo original.",async()=>{const source=await getOrangePhotoObjectStream({bucket:row.bucket,object_key:row.object_key});await pipeline(source.Body,fsNative.createWriteStream(inputPath));});
+    const metadata = await videoPhase(row,"probe_video","No se pudieron leer los metadatos del vídeo.",async()=>{const probed=await probeVideoFile(inputPath);if(!probed.duration||!probed.width||!probed.height)throw new Error("ffprobe no devolvió metadatos válidos.");return probed;});
     const generated = [];
-    if (needsPoster) generated.push({ variant:"poster",path:posterPath,mime_type:"image/jpeg",extension:"jpg",...(await createVideoPoster(inputPath,posterPath)) });
+    if (needsPoster) generated.push({ variant:"poster",path:posterPath,mime_type:"image/jpeg",extension:"jpg",...(await videoPhase(row,"generate_poster","ffmpeg no pudo generar la miniatura.",()=>createVideoPoster(inputPath,posterPath))) });
     if (needsPreview) generated.push({ variant:"preview",path:previewPath,mime_type:"video/mp4",extension:"mp4",...(await createVideoPreview(inputPath,previewPath)) });
     if (dryRun) return { photo:row,actions,metadata,created:generated.map(item=>({variant:item.variant,size:item.size,width:item.metadata.width,height:item.metadata.height})),possible_orphans:[] };
     const derivatives = [];
     try {
       for (const item of generated) {
-        const buffer = await fs.readFile(item.path), upload = await uploadOrangePhotoToWasabi(buffer, { familyId:row.family_id,mimeType:item.mime_type,extension:item.extension,originalFilename:`${row.original_filename || row.id}-${item.variant}.${item.extension}`,variant:item.variant });
+        const buffer = await fs.readFile(item.path), upload = item.variant==="poster"?await videoPhase(row,"upload_poster","No se pudo guardar la miniatura.",()=>uploadOrangePhotoToWasabi(buffer, { familyId:row.family_id,mimeType:item.mime_type,extension:item.extension,originalFilename:`${row.original_filename || row.id}-${item.variant}.${item.extension}`,variant:item.variant })):await uploadOrangePhotoToWasabi(buffer, { familyId:row.family_id,mimeType:item.mime_type,extension:item.extension,originalFilename:`${row.original_filename || row.id}-${item.variant}.${item.extension}`,variant:item.variant });
         derivatives.push({ ...item, upload });
       }
-      if (!replacePoster) await register(row,metadata,derivatives,updateMetadata,possibleOrphans);
+      if (!replacePoster) await videoPhase(row,"replace_database_record",needsPoster&&!needsPreview?"No se pudo registrar la nueva miniatura.":"No se pudieron registrar los derivados del vídeo.",()=>register(row,metadata,derivatives,updateMetadata,possibleOrphans));
     } catch (error) {
       const uploadedKeys = derivatives.map(item => item.upload.object_key);
       error.possibleOrphans = [...new Set([...possibleOrphans, ...uploadedKeys])];

@@ -11,7 +11,7 @@ import {
   timeOutline,
 } from "ionicons/icons";
 import AttachmentsImageLightbox from "../../shared/components/AttachmentsImageLightbox.jsx";
-import { generateOrangePhotoPoster, orangePhotoDownloadUrl } from "../../shared/api/orangePhotosApi.js";
+import { orangePhotoDownloadUrl } from "../../shared/api/orangePhotosApi.js";
 import { OD_ICONS } from "../../shared/ui/odIcons.js";
 import OrangePhotoDetailsPanel from "./OrangePhotoDetailsPanel.jsx";
 import OrangePhotoShareModal from "./OrangePhotoShareModal.jsx";
@@ -92,7 +92,31 @@ export default function OrangePhotoViewer({
     onPurge();
   };
 
-  const handleGeneratePoster=async()=>{if(hasPoster&&!window.confirm("Se sustituirá la miniatura actual del vídeo. El vídeo original no se modificará."))return;setPosterBusy(true);setPosterError("");try{if(hasPoster)await generateOrangePhotoPoster(photo.id,true);else await onGeneratePoster(false);notify("Miniatura generada");closeMore();}catch(error){setPosterError(error.message);}finally{setPosterBusy(false);}};
+  const handleGeneratePoster = async () => {
+    if (
+      hasPoster &&
+      !window.confirm(
+        "Se sustituirá la miniatura actual del vídeo. El vídeo original no se modificará.",
+      )
+    ) {
+      return;
+    }
+
+    setPosterBusy(true);
+    setPosterError("");
+
+    try {
+      await onGeneratePoster(hasPoster);
+      notify(hasPoster ? "Miniatura recreada" : "Miniatura generada");
+      closeMore();
+    } catch (error) {
+      setPosterError(
+        error?.message || "No se pudo generar la miniatura.",
+      );
+    } finally {
+      setPosterBusy(false);
+    }
+  };
 
   return (
     <>
