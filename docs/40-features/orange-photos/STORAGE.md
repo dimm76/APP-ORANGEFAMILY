@@ -166,6 +166,8 @@ La migración `20260726130000_orange_photo_album_contributions.sql` añade `oran
 
 Cada álbum dispone de una cabecera interna centrada con título, estado de compartición y contador. Sus acciones de compartir, añadir contenido, actividad y menú de opciones se muestran en el host global derecho de la barra superior, con prioridad para los modos de papelera, selección múltiple y elección de portada. El alta de contenido abre la biblioteca global en modo selección, conserva identificados los elementos ya incluidos y vuelve al álbum al confirmar. La elección de portada solo admite imágenes pertenecientes al álbum y se activa mediante la ruta `?selectCover=1`. El modal de compartición es común al listado y a la cabecera, agrupa visualmente visibilidad y permisos, y explica dinámicamente si otras personas pueden añadir fotos y vídeos.
 
+Los álbumes se muestran con paginación; su vista interna y la elección de portada permiten cargar todas las páginas. El selector para añadir contenido obtiene del backend los identificadores ya incluidos. Si se retira la portada, se asigna la siguiente imagen disponible o el álbum queda sin portada.
+
 Los iconos sobre fotografías y portadas de álbum indican mediante tooltip si el contenido fue compartido con la familia, con miembros concretos, por otra persona o mediante un álbum. La actividad persistida, comentarios, likes, notificaciones, compartir mediante enlace, presentación y descarga completa del álbum quedan aplazados.
 
 ## Gestión de la cola web

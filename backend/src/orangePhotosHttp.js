@@ -119,6 +119,7 @@ function handleOrangePhotosRoutes(app) {
   app.post("/api/orange-photos/:id/share", safe(req => service.share(req, req.params.id, req.body || {}), "No se pudo compartir la foto."));
   app.get("/api/orange-photo-albums", safe(req => service.albums(req), "No se pudieron cargar los álbumes."));
   app.post("/api/orange-photo-albums", safe(req => service.createAlbum(req, req.body || {}), "No se pudo crear el álbum.", 201));
+  app.get("/api/orange-photo-albums/:id/photo-ids", safe(req => service.albumPhotoIds(req, req.params.id), "No se pudieron cargar los elementos del álbum."));
   app.patch("/api/orange-photo-albums/:id", safe(req => service.updateAlbum(req, req.params.id, req.body || {}), "No se pudo actualizar el álbum."));
   app.post("/api/orange-photo-albums/:id/photos", safe(req => service.addPhoto(req, req.params.id, req.body || {}), "No se pudo añadir la foto."));
   app.delete("/api/orange-photo-albums/:id/photos/:photoId", safe(req => service.addPhoto(req, req.params.id, { photo_id: req.params.photoId }, true), "No se pudo quitar la foto."));
