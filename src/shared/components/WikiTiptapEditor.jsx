@@ -37,6 +37,8 @@ import RichTextGoogleSheetsBubbleMenu from "./RichTextGoogleSheetsBubbleMenu.jsx
 import RichTextFigmaBubbleMenu from "./RichTextFigmaBubbleMenu.jsx";
 import RichTextOdContainerBubbleMenu from "./RichTextOdContainerBubbleMenu.jsx";
 import RichTextOdColumnsBubbleMenu from "./RichTextOdColumnsBubbleMenu.jsx";
+import RichTextOrangePhotoAlbumBubbleMenu from "./RichTextOrangePhotoAlbumBubbleMenu.jsx";
+import RichTextOrangePhotoVideoBubbleMenu from "./RichTextOrangePhotoVideoBubbleMenu.jsx";
 import AttachmentImageLibraryModal from "./AttachmentImageLibraryModal.jsx";
 import ImageSourcePickerModal from "./ImageSourcePickerModal.jsx";
 import OrangePhotoEmbedPickerModal from "./OrangePhotoEmbedPickerModal.jsx";
@@ -300,6 +302,8 @@ export default function WikiTiptapEditor({
       {!disabled ? <RichTextFigmaBubbleMenu editor={editor} /> : null}
       {!disabled ? <RichTextOdContainerBubbleMenu editor={editor} /> : null}
       {!disabled ? <RichTextOdColumnsBubbleMenu editor={editor} /> : null}
+      {!disabled ? <RichTextOrangePhotoAlbumBubbleMenu editor={editor} /> : null}
+      {!disabled ? <RichTextOrangePhotoVideoBubbleMenu editor={editor} /> : null}
       {!disabled ? (
         <RichTextSlashCommandMenu
           editor={editor}
