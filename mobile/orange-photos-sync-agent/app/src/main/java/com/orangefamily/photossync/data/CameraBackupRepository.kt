@@ -69,6 +69,22 @@ class CameraBackupRepository(
     suspend fun markRestoreAvailable(accountUserId: String, id: Long, remoteId: String, checksum: String, at: Long) = dao.markRestoreAvailable(accountUserId, id, remoteId, checksum, at)
     suspend fun tryAcquireSyncLock(accountUserId: String, token: String, now: Long, expiresAt: Long) = dao.tryAcquireSyncLock(accountUserId, token, now, expiresAt) == 1
     suspend fun releaseSyncLock(accountUserId: String, token: String) = dao.releaseSyncLock(accountUserId, token)
+    fun observeBucketItems(accountUserId: String, bucketId: String) = dao.observeBucketItems(accountUserId, bucketId)
+    suspend fun bucketItems(accountUserId: String, bucketId: String) = dao.getBucketItems(accountUserId, bucketId)
+    suspend fun findMediaItem(accountUserId: String, collection: String, mediaType: String, mediaStoreId: Long) = dao.findMediaItem(accountUserId, collection, mediaType, mediaStoreId)
+    suspend fun upsertDeviceMedia(items: List<LocalMediaItem>) = dao.upsertDeviceMedia(items)
+    suspend fun updateDeviceHash(item: LocalMediaItem, checksum: String, at: Long) = dao.saveDeviceHash(item.accountUserId, item.mediaCollection, item.mediaType, item.mediaStoreId, checksum, at)
+    suspend fun markChecking(item: LocalMediaItem) = dao.markChecking(item.accountUserId, item.mediaCollection, item.mediaType, item.mediaStoreId)
+    suspend fun invalidateBucketVerification(accountUserId: String, bucketId: String) = dao.invalidateBucketVerification(accountUserId, bucketId)
+    suspend fun updateCloudStatus(item: LocalMediaItem, status: String, remoteId: String?, at: Long) = dao.updateCloudStatus(item.accountUserId, item.mediaCollection, item.mediaType, item.mediaStoreId, status, remoteId, at)
+    suspend fun removeLocalItem(item: LocalMediaItem) = dao.removeLocalItem(item.accountUserId, item.mediaCollection, item.mediaType, item.mediaStoreId)
+    suspend fun enqueueDeviceMedia(items: List<LocalMediaItem>, forceDuplicate: Boolean = false) = database.withTransaction {
+        items.forEach { item ->
+            val existing=dao.findMediaItem(item.accountUserId,item.mediaCollection,item.mediaType,item.mediaStoreId)
+            if(existing==null) dao.upsertDeviceMedia(listOf(item.copy(localStatus=LocalMediaItem.STATUS_PENDING)))
+            else dao.enqueueDeviceMedia(existing.accountUserId,existing.mediaCollection,existing.mediaType,existing.mediaStoreId,forceDuplicate)
+        }
+    }
 }
 
 data class LocalInventorySnapshot(

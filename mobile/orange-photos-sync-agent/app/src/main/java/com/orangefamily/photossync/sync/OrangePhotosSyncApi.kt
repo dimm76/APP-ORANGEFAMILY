@@ -6,6 +6,7 @@ import android.util.Log
 import com.orangefamily.photossync.auth.OrangeFamilyAuthApi
 import com.orangefamily.photossync.data.LocalMediaItem
 import org.json.JSONObject
+import org.json.JSONArray
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -17,12 +18,13 @@ class OrangePhotosSyncApi(apiBaseUrl: String, private val sessionToken: String, 
 
     fun currentUser() = authApi.currentUser(sessionToken)
 
-    fun checkUpload(item: LocalMediaItem, checksum: String): UploadCheck {
+    fun checkUpload(item: LocalMediaItem, checksum: String, forceDuplicate: Boolean = false): UploadCheck {
         val body = JSONObject()
             .put("original_filename", item.displayName)
             .put("size_bytes", item.sizeBytes)
             .put("mime_type", item.mimeType)
             .put("checksum_sha256", checksum)
+            .put("force_duplicate", forceDuplicate)
         if (!Regex("^[0-9a-f]{64}$").matches(checksum)) {
             throw SyncApiException(0, "INVALID_LOCAL_CHECKSUM", "El checksum local no es válido.", transient = false)
         }
@@ -52,12 +54,22 @@ class OrangePhotosSyncApi(apiBaseUrl: String, private val sessionToken: String, 
         )
     }
 
-    fun uploadSimple(item: LocalMediaItem, checksum: String, contentResolver: ContentResolver): String {
+    fun checkStorageStatus(items: List<StorageStatusRequestItem>): List<StorageStatusResult> {
+        require(items.isNotEmpty() && items.size <= 200)
+        val requestItems=JSONArray()
+        items.forEach { item -> requestItems.put(JSONObject().put("client_id",item.clientId).put("hash",item.hash).put("hash_algorithm","sha256").put("size_bytes",item.sizeBytes).apply { item.displayName?.let { put("display_name",it) } }) }
+        val response=requestJson("api/orange-photos/check-storage-status","POST","application/json; charset=utf-8",fixedBody=JSONObject().put("items",requestItems).toString().toByteArray(Charsets.UTF_8))
+        val values=response.getJSONArray("items")
+        return buildList { for(index in 0 until values.length()){ val value=values.getJSONObject(index); add(StorageStatusResult(value.getString("client_id"),value.getString("status"),value.optString("remote_photo_id").takeIf(String::isNotBlank))) } }
+    }
+
+    fun uploadSimple(item: LocalMediaItem, checksum: String, contentResolver: ContentResolver, forceDuplicate: Boolean = false): String {
         val boundary = "OrangeFamily-${UUID.randomUUID()}"
         val json = requestJson("api/orange-photos", "POST", "multipart/form-data; boundary=$boundary") { output ->
             fun text(value: String) = output.write(value.toByteArray(Charsets.UTF_8))
             text("--$boundary\r\nContent-Disposition: form-data; name=\"metadata\"\r\n\r\n")
             text(JSONObject().put("visibility", "private").toString())
+            text("\r\n--$boundary\r\nContent-Disposition: form-data; name=\"force_duplicate\"\r\n\r\n$forceDuplicate")
             text("\r\n--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"${safeFilename(item.displayName)}\"\r\nContent-Type: ${item.mimeType}\r\n\r\n")
             contentResolver.openInputStream(Uri.parse(item.contentUri))?.use { input -> input.copyTo(output, BUFFER_SIZE) }
                 ?: throw LocalFileUnavailableException()
@@ -66,13 +78,14 @@ class OrangePhotosSyncApi(apiBaseUrl: String, private val sessionToken: String, 
         return remoteId(json)
     }
 
-    fun uploadDirect(item: LocalMediaItem, checksum: String, contentResolver: ContentResolver): String {
+    fun uploadDirect(item: LocalMediaItem, checksum: String, contentResolver: ContentResolver, forceDuplicate: Boolean = false): String {
         val metadata = JSONObject().put("visibility", "private").toString()
         val json = requestJson("api/orange-photos/uploads/direct", "POST", "application/octet-stream", mapOf(
             "x-orange-filename" to Uri.encode(item.displayName),
             "x-orange-mime-type" to item.mimeType.orEmpty(),
             "x-orange-file-size" to item.sizeBytes.toString(),
             "x-orange-metadata" to Uri.encode(metadata),
+            "x-orange-force-duplicate" to forceDuplicate.toString(),
         )) { output ->
             contentResolver.openInputStream(Uri.parse(item.contentUri))?.use { input -> input.copyTo(output, BUFFER_SIZE) }
                 ?: throw LocalFileUnavailableException()
@@ -131,6 +144,8 @@ class OrangePhotosSyncApi(apiBaseUrl: String, private val sessionToken: String, 
     private fun safeFilename(value: String) = value.replace(Regex("[\\r\\n\\\"]"), "_")
 
     data class UploadCheck(val decision: String, val photoId: String?, val uploadMode: String?)
+    data class StorageStatusRequestItem(val clientId: String, val hash: String, val sizeBytes: Long, val displayName: String?)
+    data class StorageStatusResult(val clientId: String, val status: String, val remotePhotoId: String?)
     class LocalFileUnavailableException : IOException()
     class TransientSyncException(cause: Throwable) : IOException(cause)
     class SyncApiException(

@@ -408,7 +408,12 @@ No se realizará una copia de seguridad tradicional de la base local.
 
 Eliminación de archivos del móvil
 
-Actualmente el agente no elimina archivos.
+El agente permite gestionar archivos locales desde «Archivos del dispositivo».
+En Android 11 o superior, la eliminación normal mueve el contenido a la papelera
+recuperable de MediaStore. Desde la pantalla Papelera puede restaurarse o
+eliminarse definitivamente con confirmación adicional del sistema. En Android
+8, 9 y 10 no existe una papelera MediaStore equivalente y la eliminación local
+es definitiva tras advertencia.
 
 En el futuro, si una foto ya está confirmada en OrangeFamily y se elimina del móvil:
 
@@ -417,7 +422,9 @@ En OrangeFamily: sí
 
 La eliminación local no debe eliminar el registro remoto.
 
-Una futura función de liberación de espacio solo podrá actuar sobre elementos cuya copia remota haya sido confirmada correctamente.
+La interfaz distingue los elementos con copia remota confirmada y ofrece limitar
+la operación a esos elementos. Ninguna operación local elimina el registro ni el
+objeto remoto de OrangeFamily.
 
 Eliminación en OrangeFamily
 
@@ -645,6 +652,45 @@ Compartición desde el agente.
 Visualización de fotos privadas de otros miembros.
 Ejecución automática en segundo plano.
 ## Release privada
+
+## Gestión manual de archivos del dispositivo
+
+Tras autenticar, el listado de carpetas es la pantalla principal. El drawer abre
+«Ajustes», que conserva el estado, conexión, permisos, estadísticas y controles
+del agente automático, o «Papelera». El inventario manual está basado exclusivamente
+en MediaStore. Las imágenes y vídeos accesibles se agrupan por volumen y bucket;
+Android no recorre rutas físicas, no solicita `MANAGE_EXTERNAL_STORAGE` y no
+accede a Wasabi.
+
+Con acceso parcial de Android 14 solo se muestran los elementos autorizados y la
+interfaz advierte que el inventario es parcial. La regla de acceso completo del
+backup automático no cambia.
+
+La identidad local estable combina `accountUserId`, volumen, tipo y MediaStore ID.
+Room conserva hash SHA-256, tamaño, fecha de modificación, estado remoto y
+`remotePhotoId`; un cambio de tamaño o fecha invalida la confirmación. La
+comprobación se realiza contra PostgreSQL a través de Node, en lotes máximos de
+200 y aislados por el propietario autenticado. Solo un hash exacto con original
+remoto válido concede `BACKED_UP`; nombre y tamaño conceden como máximo
+`POSSIBLE_MATCH`.
+
+La selección usa identificadores estables y admite elementos individuales,
+rangos, todos y pendientes. Las subidas manuales entran en la misma tabla Room,
+WorkManager, autenticación y worker que el backup automático. El borrado usa
+MediaStore y afecta solo al fichero local; nunca elimina PostgreSQL ni Wasabi.
+No se inicia un escaneo/hash de todo el dispositivo en segundo plano.
+
+Cuando el worker completa una subida, actualiza en la misma operación Room los
+campos `local_status`, `cloud_status=backed_up`, `remotePhotoId`, checksum y fecha
+de verificación. El Flow observado por la cuadrícula refleja inmediatamente la
+nube confirmada sin exigir una reconciliación manual.
+
+La carpeta usa una cuadrícula con miniaturas solicitadas a `ContentResolver`,
+carga incremental en páginas de 200 y estados observados desde Room. El estado
+remoto caduca a las 24 horas y puede renovarse con «Verificar». «Todo» selecciona
+los elementos cargados hasta ese momento. `remote_missing` permanece reservado:
+el backend no lo produce mientras PostgreSQL no disponga de un estado físico
+oficial del objeto.
 
 La URL release de la API es:
 

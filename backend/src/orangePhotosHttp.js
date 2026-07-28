@@ -97,6 +97,7 @@ function handleOrangePhotosRoutes(app) {
   app.get("/api/orange-photos/around-date", safe(req => service.aroundDate(req), "No se pudo cargar el periodo solicitado."));
   app.delete("/api/orange-photos/trash", safe(req => service.emptyTrash(req), "No se pudo vaciar la papelera."));
   app.post("/api/orange-photos/uploads/check", safe(req => service.checkUpload(req, req.body || {}), "No se pudo comprobar el archivo."));
+  app.post("/api/orange-photos/check-storage-status", safe(req => service.checkStorageStatus(req, req.body || {}), "No se pudo comprobar el estado de almacenamiento."));
   app.post("/api/orange-photos/uploads/direct", safe(req => service.uploadDirect(req), "No se pudo completar la subida.", 201));
   app.post("/api/orange-photos/uploads/multipart", safe(req => multipartService.initiate(req, req.body || {}), "No se pudo iniciar la subida.", 201));
   app.post("/api/orange-photos/uploads/:id/parts", safe(req => multipartService.signParts(req, req.params.id, req.body || {}), "No se pudieron preparar las partes."));

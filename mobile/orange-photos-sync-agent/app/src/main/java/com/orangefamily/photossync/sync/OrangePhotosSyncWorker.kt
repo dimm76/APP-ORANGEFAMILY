@@ -70,7 +70,8 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
                 val checksum = item.checksumSha256 ?: hash(item).also {
                     repository.updateChecksum(accountUserId, item.id, it)
                 }
-                val check = api.checkUpload(item, checksum)
+                val forceDuplicate = item.failureCode == "FORCE_DUPLICATE"
+                val check = api.checkUpload(item, checksum, forceDuplicate)
                 Log.d(TAG, "Preflight decision=${check.decision} mode=${check.uploadMode}")
                 when (check.decision) {
                     "already_owned" -> repository.markUploaded(accountUserId, item.id, requireRemoteId(check.photoId), checksum, attemptedAt)
@@ -78,8 +79,8 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
                     "suppressed" -> repository.markSuppressed(accountUserId, item.id, checksum, attemptedAt)
                     "upload_required" -> {
                         val remoteId = when (check.uploadMode) {
-                            "simple" -> api.uploadSimple(item, checksum, applicationContext.contentResolver)
-                            "direct_backend" -> api.uploadDirect(item, checksum, applicationContext.contentResolver)
+                            "simple" -> api.uploadSimple(item, checksum, applicationContext.contentResolver, forceDuplicate)
+                            "direct_backend" -> api.uploadDirect(item, checksum, applicationContext.contentResolver, forceDuplicate)
                             "multipart" -> throw ItemFailure("UNSUPPORTED_MULTIPART")
                             else -> throw ItemFailure("INVALID_UPLOAD_MODE")
                         }

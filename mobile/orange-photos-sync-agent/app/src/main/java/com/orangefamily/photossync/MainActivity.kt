@@ -1,6 +1,7 @@
 package com.orangefamily.photossync
 
 import android.content.Intent
+import android.app.Activity
 import android.Manifest
 import android.content.pm.PackageManager
 import android.database.ContentObserver
@@ -12,6 +13,7 @@ import android.provider.MediaStore
 import android.provider.Settings
 import android.os.Build
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.IntentSenderRequest
 import androidx.core.content.ContextCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -47,10 +49,36 @@ import com.orangefamily.photossync.ui.LoginScreen
 import com.orangefamily.photossync.ui.StatusScreen
 import com.orangefamily.photossync.ui.theme.OrangeFamilyPhotosSyncTheme
 import com.orangefamily.photossync.sync.OrangePhotosSyncScheduler
+import com.orangefamily.photossync.data.LocalMediaItem
+import com.orangefamily.photossync.device.DeviceMediaStoreScanner
+import com.orangefamily.photossync.device.DeviceMediaVerifier
+import com.orangefamily.photossync.device.DeviceMediaHashService
+import com.orangefamily.photossync.device.DeviceMediaThumbnailLoader
+import com.orangefamily.photossync.device.InstallationIdStore
+import com.orangefamily.photossync.sync.OrangePhotosSyncApi
+import com.orangefamily.photossync.ui.device.DeviceMediaScreen
+import com.orangefamily.photossync.ui.device.DeviceTrashScreen
+import android.content.ActivityNotFoundException
+import android.widget.Toast
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+
+internal enum class AgentScreen { FOLDERS, SETTINGS, TRASH }
+internal fun initialAuthenticatedScreen() = AgentScreen.FOLDERS
+private enum class MediaOperation { TRASH, RESTORE, DELETE }
 
 class MainActivity : ComponentActivity() {
     private lateinit var authController: AuthController
     private lateinit var cameraBackupController: CameraBackupController
+    private lateinit var repository: CameraBackupRepository
+    private lateinit var scheduler: OrangePhotosSyncScheduler
+    private lateinit var deviceScanner: DeviceMediaStoreScanner
+    private lateinit var deviceVerifier: DeviceMediaVerifier
+    private lateinit var thumbnailLoader: DeviceMediaThumbnailLoader
+    private lateinit var sessionStore: SecureSessionStore
+    private var pendingDeleteItems: List<LocalMediaItem> = emptyList()
+    private var pendingMediaOperation: MediaOperation? = null
+    private var mediaRefreshVersion by mutableStateOf(0)
     private var mediaObserverRegistered = false
     private val mediaObserver by lazy {
         object : ContentObserver(Handler(Looper.getMainLooper())) {
@@ -66,19 +94,35 @@ class MainActivity : ComponentActivity() {
         refreshMediaPermission()
     }
     private val notificationPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    private val deleteMediaLauncher=registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()){result->
+        val requested=pendingDeleteItems;pendingDeleteItems=emptyList()
+        if(result.resultCode==Activity.RESULT_OK){
+            if(pendingMediaOperation==MediaOperation.DELETE)reconcileDeletedMedia(requested)
+            mediaRefreshVersion+=1
+        }
+        pendingMediaOperation=null
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        sessionStore=SecureSessionStore(applicationContext)
         authController = AuthController(
             api = OrangeFamilyAuthApi(BuildConfig.API_BASE_URL),
-            sessionStore = SecureSessionStore(applicationContext),
+            sessionStore = sessionStore,
         )
         val database = OrangePhotosLocalDatabase.getInstance(applicationContext)
+        repository = CameraBackupRepository(database)
+        scheduler = OrangePhotosSyncScheduler(applicationContext)
+        deviceScanner = DeviceMediaStoreScanner(applicationContext)
+        thumbnailLoader=DeviceMediaThumbnailLoader(contentResolver)
+        deviceVerifier=DeviceMediaVerifier(repository,DeviceMediaHashService(contentResolver)){
+            sessionStore.load(BuildConfig.API_BASE_URL)?.let{OrangePhotosSyncApi(BuildConfig.API_BASE_URL,it,InstallationIdStore(applicationContext).getOrCreate())}
+        }
         cameraBackupController = CameraBackupController(
-            repository = CameraBackupRepository(database),
+            repository = repository,
             scanner = CameraMediaScanner(applicationContext),
-            scheduler = OrangePhotosSyncScheduler(applicationContext),
+            scheduler = scheduler,
         )
         mediaPermissionAccess = MediaPermissions.evaluate(this)
         authController.restore(lifecycleScope)
@@ -88,8 +132,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             OrangeFamilyPhotosSyncTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { contentPadding ->
-                    AuthContent(
+                AuthContent(
                         state = authController.state,
                         cameraBackupController = cameraBackupController,
                         mediaPermissionAccess = mediaPermissionAccess,
@@ -113,14 +156,56 @@ class MainActivity : ComponentActivity() {
                                 ),
                             )
                         },
+                        deviceScanner = deviceScanner,
+                        repository = repository,
+                        deviceVerifier = deviceVerifier,
+                        thumbnailLoader = thumbnailLoader,
+                        onOpenMedia = ::openMedia,
+                        onUploadMedia = ::enqueueMedia,
+                        onDeleteMedia = ::deleteMedia,
+                        onRestoreMedia = ::restoreMedia,
+                        onDeleteForever = ::deleteForever,
+                        mediaRefreshVersion = mediaRefreshVersion,
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(contentPadding),
+                            .fillMaxSize(),
                     )
-                }
             }
         }
     }
+
+    private fun openMedia(item: LocalMediaItem) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.contentUri)).setDataAndType(Uri.parse(item.contentUri), item.mimeType).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(this, "No hay una aplicación compatible.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun enqueueMedia(items: List<LocalMediaItem>, forceDuplicate: Boolean) {
+        if (items.isEmpty()) return
+        lifecycleScope.launch(Dispatchers.IO) {
+            repository.enqueueDeviceMedia(items, forceDuplicate)
+            scheduler.enqueueNow(items.first().accountUserId)
+        }
+    }
+
+    private fun deleteMedia(items: List<LocalMediaItem>) {
+        if (items.isEmpty()) return
+        val uris=items.map { Uri.parse(it.contentUri) }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            pendingDeleteItems=items
+            pendingMediaOperation=MediaOperation.TRASH
+            deleteMediaLauncher.launch(IntentSenderRequest.Builder(MediaStore.createTrashRequest(contentResolver,uris,true).intentSender).build())
+        } else lifecycleScope.launch(Dispatchers.IO) {
+            items.filter{item->runCatching{contentResolver.delete(Uri.parse(item.contentUri),null,null)>0}.getOrDefault(false)}.forEach{repository.removeLocalItem(it)}
+            kotlinx.coroutines.withContext(Dispatchers.Main){mediaRefreshVersion+=1}
+        }
+    }
+
+    private fun restoreMedia(items:List<LocalMediaItem>){if(Build.VERSION.SDK_INT<Build.VERSION_CODES.R||items.isEmpty())return;pendingDeleteItems=items;pendingMediaOperation=MediaOperation.RESTORE;deleteMediaLauncher.launch(IntentSenderRequest.Builder(MediaStore.createTrashRequest(contentResolver,items.map{Uri.parse(it.contentUri)},false).intentSender).build())}
+    private fun deleteForever(items:List<LocalMediaItem>){if(items.isEmpty())return;pendingDeleteItems=items;pendingMediaOperation=MediaOperation.DELETE;deleteMediaLauncher.launch(IntentSenderRequest.Builder(MediaStore.createDeleteRequest(contentResolver,items.map{Uri.parse(it.contentUri)}).intentSender).build())}
+
+    private fun reconcileDeletedMedia(items:List<LocalMediaItem>){lifecycleScope.launch(Dispatchers.IO){items.forEach{item->val exists=runCatching{contentResolver.openFileDescriptor(Uri.parse(item.contentUri),"r")?.use{true}?:false}.getOrDefault(false);if(!exists)repository.removeLocalItem(item)}}}
 
     override fun onResume() {
         super.onResume()
@@ -166,6 +251,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun AuthContent(
     state: AuthController.AuthState,
@@ -176,10 +262,22 @@ private fun AuthContent(
     onMediaObservationChanged: (Boolean) -> Unit,
     onRequestMediaPermission: () -> Unit,
     onOpenPermissionSettings: () -> Unit,
+    deviceScanner: DeviceMediaStoreScanner,
+    repository: CameraBackupRepository,
+    deviceVerifier: DeviceMediaVerifier,
+    thumbnailLoader: DeviceMediaThumbnailLoader,
+    onOpenMedia: (LocalMediaItem) -> Unit,
+    onUploadMedia: (List<LocalMediaItem>, Boolean) -> Unit,
+    onDeleteMedia: (List<LocalMediaItem>) -> Unit,
+    onRestoreMedia: (List<LocalMediaItem>) -> Unit,
+    onDeleteForever: (List<LocalMediaItem>) -> Unit,
+    mediaRefreshVersion: Int,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
+    var screen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(initialAuthenticatedScreen()) }
     val authenticatedUserId = (state as? AuthController.AuthState.Authenticated)?.user?.id
+    LaunchedEffect(authenticatedUserId){if(authenticatedUserId!=null)screen=initialAuthenticatedScreen()}
     val observerEnabled = authenticatedUserId != null &&
         cameraBackupController.state.accountUserId == authenticatedUserId &&
         cameraBackupController.state.config?.enabled == true &&
@@ -210,7 +308,25 @@ private fun AuthContent(
                     permission = mediaPermissionAccess,
                 )
             }
-            StatusScreen(
+            if (screen == AgentScreen.FOLDERS) {
+                DeviceMediaScreen(
+                    accountUserId=state.user.id,
+                    permission=mediaPermissionAccess,
+                    scanner=deviceScanner,
+                    repository=repository,
+                    verifier=deviceVerifier,
+                    thumbnailLoader=thumbnailLoader,
+                    onSettings={screen=AgentScreen.SETTINGS},
+                    onTrash={screen=AgentScreen.TRASH},
+                    onOpen=onOpenMedia,
+                    onUpload=onUploadMedia,
+                    onDelete=onDeleteMedia,
+                    refreshVersion=mediaRefreshVersion,
+                    modifier=modifier,
+                )
+            } else if(screen==AgentScreen.TRASH){
+                DeviceTrashScreen(scanner=deviceScanner,accountUserId=state.user.id,thumbnailLoader=thumbnailLoader,onBack={screen=AgentScreen.FOLDERS},onRestore=onRestoreMedia,onDeleteForever=onDeleteForever,refreshVersion=mediaRefreshVersion,modifier=modifier)
+            } else Scaffold(topBar={androidx.compose.material3.TopAppBar(title={androidx.compose.material3.Text(stringResource(R.string.settings_title))},navigationIcon={androidx.compose.material3.IconButton(onClick={screen=AgentScreen.FOLDERS}){androidx.compose.material3.Text("←")}})}) { settingsPadding -> StatusScreen(
                 user = state.user,
                 loggingOut = false,
                 cameraBackupState = cameraBackupController.state.takeIf {
@@ -225,8 +341,8 @@ private fun AuthContent(
                 onActivate = { cameraBackupController.activate(scope) },
                 onScan = { cameraBackupController.syncNow(scope) },
                 onLogout = onLogout,
-                modifier = modifier,
-            )
+                modifier = modifier.padding(settingsPadding),
+            ) }
         }
     }
 }

@@ -13,6 +13,9 @@ import androidx.room.PrimaryKey
             unique = true,
         ),
         Index(value = ["account_user_id", "local_status", "detected_at"]),
+        Index(value = ["account_user_id", "bucket_id"]),
+        Index(value = ["account_user_id", "cloud_status"]),
+        Index(value = ["account_user_id", "checksum_sha256"]),
     ],
 )
 data class LocalMediaItem(
@@ -56,15 +59,39 @@ data class LocalMediaItem(
     val lastAttemptAt: Long? = null,
     @ColumnInfo(name = "failure_code")
     val failureCode: String? = null,
+    @ColumnInfo(name = "date_modified")
+    val dateModified: Long = 0,
+    @ColumnInfo(name = "bucket_id")
+    val bucketId: String? = null,
+    @ColumnInfo(name = "bucket_name")
+    val bucketName: String? = null,
+    @ColumnInfo(name = "hash_algorithm")
+    val hashAlgorithm: String? = null,
+    @ColumnInfo(name = "hash_computed_at")
+    val hashComputedAt: Long? = null,
+    @ColumnInfo(name = "cloud_status")
+    val cloudStatus: String = CLOUD_UNKNOWN,
+    @ColumnInfo(name = "remote_verified_at")
+    val remoteVerifiedAt: Long? = null,
 ) {
     companion object {
         const val TYPE_IMAGE = "image"
         const val TYPE_VIDEO = "video"
         const val STATUS_PENDING = "pending"
+        const val STATUS_DISCOVERED = "discovered"
         const val STATUS_UPLOADING = "uploading"
         const val STATUS_UPLOADED = "uploaded"
         const val STATUS_FAILED = "failed"
         const val STATUS_SUPPRESSED = "suppressed"
         const val STATUS_RESTORE_AVAILABLE = "restore_available"
+        const val CLOUD_UNKNOWN = "unknown"
+        const val CLOUD_CHECKING = "checking"
+        const val CLOUD_BACKED_UP = "backed_up"
+        const val CLOUD_POSSIBLE_MATCH = "possible_match"
+        const val CLOUD_NOT_FOUND = "not_found"
+        const val CLOUD_REMOTE_MISSING = "remote_missing"
+        const val CLOUD_ERROR = "error"
     }
+
+    fun hasConfirmedRemoteCopy(): Boolean = cloudStatus == CLOUD_BACKED_UP
 }

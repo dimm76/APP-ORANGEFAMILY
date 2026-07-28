@@ -5,6 +5,8 @@ import androidx.room.ColumnInfo
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Upsert
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CameraBackupDao {
@@ -22,6 +24,36 @@ interface CameraBackupDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertPending(items: List<LocalMediaItem>): List<Long>
+
+    @Upsert
+    suspend fun upsertDeviceMedia(items: List<LocalMediaItem>)
+
+    @Query("SELECT * FROM local_media_items WHERE account_user_id=:accountUserId AND bucket_id=:bucketId ORDER BY date_taken DESC, media_store_id DESC")
+    suspend fun getBucketItems(accountUserId: String, bucketId: String): List<LocalMediaItem>
+
+    @Query("SELECT * FROM local_media_items WHERE account_user_id=:accountUserId AND bucket_id=:bucketId ORDER BY COALESCE(date_taken,date_added*1000) DESC, media_store_id DESC")
+    fun observeBucketItems(accountUserId: String, bucketId: String): Flow<List<LocalMediaItem>>
+
+    @Query("SELECT * FROM local_media_items WHERE account_user_id=:accountUserId AND media_collection=:collection AND media_type=:mediaType AND media_store_id=:mediaStoreId LIMIT 1")
+    suspend fun findMediaItem(accountUserId: String, collection: String, mediaType: String, mediaStoreId: Long): LocalMediaItem?
+
+    @Query("UPDATE local_media_items SET cloud_status=:status, remote_photo_id=:remotePhotoId, remote_verified_at=:verifiedAt WHERE account_user_id=:accountUserId AND media_collection=:collection AND media_type=:mediaType AND media_store_id=:mediaStoreId")
+    suspend fun updateCloudStatus(accountUserId: String, collection: String, mediaType: String, mediaStoreId: Long, status: String, remotePhotoId: String?, verifiedAt: Long)
+
+    @Query("UPDATE local_media_items SET checksum_sha256=:checksum, hash_algorithm='sha256', hash_computed_at=:computedAt, cloud_status=:cloudStatus, remote_photo_id=NULL, remote_verified_at=NULL WHERE account_user_id=:accountUserId AND media_collection=:collection AND media_type=:mediaType AND media_store_id=:mediaStoreId")
+    suspend fun saveDeviceHash(accountUserId: String, collection: String, mediaType: String, mediaStoreId: Long, checksum: String, computedAt: Long, cloudStatus: String = LocalMediaItem.CLOUD_UNKNOWN)
+
+    @Query("UPDATE local_media_items SET cloud_status='checking' WHERE account_user_id=:accountUserId AND media_collection=:collection AND media_type=:mediaType AND media_store_id=:mediaStoreId")
+    suspend fun markChecking(accountUserId: String, collection: String, mediaType: String, mediaStoreId: Long)
+
+    @Query("UPDATE local_media_items SET cloud_status='unknown', remote_verified_at=NULL WHERE account_user_id=:accountUserId AND bucket_id=:bucketId")
+    suspend fun invalidateBucketVerification(accountUserId: String, bucketId: String)
+
+    @Query("UPDATE local_media_items SET local_status='pending', failure_code=CASE WHEN :forceDuplicate THEN 'FORCE_DUPLICATE' ELSE NULL END WHERE account_user_id=:accountUserId AND media_collection=:collection AND media_type=:mediaType AND media_store_id=:mediaStoreId AND local_status!='uploading'")
+    suspend fun enqueueDeviceMedia(accountUserId: String, collection: String, mediaType: String, mediaStoreId: Long, forceDuplicate: Boolean)
+
+    @Query("DELETE FROM local_media_items WHERE account_user_id=:accountUserId AND media_collection=:collection AND media_type=:mediaType AND media_store_id=:mediaStoreId")
+    suspend fun removeLocalItem(accountUserId: String, collection: String, mediaType: String, mediaStoreId: Long)
 
     @Query(
         """
@@ -56,7 +88,7 @@ interface CameraBackupDao {
     @Query("UPDATE local_media_items SET local_status = :status, last_attempt_at = :lastAttemptAt, failure_code = :failureCode WHERE id = :id AND account_user_id = :accountUserId")
     suspend fun markAttempt(accountUserId: String, id: Long, status: String, lastAttemptAt: Long, failureCode: String?)
 
-    @Query("UPDATE local_media_items SET local_status = 'uploaded', remote_photo_id = :remotePhotoId, checksum_sha256 = :checksum, last_attempt_at = :lastAttemptAt, failure_code = NULL WHERE id = :id AND account_user_id = :accountUserId")
+    @Query("UPDATE local_media_items SET local_status = 'uploaded', cloud_status = 'backed_up', remote_photo_id = :remotePhotoId, checksum_sha256 = :checksum, remote_verified_at = :lastAttemptAt, last_attempt_at = :lastAttemptAt, failure_code = NULL WHERE id = :id AND account_user_id = :accountUserId")
     suspend fun markUploaded(accountUserId: String, id: Long, remotePhotoId: String, checksum: String, lastAttemptAt: Long)
 
     @Query("UPDATE local_media_items SET local_status = 'suppressed', remote_photo_id = NULL, checksum_sha256 = :checksum, last_attempt_at = :lastAttemptAt, failure_code = NULL WHERE id = :id AND account_user_id = :accountUserId")

@@ -81,3 +81,18 @@ No deberán exponerse:
 ## Estado actual
 
 OrangeFamily dispone de una API Node operativa, implementada parcialmente y en evolución por módulos. Orange Photos ya utiliza rutas implementadas; sus contratos específicos se documentan junto al módulo.
+# Comprobación masiva de almacenamiento de Orange Photos
+
+`POST /api/orange-photos/check-storage-status` requiere sesión. Acepta
+`{"items":[{"client_id":"external:image:123","hash":"<sha256>","hash_algorithm":"sha256","size_bytes":123,"display_name":"IMG.jpg"}]}`
+con entre 1 y 200 elementos. Devuelve por `client_id` los estados `backed_up`,
+`not_found`, `possible_match` o `remote_missing` y, solo para una coincidencia
+propia, `remote_photo_id`.
+
+Node obtiene familia y propietario de la sesión y consulta PostgreSQL en un
+número constante de consultas por lote. No devuelve owner ajeno, storage key,
+bucket, URL ni metadatos privados y no realiza `HEAD` contra Wasabi.
+
+`remote_missing` se reserva en el contrato, pero el esquema actual no conserva
+un estado físico fiable que permita producirlo; por ahora el endpoint devuelve
+`backed_up`, `possible_match` o `not_found`.

@@ -58,4 +58,37 @@
         <item quantity="one">%d archivo guardado correctamente.</item>
         <item quantity="other">%d archivos guardados correctamente.</item>
     </plurals>
+    <string name="device_files">Archivos del dispositivo</string>
+    <string name="settings_title">Ajustes</string>
+    <string name="trash_title">Papelera</string>
+    <string name="search_folders">Buscar carpetas</string>
+    <string name="clear_search">Borrar búsqueda</string>
+    <string name="open_menu">Abrir menú</string>
+    <string name="back_action">Volver</string>
+    <string name="close_selection">Cerrar selección</string>
+    <string name="upload_action">Subir</string>
+    <string name="duplicate_upload_title">Ya existe una copia</string>
+    <string name="duplicate_upload_message_single">Esta imagen ya tiene una copia confirmada en OrangeFamily. ¿Quieres volver a subirla?</string>
+    <string name="duplicate_upload_message_multiple">Algunos de los elementos seleccionados ya tienen una copia confirmada en OrangeFamily. ¿Quieres volver a subirlos?</string>
+    <string name="upload_again">Subir de nuevo</string>
+    <string name="cancel">Cancelar</string>
+    <string name="delete_action">Eliminar</string>
+    <string name="restore_action">Restaurar</string>
+    <string name="delete_forever">Eliminar definitivamente</string>
+    <string name="trash_empty">La papelera está vacía</string>
+    <string name="trash_unsupported">La papelera del sistema está disponible a partir de Android 11.</string>
+    <string name="trash_loading">Cargando papelera…</string>
+    <string name="retry_action">Reintentar</string>
+    <string name="trash_move_warning">Los elementos se moverán a la papelera del sistema. La copia de OrangeFamily no se eliminará.</string>
+    <string name="legacy_delete_warning">Este dispositivo no admite la papelera del sistema. Los archivos seleccionados se eliminarán definitivamente.</string>
+    <string name="delete_forever_single">Esta imagen se eliminará definitivamente del dispositivo y no podrá recuperarse.</string>
+    <string name="delete_forever_plural">Estas imágenes se eliminarán definitivamente del dispositivo y no podrán recuperarse.</string>
+    <string name="all_filter">Todo</string>
+    <string name="pending_filter">Pendiente</string>
+    <string name="verify_action">Verificar</string>
+    <string name="verifying_status">Verificando…</string>
+    <plurals name="selected_media_count">
+        <item quantity="one">%d seleccionada</item>
+        <item quantity="other">%d seleccionadas</item>
+    </plurals>
 </resources>

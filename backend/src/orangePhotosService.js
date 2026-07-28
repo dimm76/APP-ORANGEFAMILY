@@ -115,7 +115,7 @@ async function checkUpload(req, body = {}) {
     if(!SHA256_RE.test(checksum))return bad(400,"INVALID_METADATA","Checksum SHA-256 no válido.");
     const duplicate=await findExactDuplicate(a.familyId,a.userId,checksum);
     const suppression=duplicate?null:await findUploadSuppression(a.familyId,a.userId,checksum);
-    const decision=uploadCheckDecision(duplicate,suppression);
+    const decision=bool(body.force_duplicate)?{decision:"upload_required"}:uploadCheckDecision(duplicate,suppression);
     if(decision.decision==="already_owned")await recordDecisionEvent(a,context,"duplicate_resolved",checksum,decision.photo_id);
     if(decision.decision==="suppressed")await recordDecisionEvent(a,context,"upload_suppressed",checksum);
     if(decision.decision==="restore_available")await recordDecisionEvent(a,context,"restore_available_detected",checksum,decision.photo_id);
@@ -123,6 +123,45 @@ async function checkUpload(req, body = {}) {
   }
   const possible=await findPossibleDuplicate(a.familyId,a.userId,filename,size);
   return ok({possible_duplicate:possible,upload_mode:uploadMode,limits});
+}
+
+async function checkStorageStatus(req, body = {}) {
+  const auth = resolveAuthenticatedFamily(req);
+  if (!auth.ok) return auth;
+  if (!Array.isArray(body.items) || body.items.length < 1 || body.items.length > 200) {
+    return bad(400, "INVALID_METADATA", "items debe contener entre 1 y 200 elementos.");
+  }
+  const items = [];
+  for (const raw of body.items) {
+    const item = {
+      clientId: String(raw?.client_id || "").trim(),
+      algorithm: String(raw?.hash_algorithm || "").trim().toLowerCase(),
+      hash: String(raw?.hash || "").trim().toLowerCase(),
+      size: Number(raw?.size_bytes),
+      displayName: raw?.display_name == null ? null : String(raw.display_name).trim(),
+    };
+    if (!item.clientId || item.clientId.length > 200 || item.algorithm !== "sha256" || !SHA256_RE.test(item.hash) || !Number.isSafeInteger(item.size) || item.size < 0 || (item.displayName != null && item.displayName.length > 500)) {
+      return bad(400, "INVALID_METADATA", "Elemento de comprobación no válido.");
+    }
+    items.push(item);
+  }
+  const hashes = [...new Set(items.map(item => item.hash))];
+  const exact = (await pool.query(`SELECT DISTINCT ON (f.checksum_sha256) f.checksum_sha256,p.id photo_id FROM public.orange_photo_files f JOIN public.orange_photos p ON p.id=f.photo_id AND p.family_id=f.family_id WHERE p.family_id=$1::uuid AND p.owner_user_id=$2::uuid AND p.is_trashed=false AND f.variant='original' AND f.checksum_sha256=ANY($3::text[]) ORDER BY f.checksum_sha256,p.created_at DESC`, [auth.familyId, auth.userId, hashes])).rows;
+  const exactByHash = new Map(exact.map(row => [row.checksum_sha256, row]));
+  const unresolved = items.filter(item => !exactByHash.has(item.hash) && item.displayName);
+  let possible = [];
+  if (unresolved.length) {
+    const names = [...new Set(unresolved.map(item => item.displayName.toLowerCase()))];
+    const sizes = [...new Set(unresolved.map(item => String(item.size)))];
+    possible = (await pool.query(`SELECT lower(p.original_filename) normalized_name,f.size_bytes::text FROM public.orange_photos p JOIN public.orange_photo_files f ON f.photo_id=p.id AND f.family_id=p.family_id AND f.variant='original' WHERE p.family_id=$1::uuid AND p.owner_user_id=$2::uuid AND p.is_trashed=false AND lower(p.original_filename)=ANY($3::text[]) AND f.size_bytes::text=ANY($4::text[])`, [auth.familyId, auth.userId, names, sizes])).rows;
+  }
+  const possibleKeys = new Set(possible.map(row => `${row.normalized_name}\u0000${row.size_bytes}`));
+  return ok({ items: items.map(item => {
+    const match = exactByHash.get(item.hash);
+    if (match) return { client_id: item.clientId, status: "backed_up", remote_photo_id: match.photo_id };
+    const key = `${item.displayName?.toLowerCase() || ""}\u0000${item.size}`;
+    return { client_id: item.clientId, status: possibleKeys.has(key) ? "possible_match" : "not_found", remote_photo_id: null };
+  }) });
 }
 
 async function insertPhoto(auth,m,storage,poster=null,warning=null,clearSuppressionChecksum=null,context={clientType:"web",installationId:null},uploadMode="simple"){const client=await pool.connect();try{await client.query('BEGIN');const p=(await client.query(`INSERT INTO public.orange_photos(family_id,owner_user_id,media_type,title,description,original_filename,mime_type,extension,captured_at,captured_at_source,timezone,width,height,duration_seconds,orientation,camera_make,camera_model,lens_model,latitude,longitude,altitude_meters,location_name,location_country,location_region,location_locality,location_source,exif_json,visibility,created_by,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$2,$2) RETURNING *`,[auth.familyId,auth.userId,m.media_type,m.title,m.description,m.original_filename,m.mime_type,m.extension,m.captured_at,m.captured_at_source,m.timezone,m.width,m.height,m.duration_seconds,m.orientation,m.camera_make,m.camera_model,m.lens_model,m.latitude,m.longitude,m.altitude_meters,m.location_name,m.location_country,m.location_region,m.location_locality,m.location_source,m.exif_json,m.visibility])).rows[0];await client.query(`INSERT INTO public.orange_photo_files(family_id,photo_id,variant,provider,bucket,object_key,mime_type,width,height,size_bytes,checksum_sha256,etag) VALUES($1,$2,'original',$3,$4,$5,$6,$7,$8,$9,$10,$11)`,[auth.familyId,p.id,storage.provider||'wasabi',storage.bucket,storage.object_key,storage.mime_type||m.mime_type,m.width,m.height,storage.size_bytes||null,storage.checksum_sha256||null,storage.etag||null]);if(poster)await client.query(`INSERT INTO public.orange_photo_files(family_id,photo_id,variant,provider,bucket,object_key,mime_type,width,height,size_bytes,checksum_sha256,etag) VALUES($1,$2,'poster',$3,$4,$5,'image/jpeg',$6,$7,$8,$9,$10)`,[auth.familyId,p.id,poster.provider||'wasabi',poster.bucket,poster.object_key,poster.width,poster.height,poster.size_bytes||null,poster.checksum_sha256||null,poster.etag||null]);await recordPhotoEvent(client,{familyId:auth.familyId,photoId:p.id,actorUserId:auth.userId,eventType:"uploaded",...context,metadata:{media_type:m.media_type,original_filename:m.original_filename,size_bytes:storage.size_bytes??null,checksum_sha256:storage.checksum_sha256??null,upload_mode:uploadMode}});if(SHA256_RE.test(String(clearSuppressionChecksum||"")))await client.query(`DELETE FROM public.orange_photo_upload_suppressions WHERE family_id=$1::uuid AND owner_user_id=$2::uuid AND checksum_sha256=$3`,[auth.familyId,auth.userId,clearSuppressionChecksum]);await client.query('COMMIT');return ok({item:p,warning});}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}}
@@ -462,4 +501,4 @@ async function events(req,id){
   return ok({items});
 }
 
-module.exports={familyMembers,createFromExisting,upload,uploadDirect,checkUpload,list:listSafe,timeline,aroundDate,detail,events,update,generateVideoPoster,trash,purge,emptyTrash,signedUrl,download,recordCompletedDownload,recordCompletedBulkDownload,downloadMany,downloadObject,share,albums,createAlbum,albumPhotoIds,updateAlbum,addPhoto,shareAlbum,tags,createTag,insertPhoto,recordPhotoEvent,clientContext,applyStoredImageMetadata,normalizeMetadata,validateMetadata,findPossibleDuplicate,findExactDuplicate,findUploadSuppression,uploadCheckDecision,normalizeDuplicateFilename,uploadModeFor,ok,bad,bool,MIME_EXT,MAX_IMAGE_BYTES,SIMPLE_VIDEO_MAX_BYTES,MAX_VIDEO_BYTES,MULTIPART_PART_BYTES,MULTIPART_UPLOAD_TTL_HOURS};
+module.exports={familyMembers,createFromExisting,upload,uploadDirect,checkUpload,checkStorageStatus,list:listSafe,timeline,aroundDate,detail,events,update,generateVideoPoster,trash,purge,emptyTrash,signedUrl,download,recordCompletedDownload,recordCompletedBulkDownload,downloadMany,downloadObject,share,albums,createAlbum,albumPhotoIds,updateAlbum,addPhoto,shareAlbum,tags,createTag,insertPhoto,recordPhotoEvent,clientContext,applyStoredImageMetadata,normalizeMetadata,validateMetadata,findPossibleDuplicate,findExactDuplicate,findUploadSuppression,uploadCheckDecision,normalizeDuplicateFilename,uploadModeFor,ok,bad,bool,MIME_EXT,MAX_IMAGE_BYTES,SIMPLE_VIDEO_MAX_BYTES,MAX_VIDEO_BYTES,MULTIPART_PART_BYTES,MULTIPART_UPLOAD_TTL_HOURS};
