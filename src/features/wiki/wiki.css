@@ -955,9 +955,74 @@
   opacity: 1 !important;
 }
 
+.od-app-root--wiki-workspace .od-app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  flex-basis: auto;
+}
+
+.od-wiki-edit-mode-host,
 .od-wiki-add-block-host {
   display: inline-flex;
   align-items: center;
+}
+
+ion-button.od-wiki-edit-mode-toggle {
+  --border-radius: 8px;
+  --padding-start: 0;
+  --padding-end: 0;
+  --min-height: 34px;
+  --min-width: 34px;
+  --background: #ffffff;
+  --color: #64748b;
+  --box-shadow: none;
+  width: 34px;
+  height: 34px;
+  margin: 0;
+}
+
+ion-button.od-wiki-edit-mode-toggle::part(native) {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 1px solid #c5d0e6;
+  border-radius: 8px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+ion-button.od-wiki-edit-mode-toggle ion-icon {
+  width: 20px;
+  height: 20px;
+  font-size: 20px;
+}
+
+ion-button.od-wiki-edit-mode-toggle.is-active {
+  --color: #fc4200;
+}
+
+ion-button.od-wiki-edit-mode-toggle.is-active::part(native) {
+  border-color: #fc4200;
+  background: #fff8f5;
+}
+
+ion-button.od-wiki-edit-mode-toggle:focus-visible {
+  outline: 2px solid #fc4200;
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  ion-button.od-wiki-edit-mode-toggle,
+  ion-button.od-wiki-edit-mode-toggle::part(native) {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 
 .od-wiki-add-block-btn-wrap {
@@ -1580,4 +1645,3 @@ ion-button.od-wiki-add-block-btn ion-icon {
 .od-wiki-workspace--public .od-rich-text-slash-menu {
   display: none !important;
 }
-

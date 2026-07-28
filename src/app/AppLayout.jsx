@@ -89,11 +89,14 @@ export default function AppLayout({ children }) {
           <div className="od-app-header-actions">
             {orangePhotosWorkspaceMode ? <span id="od-orangephotos-actions-host" /> : null}
             {wikiWorkspaceMode ? (
-              <span
-                id="od-wiki-add-block-host"
-                className="od-wiki-add-block-host"
-                aria-hidden="false"
-              />
+              <>
+                <span id="od-wiki-edit-mode-host" className="od-wiki-edit-mode-host" />
+                <span
+                  id="od-wiki-add-block-host"
+                  className="od-wiki-add-block-host"
+                  aria-hidden="false"
+                />
+              </>
             ) : null}
           </div>
         </header>

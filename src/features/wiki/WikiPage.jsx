@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect, react-hooks/preserve-manual-memoization */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { IonButton, IonContent, IonIcon, IonItem, IonList, IonPopover } from "@ionic/react";
 import WikiTiptapEditor from "../../shared/components/WikiTiptapEditor.jsx";
 import ODFilterSelect from "../../shared/components/ODFilterSelect.jsx";
@@ -1395,7 +1396,7 @@ function WikiDocumentWorkspace({ pageId }) {
   const [detail, setDetail] = useState(null);
   const [titleDraft, setTitleDraft] = useState("");
   const [dirtyTitle, setDirtyTitle] = useState(false);
-  const [detailViewMode, setDetailViewMode] = useState("edit");
+  const [detailViewMode, setDetailViewMode] = useState("read");
   const [treeDragState, setTreeDragState] = useState({
     sourceId: "",
     targetId: "",
@@ -1454,7 +1455,7 @@ function WikiDocumentWorkspace({ pageId }) {
       setDetail(page);
       setTitleDraft(String(page?.title ?? ""));
       setDirtyTitle(false);
-      setDetailViewMode(page?.is_archived ? "read" : "edit");
+      setDetailViewMode("read");
     } catch (err) {
       const msg =
         typeof err?.message === "string" && err.message.trim() !== ""
@@ -1811,6 +1812,15 @@ function WikiDocumentWorkspace({ pageId }) {
 
   const documentTitle = String(documentRoot?.title ?? "").trim() || "Documento";
   const canEdit = Boolean(detail?.id && !detail.is_archived);
+  const isEditMode = canEdit && detailViewMode === "edit";
+  const editModeHost = typeof document !== "undefined"
+    ? document.getElementById("od-wiki-edit-mode-host")
+    : null;
+
+  function toggleDetailViewMode() {
+    if (!canEdit) return;
+    setDetailViewMode((current) => (current === "edit" ? "read" : "edit"));
+  }
 
   function renderDocActionsMenu(triggerId) {
     return (
@@ -2009,6 +2019,23 @@ function WikiDocumentWorkspace({ pageId }) {
 
         <div id="od-wiki-block-panel-host" className="od-wiki-block-panel-host" aria-hidden="true" />
       </div>
+
+      {canEdit && editModeHost
+        ? createPortal(
+            <IonButton
+              type="button"
+              fill="clear"
+              className={`od-wiki-edit-mode-toggle${isEditMode ? " is-active" : ""}`}
+              aria-label={isEditMode ? "Desactivar modo edición" : "Activar modo edición"}
+              aria-pressed={isEditMode}
+              title={isEditMode ? "Modo edición activo" : "Modo lectura activo"}
+              onClick={toggleDetailViewMode}
+            >
+              <IonIcon icon={isEditMode ? OD_ICONS.edit : OD_ICONS.eye} aria-hidden="true" />
+            </IonButton>,
+            editModeHost
+          )
+        : null}
 
       {saveHint ? (
         <div
