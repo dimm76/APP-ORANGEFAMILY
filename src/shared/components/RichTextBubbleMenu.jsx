@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BubbleMenu } from "@tiptap/react/menus";
+import { NodeSelection } from "@tiptap/pm/state";
 import { IonIcon } from "@ionic/react";
 import { OD_ICONS } from "../ui/odIcons.js";
 import { RICH_TEXT_GLYPH } from "./richTextMenuGlyphs.js";
@@ -289,6 +290,12 @@ export default function RichTextBubbleMenu({ editor, inlineOnly = false }) {
   return (
     <BubbleMenu
       editor={editor}
+      shouldShow={({ state }) => {
+        if (inlineOnly && state.selection instanceof NodeSelection) {
+          return false;
+        }
+        return true;
+      }}
       tippyOptions={{
         duration: 100,
         interactive: true,
