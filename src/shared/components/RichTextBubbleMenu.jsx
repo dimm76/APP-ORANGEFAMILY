@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { NodeSelection } from "@tiptap/pm/state";
 import { IonIcon } from "@ionic/react";
@@ -253,19 +253,6 @@ function getBlockActiveState(editor) {
  * }} props
  */
 export default function RichTextBubbleMenu({ editor, inlineOnly = false }) {
-  const [, setTick] = useState(0);
-
-  useEffect(() => {
-    if (!editor) return undefined;
-    const refresh = () => setTick((n) => n + 1);
-    editor.on("selectionUpdate", refresh);
-    editor.on("transaction", refresh);
-    return () => {
-      editor.off("selectionUpdate", refresh);
-      editor.off("transaction", refresh);
-    };
-  }, [editor]);
-
   if (!editor) return null;
 
   const block = getBlockActiveState(editor);
