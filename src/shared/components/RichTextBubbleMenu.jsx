@@ -277,10 +277,19 @@ export default function RichTextBubbleMenu({ editor, inlineOnly = false }) {
   return (
     <BubbleMenu
       editor={editor}
-      shouldShow={({ state }) => {
-        if (inlineOnly && state.selection instanceof NodeSelection) {
+      shouldShow={({ editor: currentEditor, state }) => {
+        if (!currentEditor.isEditable) {
           return false;
         }
+
+        if (inlineOnly) {
+          if (state.selection instanceof NodeSelection) {
+            return false;
+          }
+
+          return !state.selection.empty;
+        }
+
         return true;
       }}
       tippyOptions={{
