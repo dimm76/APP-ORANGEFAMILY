@@ -11,7 +11,7 @@ export function listOrangePhotosAroundDate(date, filters = {}, options = {}) {
   if (options.direction) q.set("direction", options.direction);
   return request(`/api/orange-photos/around-date?${q}`, { signal: options.signal });
 }
-export const getOrangePhoto=id=>request(`/api/orange-photos/${encodeURIComponent(id)}`);
+export const getOrangePhoto=(id,options={})=>request(`/api/orange-photos/${encodeURIComponent(id)}`,{signal:options.signal});
 export async function generateOrangePhotoPoster(id,replaceExisting=false,options={}){const controller=options.signal?null:new AbortController(),timeout=controller?window.setTimeout(()=>controller.abort(),180000):null;try{return await request(`/api/orange-photos/${encodeURIComponent(id)}/poster`,{method:'POST',body:JSON.stringify({replace_existing:replaceExisting}),signal:options.signal||controller.signal});}catch(error){if(error.name==="AbortError")throw new Error("La generación está tardando demasiado. Comprueba el estado dentro de unos minutos o vuelve a intentarlo.",{cause:error});throw error;}finally{if(timeout)window.clearTimeout(timeout);}}
 export function getOrangePhotoEvents(photoId,options={}){return request(`/api/orange-photos/${encodeURIComponent(photoId)}/events`,{signal:options.signal});}
 export const updateOrangePhoto=(id,body)=>request(`/api/orange-photos/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify(body)});
@@ -32,7 +32,9 @@ export const completeOrangePhotoMultipartUpload=(uploadId,parts)=>request(`/api/
 export const abortOrangePhotoMultipartUpload=uploadId=>request(`/api/orange-photos/uploads/${encodeURIComponent(uploadId)}`,{method:'DELETE'});
 export const getOrangePhotoMultipartUpload=uploadId=>request(`/api/orange-photos/uploads/${encodeURIComponent(uploadId)}`);
 export function uploadOrangePhotoMultipartPart(url,blob,{signal,onProgress}={}){return new Promise((resolve,reject)=>{const xhr=new XMLHttpRequest(),interrupted=()=>apiError({code:'UPLOAD_INTERRUPTED',message:'La conexión se interrumpió durante la subida.'});xhr.open('PUT',url);xhr.timeout=180000;xhr.withCredentials=false;xhr.upload.onprogress=event=>onProgress?.(event.loaded);xhr.onerror=()=>reject(interrupted());xhr.ontimeout=()=>reject(interrupted());xhr.onabort=()=>reject(interrupted());xhr.onload=()=>{if(xhr.status<200||xhr.status>=300){const error=apiError({code:'STORAGE_UPLOAD_FAILED',message:'No se pudo transferir una parte al almacenamiento.'});error.status=xhr.status;return reject(error);}const etag=xhr.getResponseHeader('ETag');if(!etag)return reject(apiError({code:'STORAGE_UPLOAD_FAILED',message:'El almacenamiento no devolvió el ETag de la parte.'}));resolve({etag});};if(signal){if(signal.aborted)return xhr.abort();signal.addEventListener('abort',()=>xhr.abort(),{once:true});}xhr.send(blob);});}
-export const listOrangeAlbums=()=>request('/api/orange-photo-albums');
+export const listOrangeAlbums=(options={})=>request('/api/orange-photo-albums',{signal:options.signal});
+export function listOrangeAlbumPhotos(albumId,options={}){return listOrangePhotos({album_id:albumId,page:options.page||1,per_page:options.perPage||100},{signal:options.signal});}
+export function listOrangePhotoVideos(options={}){return listOrangePhotos({media_type:'video',page:options.page||1,per_page:options.perPage||100},{signal:options.signal});}
 export const listOrangeAlbumPhotoIds=id=>request(`/api/orange-photo-albums/${encodeURIComponent(id)}/photo-ids`);
 export const createOrangeAlbum=body=>request('/api/orange-photo-albums',{method:'POST',body:JSON.stringify(body)});
 export const updateOrangeAlbum=(id,body)=>request(`/api/orange-photo-albums/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify(body)});

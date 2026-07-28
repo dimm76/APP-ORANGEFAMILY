@@ -23,6 +23,8 @@ import { promptAndInsertFigmaEmbed } from "./insertFigmaEmbed.js";
 import { odRichColumnsExtensions } from "./RichTextOdColumns.js";
 import { RichTextAttachmentImage } from "./RichTextAttachmentImage.js";
 import { RichTextVideoEmbed } from "./RichTextVideoEmbed.js";
+import { RichTextOrangePhotoAlbum } from "./RichTextOrangePhotoAlbum.jsx";
+import { RichTextOrangePhotoVideo } from "./RichTextOrangePhotoVideo.jsx";
 import { RichTextGoogleSheetsEmbed } from "./RichTextGoogleSheetsEmbed.js";
 import { RichTextFigmaEmbed } from "./RichTextFigmaEmbed.js";
 import { RichTextOdContainer } from "./RichTextOdContainer.js";
@@ -37,6 +39,7 @@ import RichTextOdContainerBubbleMenu from "./RichTextOdContainerBubbleMenu.jsx";
 import RichTextOdColumnsBubbleMenu from "./RichTextOdColumnsBubbleMenu.jsx";
 import AttachmentImageLibraryModal from "./AttachmentImageLibraryModal.jsx";
 import ImageSourcePickerModal from "./ImageSourcePickerModal.jsx";
+import OrangePhotoEmbedPickerModal from "./OrangePhotoEmbedPickerModal.jsx";
 import { WikiBlockInsertMenu } from "./WikiBlockInsertMenu.jsx";
 import { useRichTextAttachmentEditor } from "../hooks/useRichTextAttachmentEditor.js";
 import { fetchSignedUrlsForAttachmentIds } from "../api/attachmentsApi.js";
@@ -82,8 +85,13 @@ export default function WikiTiptapEditor({
 }) {
   const rootRef = useRef(null);
   const imageInputRef = useRef(null);
+  const externalSourceSignatureRef = useRef("");
   const [imageSourceOpen, setImageSourceOpen] = useState(false);
   const [imageLibraryOpen, setImageLibraryOpen] = useState(false);
+  const [orangePhotoPickerMode, setOrangePhotoPickerMode] = useState(null);
+
+  const serializedContentJson = isDocJson(contentJson) ? JSON.stringify(contentJson) : "";
+  const serializedContentHtml = serializedContentJson ? "" : String(contentHtml ?? "");
 
   const initialContent = useMemo(() => {
     if (isDocJson(contentJson)) {
@@ -137,6 +145,8 @@ export default function WikiTiptapEditor({
         },
       }),
       RichTextVideoEmbed,
+      RichTextOrangePhotoAlbum,
+      RichTextOrangePhotoVideo,
       RichTextGoogleSheetsEmbed,
       RichTextFigmaEmbed,
       RichTextOdContainer,
@@ -194,6 +204,15 @@ export default function WikiTiptapEditor({
     promptAndInsertFigmaEmbed(editor);
   }
 
+  function handlePickOrangePhotoAlbum() { setOrangePhotoPickerMode("album"); }
+  function handlePickOrangePhotoVideo() { setOrangePhotoPickerMode("video"); }
+
+  function handleConfirmOrangePhoto(resource) {
+    if (orangePhotoPickerMode === "album") editor.chain().focus().setOrangePhotoAlbum({ albumId: resource.id, height: "normal" }).run();
+    if (orangePhotoPickerMode === "video") editor.chain().focus().setOrangePhotoVideo({ photoId: resource.id, aspectRatio: "16/9" }).run();
+    setOrangePhotoPickerMode(null);
+  }
+
   function handleImageFileChange(event) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -209,19 +228,25 @@ export default function WikiTiptapEditor({
   useEffect(() => {
     if (!editor) return undefined;
     let cancelled = false;
+    const sourceSignature = serializedContentJson
+      ? `json:${serializedContentJson}`
+      : `html:${serializedContentHtml}`;
+    externalSourceSignatureRef.current = sourceSignature;
 
     (async () => {
+      const externalJson = serializedContentJson ? JSON.parse(serializedContentJson) : null;
       const ids = [
-        ...extractAttachmentIdsFromJson(contentJson),
-        ...extractAttachmentIdsFromHtml(String(contentHtml ?? "")),
+        ...extractAttachmentIdsFromJson(externalJson),
+        ...extractAttachmentIdsFromHtml(serializedContentHtml),
       ];
       const unique = [...new Set(ids)];
       const urlById = unique.length ? await fetchSignedUrlsForAttachmentIds(unique) : {};
 
       if (cancelled) return;
+      if (externalSourceSignatureRef.current !== sourceSignature) return;
 
-      if (isDocJson(contentJson)) {
-        const hydrated = hydrateJsonAttachmentSrc(contentJson, urlById);
+      if (externalJson) {
+        const hydrated = hydrateJsonAttachmentSrc(externalJson, urlById);
         const current = JSON.stringify(editor.getJSON());
         const next = JSON.stringify(hydrated);
         if (current !== next) {
@@ -230,7 +255,7 @@ export default function WikiTiptapEditor({
         return;
       }
 
-      const raw = normalizeRichTextHtml(String(contentHtml ?? ""));
+      const raw = normalizeRichTextHtml(serializedContentHtml);
       const next = hydrateHtmlAttachmentSrc(raw, urlById);
       if (normalizeHtml(editor.getHTML()) !== normalizeHtml(next)) {
         editor.commands.setContent(next, false);
@@ -240,7 +265,7 @@ export default function WikiTiptapEditor({
     return () => {
       cancelled = true;
     };
-  }, [editor, pageKey, contentJson, contentHtml]);
+  }, [editor, pageKey, serializedContentJson, serializedContentHtml]);
 
   function commitSave() {
     if (!editor || disabled) return;
@@ -285,6 +310,8 @@ export default function WikiTiptapEditor({
             onPickVentoVideo: handlePickVentoVideo,
             onPickGoogleSheets: handlePickGoogleSheets,
             onPickFigma: handlePickFigma,
+            onPickOrangePhotoAlbum: handlePickOrangePhotoAlbum,
+            onPickOrangePhotoVideo: handlePickOrangePhotoVideo,
           }}
           menuClassName="od-wiki-add-block-menu"
         />
@@ -299,6 +326,8 @@ export default function WikiTiptapEditor({
           onPickVentoVideo={handlePickVentoVideo}
           onPickGoogleSheets={handlePickGoogleSheets}
           onPickFigma={handlePickFigma}
+          onPickOrangePhotoAlbum={handlePickOrangePhotoAlbum}
+          onPickOrangePhotoVideo={handlePickOrangePhotoVideo}
         />
       ) : null}
       <input
@@ -321,6 +350,7 @@ export default function WikiTiptapEditor({
         onClose={() => setImageLibraryOpen(false)}
         onConfirm={handleConfirmLibraryImage}
       />
+      <OrangePhotoEmbedPickerModal open={Boolean(orangePhotoPickerMode)} mode={orangePhotoPickerMode} selectedId={null} onClose={() => setOrangePhotoPickerMode(null)} onConfirm={handleConfirmOrangePhoto} />
       <div className="od-rich-text-editor__content-wrap">
         <EditorContent editor={editor} className="od-rich-text-editor__content" />
       </div>

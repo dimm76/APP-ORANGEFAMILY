@@ -87,19 +87,7 @@ function ColumnsLayoutPicker({
  * @param {{ editor: import("@tiptap/react").Editor }} props
  */
 export default function RichTextOdColumnsBubbleMenu({ editor }) {
-  const [, setTick] = useState(0);
   const [openPicker, setOpenPicker] = useState(false);
-
-  useEffect(() => {
-    if (!editor) return undefined;
-    const refresh = () => setTick((n) => n + 1);
-    editor.on("selectionUpdate", refresh);
-    editor.on("transaction", refresh);
-    return () => {
-      editor.off("selectionUpdate", refresh);
-      editor.off("transaction", refresh);
-    };
-  }, [editor]);
 
   if (!editor) return null;
 

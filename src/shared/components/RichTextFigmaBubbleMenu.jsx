@@ -82,21 +82,7 @@ function FigmaToolbarPicker({
  * @param {{ editor: import("@tiptap/react").Editor }} props
  */
 export default function RichTextFigmaBubbleMenu({ editor }) {
-  const [, setTick] = useState(0);
   const [openPicker, setOpenPicker] = useState(null);
-
-  useEffect(() => {
-    if (!editor) return undefined;
-
-    const refresh = () => setTick((value) => value + 1);
-    editor.on("selectionUpdate", refresh);
-    editor.on("transaction", refresh);
-
-    return () => {
-      editor.off("selectionUpdate", refresh);
-      editor.off("transaction", refresh);
-    };
-  }, [editor]);
 
   if (!editor) return null;
 

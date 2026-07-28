@@ -25,6 +25,8 @@ function getEditorBlockCaps(editor) {
     canImage: typeof editor.commands.setImage === "function",
     canYoutube: typeof editor.commands.setYoutubeVideo === "function",
     canVideoEmbed: typeof editor.commands.setVideoEmbed === "function",
+    canOrangePhotoAlbum: typeof editor.commands.setOrangePhotoAlbum === "function",
+    canOrangePhotoVideo: typeof editor.commands.setOrangePhotoVideo === "function",
     canGoogleSheetsEmbed: typeof editor.commands.setGoogleSheetsEmbed === "function",
     canFigmaEmbed: typeof editor.commands.setFigmaEmbed === "function",
     canOdTabs: typeof editor.commands.insertOdTabs === "function",
@@ -35,7 +37,7 @@ function getEditorBlockCaps(editor) {
 /**
  * Grupos de acciones de bloque reutilizables (menú Wiki, futuro comando "/").
  * @param {import("@tiptap/core").Editor | null} editor
- * @param {{ onPickImage?: () => void, onPickYoutube?: () => void, onPickGoogleDriveVideo?: () => void, onPickVentoVideo?: () => void, onPickGoogleSheets?: () => void, onPickFigma?: () => void }} [handlers]
+ * @param {{ onPickImage?: () => void, onPickOrangePhotoAlbum?: () => void, onPickOrangePhotoVideo?: () => void, onPickYoutube?: () => void, onPickGoogleDriveVideo?: () => void, onPickVentoVideo?: () => void, onPickGoogleSheets?: () => void, onPickFigma?: () => void }} [handlers]
  * @returns {{ title: string, items: Array<{ id: string, icon: string, label: string, title: string, disabled?: boolean, onClick: () => void }> }[]}
  */
 export function getRichTextBlockMenuGroups(editor, handlers = {}) {
@@ -190,6 +192,12 @@ export function getRichTextBlockMenuGroups(editor, handlers = {}) {
               onClick: handlers.onPickImage,
             }
           : null,
+        caps.canOrangePhotoAlbum && typeof handlers.onPickOrangePhotoAlbum === "function"
+          ? { id: "orange-photo-album", icon: OD_ICONS.richImage, label: "Álbum de Orange Photos", title: "Insertar una vista interactiva de un álbum de Orange Photos", slashAliases: ["album", "álbum", "orange photos", "orange photo album", "fotos"], onClick: handlers.onPickOrangePhotoAlbum }
+          : null,
+        caps.canOrangePhotoVideo && typeof handlers.onPickOrangePhotoVideo === "function"
+          ? { id: "orange-photo-video", icon: OD_ICONS.richVideo, label: "Vídeo de Orange Photos", title: "Insertar un vídeo almacenado en Orange Photos", slashAliases: ["video", "vídeo", "orange photos video", "orange photo video"], onClick: handlers.onPickOrangePhotoVideo }
+          : null,
         caps.canGoogleSheetsEmbed && typeof handlers.onPickGoogleSheets === "function"
           ? {
               id: "google-sheets",
@@ -329,7 +337,7 @@ export function wrapBlockMenuGroupsForSlash(editor, groups) {
 
 /**
  * @param {import("@tiptap/core").Editor | null} editor
- * @param {{ onPickImage?: () => void, onPickYoutube?: () => void, onPickGoogleDriveVideo?: () => void, onPickVentoVideo?: () => void, onPickGoogleSheets?: () => void, onPickFigma?: () => void }} [handlers]
+ * @param {{ onPickImage?: () => void, onPickOrangePhotoAlbum?: () => void, onPickOrangePhotoVideo?: () => void, onPickYoutube?: () => void, onPickGoogleDriveVideo?: () => void, onPickVentoVideo?: () => void, onPickGoogleSheets?: () => void, onPickFigma?: () => void }} [handlers]
  * @param {string} [query]
  */
 export function getFilteredRichTextBlockMenuGroups(editor, handlers = {}, query = "") {

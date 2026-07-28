@@ -27,6 +27,8 @@ Etiquetas: `GET/POST /api/orange-photo-tags`. Miembros seleccionables: `GET /api
 
 `OrangePhotosPage` coordina filtros, galería cronológica, selección, álbumes, paginación, subida, visor, detalles y compartición. Los componentes están en `src/features/orange-photos/` y consumen únicamente la API Node.
 
+La Wiki admite los nodos Tiptap `orangePhotoAlbum` (`albumId`, `height`) y `orangePhotoVideo` (`photoId`, `aspectRatio`). El contenido persiste exclusivamente los identificadores, nunca URLs firmadas, y resuelve cada recurso mediante la API autenticada de Orange Photos, que vuelve a comprobar sus permisos. El HTML de respaldo conserva un `div` de referencia. Los tamaños de álbum son `compact` (280 px), `normal` (420 px) y `large` (600 px).
+
 ## Agente Android
 
 El [agente Android privado de sincronización](ANDROID_SYNC_AGENT.md) está en desarrollo. Actualmente solo se ha creado el proyecto base; la sincronización automática todavía no está implementada.

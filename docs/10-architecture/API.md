@@ -80,6 +80,4 @@ No deberán exponerse:
 
 ## Estado actual
 
-La API de OrangeFamily todavía no está implementada.
-
-Las rutas y contratos se documentarán cuando se revise la infraestructura reutilizable y comience el desarrollo del backend.
+OrangeFamily dispone de una API Node operativa, implementada parcialmente y en evolución por módulos. Orange Photos ya utiliza rutas implementadas; sus contratos específicos se documentan junto al módulo.

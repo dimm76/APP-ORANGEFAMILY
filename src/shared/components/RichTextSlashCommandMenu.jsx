@@ -60,7 +60,7 @@ function computeSlashMenuLayout(editor) {
  * Comando "/" — menú de bloques anclado al cursor, siempre dentro del viewport.
  * @param {{
  *   editor: import("@tiptap/core").Editor | null,
- *   handlers?: { onPickImage?: () => void },
+ *   handlers?: { onPickImage?: () => void, onPickOrangePhotoAlbum?: () => void, onPickOrangePhotoVideo?: () => void },
  *   menuClassName?: string,
  * }} props
  */

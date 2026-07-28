@@ -16,6 +16,8 @@ function WikiBlockInsertMenu({
   onPickVentoVideo,
   onPickGoogleSheets,
   onPickFigma,
+  onPickOrangePhotoAlbum,
+  onPickOrangePhotoVideo,
 }) {
   const [btnHostEl, setBtnHostEl] = useState(null);
   const [panelHostEl, setPanelHostEl] = useState(null);
@@ -72,6 +74,8 @@ function WikiBlockInsertMenu({
         setOpen(false);
         onPickFigma?.();
       },
+      onPickOrangePhotoAlbum: () => { setOpen(false); onPickOrangePhotoAlbum?.(); },
+      onPickOrangePhotoVideo: () => { setOpen(false); onPickOrangePhotoVideo?.(); },
     }),
     [
       onPickImage,
@@ -80,6 +84,8 @@ function WikiBlockInsertMenu({
       onPickVentoVideo,
       onPickGoogleSheets,
       onPickFigma,
+      onPickOrangePhotoAlbum,
+      onPickOrangePhotoVideo,
     ]
   );
 
