@@ -25,7 +25,7 @@ class OrangePhotosSyncScheduler(context: Context) {
 
     fun scheduleUnmeteredSync(accountUserId: String) {
         val request = oneTimeRequest(NetworkType.UNMETERED)
-        workManager.enqueueUniqueWork(unmeteredName(accountUserId), ExistingWorkPolicy.KEEP, request)
+        workManager.enqueueUniqueWork(unmeteredName(accountUserId), ExistingWorkPolicy.REPLACE, request)
     }
 
     fun scheduleMediaChangeSync(accountUserId: String) {
@@ -41,20 +41,22 @@ class OrangePhotosSyncScheduler(context: Context) {
         workManager.enqueueUniquePeriodicWork(periodicName(accountUserId), ExistingPeriodicWorkPolicy.KEEP, request)
     }
 
+    fun onUnmeteredNetworkAvailable(accountUserId: String, policy: UploadNetworkPolicy) {
+        if (policy != UploadNetworkPolicy.ANY_NETWORK) {
+            scheduleUnmeteredSync(accountUserId)
+        }
+    }
+
     fun rescheduleForPolicy(accountUserId: String, policy: UploadNetworkPolicy) {
+        workManager.cancelUniqueWork(immediateName(accountUserId))
+        workManager.cancelUniqueWork(unmeteredName(accountUserId))
+        workManager.cancelUniqueWork(mediaChangeName(accountUserId))
+
         when (policy) {
-            UploadNetworkPolicy.WIFI_ONLY -> {
-                workManager.cancelUniqueWork(immediateName(accountUserId))
-                scheduleUnmeteredSync(accountUserId)
-            }
-            UploadNetworkPolicy.MOBILE_UP_TO_800_MB -> {
-                scheduleImmediateSync(accountUserId)
-                scheduleUnmeteredSync(accountUserId)
-            }
-            UploadNetworkPolicy.ANY_NETWORK -> {
-                workManager.cancelUniqueWork(unmeteredName(accountUserId))
-                scheduleImmediateSync(accountUserId)
-            }
+            UploadNetworkPolicy.WIFI_ONLY -> scheduleUnmeteredSync(accountUserId)
+            UploadNetworkPolicy.MOBILE_UP_TO_800_MB,
+            UploadNetworkPolicy.ANY_NETWORK,
+            -> scheduleImmediateSync(accountUserId)
         }
     }
 
