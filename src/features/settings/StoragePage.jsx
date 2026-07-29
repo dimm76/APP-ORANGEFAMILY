@@ -89,44 +89,90 @@ function StorageDistribution({ totals }) {
   );
 }
 
-function UserStorageCard({ user }) {
-  const totals = {
-    total_bytes: user.total_bytes,
-    attachments_bytes: user.attachments_bytes,
-    images_bytes: user.images_bytes,
-    videos_bytes: user.videos_bytes,
-  };
+function UserStorageRow({ user }) {
+  const totalBytes = Math.max(0, Number(user.total_bytes) || 0);
 
   return (
-    <article className="of-storage-user-card">
-      <header className="of-storage-user-card__header">
-        <div>
-          <h3>{user.display_name}</h3>
-          {user.role === "owner" ? (
-            <span className="of-storage-user-card__role">
-              Administrador
+    <article className="of-storage-user-row">
+      <div className="of-storage-user-row__identity">
+        <h3>{user.display_name}</h3>
+
+        {user.role === "owner" ? (
+          <span className="of-storage-user-row__role">
+            Administrador
+          </span>
+        ) : null}
+      </div>
+
+      <div className="of-storage-user-row__usage">
+        <div
+          className="of-storage-user-row__bar"
+          role="img"
+          aria-label={`Distribución de ${formatBytes(
+            totalBytes
+          )} de almacenamiento para ${user.display_name}`}
+        >
+          {totalBytes > 0 ? (
+            CATEGORIES.map((category) => {
+              const bytes = Math.max(
+                0,
+                Number(user[category.key]) || 0
+              );
+
+              if (bytes === 0) return null;
+
+              return (
+                <span
+                  key={category.key}
+                  className={`of-storage-summary__segment ${category.className}`}
+                  style={{
+                    width: `${(bytes / totalBytes) * 100}%`,
+                  }}
+                  title={`${category.label}: ${formatBytes(bytes)}`}
+                />
+              );
+            })
+          ) : (
+            <span className="of-storage-summary__empty" />
+          )}
+        </div>
+
+        <div className="of-storage-user-row__details">
+          <div className="of-storage-user-row__categories">
+            {CATEGORIES.map((category) => (
+              <span
+                className="of-storage-user-row__detail"
+                key={category.key}
+              >
+                <span
+                  className={`of-storage-user-row__dot ${category.className}`}
+                  aria-hidden="true"
+                />
+                <span>{category.label}</span>
+                <strong>{formatBytes(user[category.key])}</strong>
+              </span>
+            ))}
+          </div>
+
+          <div className="of-storage-user-row__totals">
+            <span className="of-storage-user-row__total">
+              <span>Total</span>
+              <strong>{formatBytes(user.total_bytes)}</strong>
             </span>
-          ) : null}
-        </div>
-      </header>
 
-      <StorageDistribution totals={totals} />
-
-      <footer className="of-storage-user-card__footer">
-        <div className="of-storage-user-card__metric">
-          <span>Total</span>
-          <strong>{formatBytes(user.total_bytes)}</strong>
+            <span className="of-storage-user-row__total">
+              <span>Papelera</span>
+              <strong>{formatBytes(user.trash_bytes)}</strong>
+              <small>
+                {user.trash_items}{" "}
+                {user.trash_items === 1
+                  ? "elemento"
+                  : "elementos"}
+              </small>
+            </span>
+          </div>
         </div>
-
-        <div className="of-storage-user-card__metric">
-          <span>Papelera</span>
-          <strong>{formatBytes(user.trash_bytes)}</strong>
-          <small>
-            {user.trash_items}{" "}
-            {user.trash_items === 1 ? "elemento" : "elementos"}
-          </small>
-        </div>
-      </footer>
+      </div>
     </article>
   );
 }
@@ -236,7 +282,7 @@ export default function StoragePage() {
               <div className="of-storage-users__list">
                 {data.users.length ? (
                   data.users.map((user) => (
-                    <UserStorageCard key={user.user_id} user={user} />
+                    <UserStorageRow key={user.user_id} user={user} />
                   ))
                 ) : (
                   <div className="od-empty-state">

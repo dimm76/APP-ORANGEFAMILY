@@ -143,76 +143,126 @@
 }
 
 .of-storage-users__list {
-  display: grid;
-  gap: 12px;
-}
-
-.of-storage-user-card {
-  display: grid;
-  gap: 14px;
-  padding: 16px;
+  overflow: hidden;
   border: 1px solid var(--od-color-border-soft, #dce3f5);
   border-radius: 10px;
   background: var(--od-color-surface, #ffffff);
 }
 
-.of-storage-user-card__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+.of-storage-user-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 200px) minmax(0, 1fr);
+  align-items: center;
+  column-gap: 18px;
+  min-width: 0;
+  padding: 11px 14px;
+  background: var(--od-color-surface, #ffffff);
 }
 
-.of-storage-user-card__header h3 {
-  margin: 0;
-  color: var(--od-color-text-strong, #111229);
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.of-storage-user-card__role {
-  display: block;
-  margin-top: 3px;
-  color: var(--od-color-text-muted, #64748b);
-  font-size: 11px;
-  font-weight: 500;
-}
-
-.of-storage-user-card__footer {
-  display: flex;
-  justify-content: flex-end;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 12px 28px;
-  padding-top: 12px;
+.of-storage-user-row + .of-storage-user-row {
   border-top: 1px solid var(--od-color-border-soft, #dce3f5);
 }
 
-.of-storage-user-card__metric {
-  display: grid;
-  justify-items: end;
-  gap: 2px;
-  min-width: 110px;
-  text-align: right;
+.of-storage-user-row__identity {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 7px;
+  min-width: 0;
 }
 
-.of-storage-user-card__metric span {
-  color: var(--od-color-text-muted, #64748b);
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.of-storage-user-card__metric strong {
+.of-storage-user-row__identity h3 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
   color: var(--od-color-text-strong, #111229);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.of-storage-user-row__role {
+  color: var(--od-color-text-muted, #64748b);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.of-storage-user-row__role::before {
+  content: "·";
+  margin-right: 7px;
+}
+
+.of-storage-user-row__usage {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.of-storage-user-row__bar {
+  display: flex;
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.of-storage-user-row__details {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  color: var(--od-color-text-muted, #64748b);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.of-storage-user-row__categories,
+.of-storage-user-row__totals {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.of-storage-user-row__totals {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.of-storage-user-row__detail,
+.of-storage-user-row__total {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.of-storage-user-row__detail strong,
+.of-storage-user-row__total strong {
+  color: var(--od-color-text-strong, #111229);
+  font-size: 11px;
   font-weight: 600;
 }
 
-.of-storage-user-card__metric small {
+.of-storage-user-row__total {
+  padding-left: 14px;
+  border-left: 1px solid var(--od-color-border-soft, #dce3f5);
+}
+
+.of-storage-user-row__total small {
   color: var(--od-color-text-muted, #64748b);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 400;
+}
+
+.of-storage-user-row__dot {
+  display: block;
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
 }
 
 @media (max-width: 700px) {
@@ -225,15 +275,27 @@
     grid-template-columns: 1fr;
   }
 
-  .of-storage-user-card {
-    padding: 14px;
+  .of-storage-user-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 11px 12px;
   }
 
-  .of-storage-user-card__footer {
-    justify-content: space-between;
+  .of-storage-user-row__details {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 7px 12px;
+    white-space: normal;
   }
 
-  .of-storage-user-card__metric {
-    min-width: 0;
+  .of-storage-user-row__categories {
+    flex-wrap: wrap;
+    gap: 7px 12px;
+  }
+
+  .of-storage-user-row__totals {
+    width: 100%;
+    justify-content: flex-end;
+    margin-left: 0;
   }
 }
