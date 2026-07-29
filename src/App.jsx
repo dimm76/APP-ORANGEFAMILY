@@ -5,6 +5,7 @@ import AttachmentsLibraryPage from "./app/AttachmentsLibraryPage.jsx";
 import WikiPage, { WikiPublicPage } from "./features/wiki/WikiPage.jsx";
 import OrangePhotosPage from "./features/orange-photos/OrangePhotosPage.jsx";
 import FamilyMembersPage from "./features/settings/FamilyMembersPage.jsx";
+import StoragePage from "./features/settings/StoragePage.jsx";
 import AuthActionPage from "./app/AuthActionPage.jsx";
 import "./App.css";
 
@@ -81,6 +82,8 @@ function AppContent() {
         <AttachmentsLibraryPage />
       ) : pathname === "/app/settings/family" ? (
         <FamilyMembersPage />
+      ) : pathname === "/app/settings/storage" ? (
+        <StoragePage />
       ) : pathname === "/app/wiki" || pathname.startsWith("/app/wiki/") ? (
         <WikiPage />
       ) : pathname.startsWith("/app/orangephotos") || pathname === "/app/orange-photos" ? (

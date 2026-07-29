@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useMemo, useState } from "react";
 import { IonIcon } from "@ionic/react";
-import { ellipsisVerticalOutline, peopleOutline } from "ionicons/icons";
+import { ellipsisVerticalOutline, people as peopleOutline } from "ionicons/icons";
 import OrangeAlbumShareModal from "./OrangeAlbumShareModal.jsx";
 
 function albumShareTitle(album) {

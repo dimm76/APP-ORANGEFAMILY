@@ -1187,3 +1187,38 @@
     pointer-events: auto;
   }
 }
+
+/* Indicador sólido de contenido compartido.
+   El contenedor amplía el área del tooltip sin añadir fondo ni borde. */
+.od-orange-photo-card__share,
+.od-orange-album-card__share {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+  cursor: help;
+  filter: drop-shadow(0 0 1px currentColor);
+}
+
+.od-orange-photo-card__share {
+  top: 4px;
+  right: 4px;
+}
+
+.od-orange-photo-card__share ion-icon,
+.od-orange-album-card__share ion-icon {
+  width: 20px;
+  height: 20px;
+  font-size: 20px;
+}
+
+.od-orange-photo-card__share--owned {
+  color: var(--od-color-primary, #fc4200);
+}
+
+.od-orange-photo-card__share--received {
+  color: #1d4ed8;
+}

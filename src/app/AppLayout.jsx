@@ -29,6 +29,10 @@ function isOrangePhotosWorkspacePath(pathname) {
   return normalizePathname(pathname).startsWith("/app/orangephotos");
 }
 
+function isSettingsWorkspacePath(pathname) {
+  return normalizePathname(pathname).startsWith("/app/settings/");
+}
+
 export default function AppLayout({ children }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -38,6 +42,9 @@ export default function AppLayout({ children }) {
     typeof window !== "undefined" ? window.location.pathname : "/";
   const wikiWorkspaceMode = isWikiDocumentWorkspacePath(pathname);
   const orangePhotosWorkspaceMode = isOrangePhotosWorkspacePath(pathname);
+  const settingsWorkspaceMode = isSettingsWorkspacePath(pathname);
+  const forceExpandedSidebar =
+    orangePhotosWorkspaceMode || settingsWorkspaceMode;
 
   useEffect(() => {
     const sync = () => setRouteTick((value) => value + 1);
@@ -51,7 +58,7 @@ export default function AppLayout({ children }) {
 
   return (
     <IonApp
-      className={`od-app-root ${collapsed && !orangePhotosWorkspaceMode ? "od-app-root--collapsed" : ""} ${
+      className={`od-app-root ${collapsed && !forceExpandedSidebar ? "od-app-root--collapsed" : ""} ${
         mobileNavOpen ? "od-app-root--mobile-nav-open" : ""
       } ${wikiWorkspaceMode ? "od-app-root--wiki-workspace" : ""} ${
         orangePhotosWorkspaceMode ? "od-app-root--orangephotos-workspace" : ""
@@ -103,11 +110,11 @@ export default function AppLayout({ children }) {
 
         <div className="od-app-body">
           <aside
-            className={`od-sidebar ${collapsed && !orangePhotosWorkspaceMode ? "od-sidebar--collapsed" : ""}`}
+            className={`od-sidebar ${collapsed && !forceExpandedSidebar ? "od-sidebar--collapsed" : ""}`}
             aria-label="Navegación principal"
           >
             <Sidebar
-              collapsed={orangePhotosWorkspaceMode ? false : collapsed}
+              collapsed={forceExpandedSidebar ? false : collapsed}
               onToggleCollapse={() => setCollapsed((current) => !current)}
               onNavigate={() => setMobileNavOpen(false)}
             />

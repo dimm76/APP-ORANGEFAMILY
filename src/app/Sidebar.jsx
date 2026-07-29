@@ -16,6 +16,7 @@ import {
 } from "ionicons/icons";
 import { useAuth } from "./authContext.js";
 import OrangePhotosSidebar from "../features/orange-photos/OrangePhotosSidebar.jsx";
+import SettingsSidebar from "../features/settings/SettingsSidebar.jsx";
 
 const OD_NAV_EVENT = "od-spa-navigate";
 
@@ -28,7 +29,12 @@ const NAV_ITEMS = [
   { label: "Wiki", href: "/app/wiki", icon: bookOutline, moduleKey: "wiki" },
   { label: "OrangePhotos", href: "/app/orangephotos", icon: imagesOutline, moduleKey: "orange_photos" },
   { label: "Notas", href: "/app/notas", icon: documentTextOutline, moduleKey: "notes" },
-  { label: "Ajustes", href: "/app/settings/family", icon: settingsOutline },
+  {
+    label: "Ajustes",
+    href: "/app/settings/family",
+    icon: settingsOutline,
+    ownerOnly: true,
+  },
 ];
 
 function currentPathname() {
@@ -68,6 +74,10 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
 
   if (hasModuleAccess("orange_photos") && pathname.startsWith("/app/orangephotos")) {
     return <OrangePhotosSidebar pathname={pathname} onNavigate={onNavigate} />;
+  }
+
+  if (isOwner && pathname.startsWith("/app/settings/")) {
+    return <SettingsSidebar pathname={pathname} onNavigate={onNavigate} />;
   }
 
   return (

@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { memo, useEffect, useRef, useState } from "react";
 import { IonIcon } from "@ionic/react";
-import { checkmarkOutline, peopleOutline, searchCircleOutline } from "ionicons/icons";
+import { checkmarkOutline, people as peopleOutline, searchCircleOutline } from "ionicons/icons";
 import { OD_ICONS } from "../../shared/ui/odIcons.js";
 
 let activePreview = null;
