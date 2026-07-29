@@ -1,4 +1,6 @@
 import Image from "@tiptap/extension-image";
+import { ReactNodeViewRenderer } from "@tiptap/react";
+import RichTextAttachmentImageView from "./RichTextAttachmentImageView.jsx";
 
 /** Imagen embebida con `attachmentId`; seleccionable; sin deformar por atributos fijos. */
 export const RichTextAttachmentImage = Image.extend({
@@ -69,5 +71,9 @@ export const RichTextAttachmentImage = Image.extend({
         class: "od-rich-attachment-image",
       },
     ];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(RichTextAttachmentImageView);
   },
 });

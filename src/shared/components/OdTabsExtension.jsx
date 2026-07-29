@@ -4,6 +4,7 @@ import { ReactNodeViewRenderer, NodeViewContent, NodeViewWrapper } from "@tiptap
 import { TextSelection } from "@tiptap/pm/state";
 import { IonIcon } from "@ionic/react";
 import { OD_ICONS } from "../ui/odIcons.js";
+import RichTextBlockDragHandle from "./RichTextBlockDragHandle.jsx";
 
 function createTabId() {
   return `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -331,6 +332,7 @@ function OdTabsNodeView({ editor, node, getPos, updateAttributes }) {
       data-active-tab-id={activeTabId || ""}
       data-active-tab-index={String(activeTabIndex)}
     >
+      <RichTextBlockDragHandle editor={editor} label="Arrastrar bloque de pestañas" />
       <div className="od-editor-tabs__bubble" contentEditable={false}>
         <button
           type="button"
@@ -465,6 +467,8 @@ export const OdTabs = Node.create({
   isolating: false,
 
   selectable: true,
+
+  draggable: true,
 
   addAttributes() {
     return {

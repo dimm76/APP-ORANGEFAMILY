@@ -1,5 +1,7 @@
 import { Node, mergeAttributes } from "@tiptap/core";
+import { ReactNodeViewRenderer } from "@tiptap/react";
 import { isAllowedExternalVideoEmbedSrc } from "../utils/videoEmbedUrl.js";
+import RichTextVideoEmbedView from "./RichTextVideoEmbedView.jsx";
 
 const ALLOWED_PROVIDERS = new Set(["google_drive", "vento"]);
 
@@ -105,5 +107,9 @@ export const RichTextVideoEmbed = Node.create({
           });
         },
     };
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(RichTextVideoEmbedView);
   },
 });

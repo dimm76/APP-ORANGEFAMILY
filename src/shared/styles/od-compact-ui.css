@@ -3993,6 +3993,42 @@ ion-button.od-rich-text-add-block-btn.is-active {
   height: 18px;
 }
 
+.od-editor-block,
+.od-rich-attachment-image-view,
+.od-tiptap-container,
+.od-orange-photo-video-embed {
+  position: relative;
+}
+
+.od-editor-block > .od-editor-block__drag-handle,
+.od-rich-attachment-image-view > .od-editor-block__drag-handle,
+.od-tiptap-container > .od-editor-block__drag-handle,
+.od-orange-photo-video-embed > .od-editor-block__drag-handle {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 1;
+  opacity: 0;
+  border-radius: 6px;
+  background: var(--od-panel-surface, #ffffff);
+}
+
+.od-editor-block:hover > .od-editor-block__drag-handle,
+.od-editor-block.ProseMirror-selectednode > .od-editor-block__drag-handle,
+.od-rich-attachment-image-view:hover > .od-editor-block__drag-handle,
+.od-rich-attachment-image-view.is-selected > .od-editor-block__drag-handle,
+.od-tiptap-container:hover > .od-editor-block__drag-handle,
+.od-tiptap-container.is-selected > .od-editor-block__drag-handle,
+.od-orange-photo-video-embed:hover > .od-editor-block__drag-handle,
+.od-orange-photo-video-embed.is-selected > .od-editor-block__drag-handle {
+  opacity: 1;
+}
+
+.od-editor-disclosure > .od-editor-disclosure__summary .od-editor-block__drag-handle,
+.od-orange-photo-album-embed__header > .od-editor-block__drag-handle {
+  opacity: 1;
+}
+
 .od-wiki-tiptap.is-wiki-readonly .od-editor-block__drag-handle {
   display: none;
 }
@@ -4017,6 +4053,11 @@ ion-button.od-rich-text-add-block-btn.is-active {
   font-size: 1rem;
 }
 
+.od-editor-disclosure__heading--paragraph {
+  font-size: 1rem;
+  font-weight: 400;
+}
+
 .od-rich-text-editor .ProseMirror .od-editor-disclosure__heading {
   margin: 0;
   line-height: 1.3;
@@ -4032,6 +4073,11 @@ ion-button.od-rich-text-add-block-btn.is-active {
 
 .od-rich-text-editor .ProseMirror .od-editor-disclosure__heading--h4 {
   font-size: 1rem;
+}
+
+.od-rich-text-editor .ProseMirror .od-editor-disclosure__heading--paragraph {
+  font-size: 1rem;
+  font-weight: 400;
 }
 
 .od-editor-disclosure__title {
@@ -5911,6 +5957,16 @@ ion-button.od-rich-text-add-block-btn.is-active {
   margin: 0.35rem 0;
   cursor: pointer;
   border-radius: 4px;
+}
+
+.od-rich-text-editor .ProseMirror .od-rich-attachment-image-view {
+  max-width: 100%;
+  margin: 0.35rem 0;
+}
+
+.od-rich-text-editor .ProseMirror .od-rich-attachment-image-view img.od-rich-attachment-image {
+  width: 100%;
+  margin: 0;
 }
 
 .od-rich-text-editor .ProseMirror img.od-rich-attachment-image[data-display-width="50"],

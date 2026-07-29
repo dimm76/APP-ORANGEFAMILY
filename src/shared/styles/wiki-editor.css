@@ -955,6 +955,17 @@
   opacity: 1 !important;
 }
 
+.od-wiki-tiptap .ProseMirror ul:not([data-type="taskList"]) > li,
+.od-wiki-tiptap .ProseMirror ol > li,
+.od-wiki-tiptap .ProseMirror ul[data-type="taskList"] > li {
+  margin-block: 0.15rem;
+}
+
+.od-wiki-tiptap .ProseMirror li > p,
+.od-wiki-tiptap .ProseMirror ul[data-type="taskList"] > li > div > p {
+  margin-block: 0;
+}
+
 .od-wiki-add-block-host {
   display: inline-flex;
   align-items: center;

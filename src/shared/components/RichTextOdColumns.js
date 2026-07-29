@@ -1,5 +1,7 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
+import { ReactNodeViewRenderer } from "@tiptap/react";
+import RichTextOdColumnsView from "./RichTextOdColumnsView.jsx";
 import {
   buildOdRichColumnsClassName,
   defaultColumnLayout,
@@ -29,6 +31,8 @@ export const OdRichColumns = Node.create({
   content: "(odRichColumn odRichColumn)|(odRichColumn odRichColumn odRichColumn)",
   defining: true,
   isolating: true,
+  selectable: true,
+  draggable: true,
 
   addAttributes() {
     return {
@@ -87,6 +91,10 @@ export const OdRichColumns = Node.create({
       }),
       0,
     ];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(RichTextOdColumnsView);
   },
 
   addCommands() {

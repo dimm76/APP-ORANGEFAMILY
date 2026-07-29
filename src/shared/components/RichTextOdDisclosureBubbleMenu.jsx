@@ -23,7 +23,10 @@ export default function RichTextOdDisclosureBubbleMenu({ editor }) {
       return context
         ? {
             open: Boolean(context.node.attrs.open),
-            titleLevel: Number(context.node.attrs.titleLevel),
+            titleLevel:
+              context.node.attrs.titleLevel === "paragraph"
+                ? "paragraph"
+                : Number(context.node.attrs.titleLevel),
           }
         : null;
     },
@@ -32,12 +35,12 @@ export default function RichTextOdDisclosureBubbleMenu({ editor }) {
   if (!editor || !editor.isEditable) return null;
 
   function updateDisclosure(patch) {
+    const context = findDisclosurePosition(editor);
+    if (!context) return;
     editor
       .chain()
       .focus()
       .command(({ tr }) => {
-        const context = findDisclosurePosition(editor);
-        if (!context) return false;
         tr.setNodeMarkup(context.pos, undefined, {
           ...context.node.attrs,
           ...patch,
@@ -61,7 +64,10 @@ export default function RichTextOdDisclosureBubbleMenu({ editor }) {
       .run();
   }
 
-  const titleLevel = [2, 3, 4].includes(disclosure?.titleLevel) ? disclosure.titleLevel : 2;
+  const titleLevel =
+    disclosure?.titleLevel === "paragraph" || [2, 3, 4].includes(disclosure?.titleLevel)
+      ? disclosure.titleLevel
+      : 2;
 
   return (
     <BubbleMenu
@@ -74,16 +80,21 @@ export default function RichTextOdDisclosureBubbleMenu({ editor }) {
       className="od-rich-text-editor__toolbar-popover"
     >
       <div className="od-rich-text-editor__toolbar">
-        {[2, 3, 4].map((level) => (
+        {[
+          { value: "paragraph", label: "Párrafo" },
+          { value: 2, label: "H2" },
+          { value: 3, label: "H3" },
+          { value: 4, label: "H4" },
+        ].map((option) => (
           <button
-            key={level}
+            key={option.value}
             type="button"
-            className={`od-rich-text-editor__button${titleLevel === level ? " is-active" : ""}`}
-            aria-pressed={titleLevel === level}
+            className={`od-rich-text-editor__button${titleLevel === option.value ? " is-active" : ""}`}
+            aria-pressed={titleLevel === option.value}
             onMouseDown={(event) => event.preventDefault()}
-            onClick={() => updateDisclosure({ titleLevel: level })}
+            onClick={() => updateDisclosure({ titleLevel: option.value })}
           >
-            H{level}
+            {option.label}
           </button>
         ))}
         <button

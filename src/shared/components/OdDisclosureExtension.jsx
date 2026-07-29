@@ -7,10 +7,13 @@ import { OD_ICONS } from "../ui/odIcons.js";
 function OdDisclosureNodeView({ node, updateAttributes, editor, getPos }) {
   const title = node.attrs.title || "Título del desplegable";
   const open = Boolean(node.attrs.open);
-  const titleLevel = [2, 3, 4].includes(Number(node.attrs.titleLevel))
-    ? Number(node.attrs.titleLevel)
-    : 2;
-  const TitleTag = `h${titleLevel}`;
+  const titleLevel =
+    node.attrs.titleLevel === "paragraph"
+      ? "paragraph"
+      : [2, 3, 4].includes(Number(node.attrs.titleLevel))
+        ? Number(node.attrs.titleLevel)
+        : 2;
+  const TitleTag = titleLevel === "paragraph" ? "p" : `h${titleLevel}`;
 
   function toggleOpen() {
     updateAttributes({ open: !open });
@@ -57,7 +60,7 @@ function OdDisclosureNodeView({ node, updateAttributes, editor, getPos }) {
         </button>
 
         <TitleTag
-          className={`od-editor-disclosure__heading od-editor-disclosure__heading--h${titleLevel}`}
+          className={`od-editor-disclosure__heading od-editor-disclosure__heading--${titleLevel === "paragraph" ? "paragraph" : `h${titleLevel}`}`}
         >
           <input
             className="od-editor-disclosure__title"
@@ -113,13 +116,18 @@ export const OdDisclosure = Node.create({
       titleLevel: {
         default: 2,
         parseHTML: (element) => {
-          const value = Number(element.getAttribute("data-title-level"));
+          const raw = element.getAttribute("data-title-level");
+          if (raw === "paragraph") return "paragraph";
+          const value = Number(raw);
           return [2, 3, 4].includes(value) ? value : 2;
         },
         renderHTML: (attributes) => ({
-          "data-title-level": [2, 3, 4].includes(Number(attributes.titleLevel))
-            ? String(attributes.titleLevel)
-            : "2",
+          "data-title-level":
+            attributes.titleLevel === "paragraph"
+              ? "paragraph"
+              : [2, 3, 4].includes(Number(attributes.titleLevel))
+                ? String(attributes.titleLevel)
+                : "2",
         }),
       },
     };
@@ -137,10 +145,13 @@ export const OdDisclosure = Node.create({
   },
 
   renderHTML({ node, HTMLAttributes }) {
-    const validLevel = [2, 3, 4].includes(Number(node.attrs.titleLevel))
-      ? Number(node.attrs.titleLevel)
-      : 2;
-    const titleTag = `h${validLevel}`;
+    const validLevel =
+      node.attrs.titleLevel === "paragraph"
+        ? "paragraph"
+        : [2, 3, 4].includes(Number(node.attrs.titleLevel))
+          ? Number(node.attrs.titleLevel)
+          : 2;
+    const titleTag = validLevel === "paragraph" ? "p" : `h${validLevel}`;
     return [
       "details",
       mergeAttributes(HTMLAttributes, {
@@ -153,7 +164,7 @@ export const OdDisclosure = Node.create({
         [
           titleTag,
           {
-            class: `od-editor-disclosure__heading od-editor-disclosure__heading--h${validLevel}`,
+            class: `od-editor-disclosure__heading od-editor-disclosure__heading--${validLevel === "paragraph" ? "paragraph" : `h${validLevel}`}`,
           },
           node.attrs.title || "Título del desplegable",
         ],
