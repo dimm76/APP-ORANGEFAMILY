@@ -23,6 +23,7 @@ class OrangePhotosSyncApplication : Application() {
     private var observedAccountUserId: String? = null
     private var registered = false
     private var networkCallbackRegistered = false
+    private val unmeteredNetworks = mutableSetOf<Network>()
     private val scheduleChange = Runnable {
         observedAccountUserId?.let(scheduler::scheduleMediaChangeSync)
     }
@@ -34,12 +35,30 @@ class OrangePhotosSyncApplication : Application() {
     }
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
-            if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) return
+            val isUnmetered = capabilities.hasCapability(
+                NetworkCapabilities.NET_CAPABILITY_NOT_METERED,
+            )
+            val becameAvailable = synchronized(unmeteredNetworks) {
+                val hadUnmeteredNetwork = unmeteredNetworks.isNotEmpty()
+                if (isUnmetered) {
+                    unmeteredNetworks.add(network)
+                } else {
+                    unmeteredNetworks.remove(network)
+                }
+                !hadUnmeteredNetwork && unmeteredNetworks.isNotEmpty()
+            }
+            if (!becameAvailable) return
             val accountUserId = observedAccountUserId ?: return
             scheduler.onUnmeteredNetworkAvailable(
                 accountUserId = accountUserId,
                 policy = policyStore.get(accountUserId),
             )
+        }
+
+        override fun onLost(network: Network) {
+            synchronized(unmeteredNetworks) {
+                unmeteredNetworks.remove(network)
+            }
         }
     }
 
