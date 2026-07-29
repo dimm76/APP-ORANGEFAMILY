@@ -7,13 +7,13 @@ export default function RichTextOdColumnsView({ node, editor }) {
   const columnLayout = resolveColumnLayout(columns, node.attrs.columnLayout);
 
   return (
-    <NodeViewWrapper
-      className={`od-editor-block ${buildOdRichColumnsClassName(columns, columnLayout)}`}
-      data-columns={String(columns)}
-      data-column-layout={columnLayout}
-    >
+    <NodeViewWrapper className="od-editor-block od-rich-columns-node-view">
       <RichTextBlockDragHandle editor={editor} label="Arrastrar bloque de columnas" />
-      <NodeViewContent />
+      <NodeViewContent
+        className={buildOdRichColumnsClassName(columns, columnLayout)}
+        data-columns={String(columns)}
+        data-column-layout={columnLayout}
+      />
     </NodeViewWrapper>
   );
 }

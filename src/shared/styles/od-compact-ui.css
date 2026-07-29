@@ -3625,6 +3625,10 @@ ion-button.od-rich-text-add-block-btn.is-active {
   min-width: 0;
 }
 
+.od-rich-columns[data-node-view-content] > [data-node-view-content-react] {
+  display: contents;
+}
+
 .od-rich-columns--2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
