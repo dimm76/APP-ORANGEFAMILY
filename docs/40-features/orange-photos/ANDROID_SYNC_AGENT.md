@@ -1,4 +1,6 @@
 # Agente Android de sincronización de Orange Photos
+> El resumen consolidado de la implementación web, backend y Android se mantiene
+> en [`IMPLEMENTATION_STATUS.md`](./IMPLEMENTATION_STATUS.md).
 
 ## Propósito
 
@@ -20,10 +22,10 @@ El agente no es, inicialmente, una versión móvil completa de OrangeFamily ni u
 
 ```text
 Android MediaStore
-  → inventario local persistente
-  → futura cola de sincronización
-  → futura ejecución mediante WorkManager
-  → API Node de OrangeFamily
+  → inventario local persistente en Room
+  → cola local de sincronización
+  → WorkManager
+  → API Node compartida de OrangeFamily
   → PostgreSQL y Wasabi
 
 Android nunca accede directamente a PostgreSQL ni a Wasabi.
@@ -157,7 +159,8 @@ qué elementos están pendientes;
 qué elementos no deben registrarse dos veces;
 desde qué punto comenzó la observación.
 
-La fuente de verdad oficial seguirá siendo PostgreSQL cuando se implemente la subida.
+PostgreSQL es la fuente de verdad oficial. Room actúa como inventario y memoria
+operativa local, pero no sustituye el registro remoto.
 
 La base local actual es:
 
@@ -189,18 +192,26 @@ duración para vídeos;
 fecha de detección;
 estado local.
 
-El único estado actual es:
+Estados locales implementados:
 
-pending
+- `discovered`;
+- `pending`;
+- `uploading`;
+- `uploaded`;
+- `failed`;
+- `suppressed`;
+- `restore_available`.
 
-Todavía no existen:
+El inventario también puede conservar:
 
-uploading;
-uploaded;
-failed;
-remotePhotoId;
-hash;
-intentos de subida.
+- checksum SHA-256;
+- identificador remoto;
+- estado remoto;
+- código de error;
+- fecha del último intento;
+- fecha de verificación;
+- sesión multipart;
+- partes multipart confirmadas.
 agent_configs
 
 Mantiene la configuración del agente por usuario:
@@ -238,6 +249,17 @@ análisis repetidos.
 Las inserciones utilizan una estrategia equivalente a:
 
 INSERT OR IGNORE
+Cuando el escáner automático encuentra un elemento ya registrado por el
+inventario manual con `local_status = discovered`, lo promociona
+transaccionalmente a `pending`.
+
+La promoción:
+
+- limpia `failure_code`;
+- actualiza `detected_at`;
+- cuenta como elemento importado;
+- no crea otro registro;
+- no modifica ningún otro estado.
 Primera activación
 
 Cuando un usuario activa el agente:
@@ -497,7 +519,7 @@ No se debe fusionar automáticamente contenido entre propietarios.
 
 Registro oficial remoto
 
-Cuando se implemente la subida:
+El flujo implementado es:
 
 PostgreSQL será el registro oficial;
 Wasabi conservará el archivo;
@@ -594,23 +616,41 @@ trazabilidad remota del origen y del ciclo de vida en `orange_photo_events`.
 
 Validado manualmente en dispositivo físico:
 
-el histórico previo no entra como pendiente;
-una foto nueva entra una sola vez;
-un segundo análisis no la duplica;
-el inventario persiste tras cerrar y abrir la app;
-un vídeo nuevo se registra correctamente;
-fotos y vídeos se contabilizan por separado.
+- el histórico previo no entra como pendiente;
+- una foto nueva entra una sola vez;
+- un segundo análisis no la duplica;
+- el inventario persiste tras cerrar y abrir la aplicación;
+- un vídeo nuevo se registra correctamente;
+- fotos y vídeos se contabilizan por separado;
+- la APK instalada coincide por SHA-256 con la release generada;
+- `versionCode = 3`;
+- `versionName = 1.1.0`;
+- un elemento previamente `discovered` se promociona a `pending`;
+- el modo económico detecta sin Wi-Fi y transfiere al conectarlo;
+- el modo intermedio permite subir fotografías mediante red móvil;
+- el modo extremo permite subir fotografías mediante red móvil;
+- un lote de fotografías y vídeo se procesa correctamente;
+- un vídeo de 865047797 bytes recibe `upload_mode = multipart`;
+- la subida multipart de ese vídeo finaliza correctamente;
+- la cola queda vacía después de completar;
+- los workers secundarios respetan el lock;
+- los avisos repetidos de una misma Wi-Fi no reprograman la cola.
+
+Pendiente de validación física específica:
+
+- interrumpir una subida multipart después de confirmar varias partes;
+- comprobar que la siguiente ejecución transmite únicamente las partes ausentes.
 
 Todavía no implementado:
 
-presencia actual del archivo en el móvil;
-eliminación local;
-sincronización bidireccional;
-importación histórica;
-registro remoto completo de dispositivos;
-agente de escritorio y verificación de discos;
-galería Android;
-telemetría de visualizaciones y accesos públicos.
+- sincronización bidireccional;
+- importación histórica automática;
+- registro remoto completo de dispositivos;
+- inventario coordinado entre varios dispositivos;
+- selección automática de carpetas adicionales para backup;
+- agente de escritorio y verificación de discos;
+- aplicación Android completa de OrangeFamily;
+- telemetría de visualizaciones y accesos públicos.
 
 La instalación se identifica localmente mediante un UUID aleatorio persistido en
 preferencias privadas y excluido de backup. Puede cambiar al desinstalar o borrar
@@ -687,8 +727,9 @@ nube confirmada sin exigir una reconciliación manual.
 
 El lock local de sincronización dura 30 minutos. Antes de adquirirlo, el worker
 recupera únicamente locks caducados, sin expiración o heredados cuya expiración
-supere ese máximo; un lock activo válido provoca un reintento de WorkManager. La
-cola mantiene pendientes y fallos reintentables, pero excluye fallos permanentes
+supere ese máximo; un lock activo válido hace que el worker secundario termine correctamente sin
+programar un reintento adicional. El worker que posee el lock continúa procesando
+la cola. La cola mantiene pendientes y fallos reintentables, pero excluye fallos permanentes
 sin bloquear elementos posteriores.
 
 La interfaz separa los estados locales `pending`, `uploading`, `failed` y
@@ -700,19 +741,47 @@ continúa siendo la fuente persistente. La cabecera permite consultar actividad,
 pendientes y resultados sin iniciar otra subida al tocar el indicador.
 
 La política de red se guarda por usuario en preferencias privadas y parte de
-`WIFI_ONLY`. El worker decide por archivo usando la capacidad Android
-`NET_CAPABILITY_NOT_METERED`; los elementos aplazados permanecen `pending` y se
-programa un trabajo único `UNMETERED`. En red medida, el modo intermedio admite
-hasta 800 MB y el extremo cualquier tamaño. Los errores inciertos y
-`DUPLICATE_FILE` se reconcilian por checksum antes de permitir otra transmisión.
+`WIFI_ONLY`.
+
+El worker decide por archivo utilizando
+`NET_CAPABILITY_NOT_METERED`.
+
+Políticas implementadas:
+
+- `WIFI_ONLY`: detecta y registra los archivos con cualquier red disponible, pero
+  mantiene la transferencia pendiente hasta una red no medida;
+- `MOBILE_UP_TO_800_MB`: permite transferir mediante red medida archivos de hasta
+  800 MB y aplaza los superiores hasta Wi-Fi;
+- `ANY_NETWORK`: permite cualquier tamaño admitido mediante cualquier red
+  conectada.
+
+Los archivos aplazados permanecen en `pending` y no se convierten en fallos.
+
+`ConnectivityManager.NetworkCallback` reactiva la cola cuando aparece una red no
+medida. La aplicación conserva un conjunto sincronizado de redes no medidas y
+solo agenda el trabajo cuando se pasa de cero redes disponibles a una o más.
+
+Los avisos repetidos sobre la misma Wi-Fi no vuelven a programar el worker.
+`onLost` elimina la red perdida y permite que una reconexión posterior reactive
+de nuevo la cola.
 
 El `ContentObserver` de imágenes y vídeos pertenece a `Application`, no a una
-`Activity`. Agrupa cambios durante 1,5 segundos y agenda el trabajo único
-`orange_photos_media_change_<userId>`. Cada ejecución del worker vuelve a leer
-MediaStore y registra los elementos detectados en Room antes de recuperar estados
-`uploading` y seleccionar el lote. Las acciones manuales convergen en
-`orange_photos_sync_<userId>`; la espera de Wi-Fi y el mantenimiento periódico
-usan nombres únicos separados para no multiplicar workers.
+`Activity`.
+
+Agrupa los cambios durante 1,5 segundos y agenda el trabajo único:
+
+```text
+orange_photos_media_change_<userId>
+Cada ejecución del worker vuelve a leer MediaStore y registra los elementos
+detectados en Room antes de recuperar estados interrumpidos y seleccionar el
+lote.
+
+Las acciones manuales utilizan el trabajo inmediato. La espera de Wi-Fi y el
+mantenimiento periódico utilizan nombres únicos separados.
+
+El lock Room evita que dos workers procesen simultáneamente la cola. Un worker
+secundario que encuentra un lock activo termina correctamente sin modificar
+estados ni solicitar otro reintento.
 
 Cuando Node devuelve `upload_mode=multipart`, Android usa la misma API reanudable
 que la web. Room 5 conserva el identificador remoto de sesión, la clave estable de
@@ -763,22 +832,6 @@ Estado de API y autenticación.
 Arquitectura de la API.
 Seguridad y protección de datos.
 Despliegue de producción.
-
-## Cuándo hacerlo
-
-Haz esta modificación **antes del commit del bloque de inventario**. Así el commit incluirá:
-
-- implementación Room;
-- permisos y detección;
-- decisiones de privacidad;
-- estado real del agente;
-- fases futuras.
-
-Después añade también el documento:
-
-```powershell
-git add docs/40-features/orange-photos/ANDROID_SYNC_AGENT.md
-```
 
 ## Desarrollo, firma y distribución de la APK
 

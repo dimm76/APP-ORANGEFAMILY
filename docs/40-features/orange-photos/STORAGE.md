@@ -1,5 +1,8 @@
 # Almacenamiento de OrangePhotos
 
+> El resumen consolidado de la implementación web, backend y Android se mantiene
+> en [`IMPLEMENTATION_STATUS.md`](./IMPLEMENTATION_STATUS.md).
+
 - Proveedor: Wasabi mediante el cliente S3 ya compartido por OrangeFamily.
 - Bucket conocido: `orangedesk` (la configuración efectiva procede del entorno backend).
 - Objetos legacy: `family_photos/...`; se leen sin mover, copiar ni renombrar.
@@ -103,15 +106,71 @@ presentes en Wasabi y transfiere únicamente las que faltan. Wake Lock se solici
 de forma opcional durante subidas de 1 GB o más, pero, igual que PWA y Background
 Sync, no garantiza la ejecución en segundo plano ni con el navegador cerrado.
 
-La futura aplicación Android utilizará la misma API multipart. Los endpoints de
-subida simple y `direct_backend` permanecen temporalmente por compatibilidad,
-pero OrangePhotos web ya no los selecciona.
+El agente Android utiliza actualmente la misma API multipart que la aplicación
+web.
+
+Cuando `POST /api/orange-photos/uploads/check` devuelve `multipart`, Android:
+
+- crea o recupera la sesión;
+- conserva su identificador y configuración en Room;
+- consulta las partes confirmadas por el servidor;
+- conserva los ETags válidos;
+- transfiere únicamente las partes ausentes;
+- completa el objeto;
+- limpia el estado multipart local después de la confirmación.
+
+Los endpoints `simple` y `direct_backend` permanecen por compatibilidad. Android
+los utiliza únicamente cuando Node devuelve expresamente esos modos.
 
 `POST /api/orange-photos/uploads/check` conserva la decisión centralizada en
 Node y devuelve directamente el modo calculado por los límites anteriores:
 `simple` hasta el umbral de vídeo simple y `multipart` cuando se supera. El modo
 `direct_backend` continúa disponible como endpoint compatible, pero no sustituye
 la decisión multipart del preflight.
+
+El contrato del preflight está validado para vídeo en el umbral configurado:
+
+- tamaño igual al límite simple: `upload_mode = simple`;
+- tamaño superior al límite simple: `upload_mode = multipart`.
+
+También se ha validado en producción que un vídeo de 865047797 bytes recibe
+`upload_mode = multipart` y completa correctamente la subida desde Android.
+
+### Comportamiento por cliente
+
+#### Aplicación web
+
+La web utiliza multipart directo para todos los originales nuevos.
+
+La cola se conserva en IndexedDB.
+
+Los archivos de hasta 100 MB pueden conservar su `File` o `Blob` cuando el
+navegador permite clonarlo. Para archivos mayores se conserva la sesión remota,
+pero después de cerrar o recargar puede ser necesario seleccionar nuevamente el
+mismo archivo.
+
+Las partes ya confirmadas no se retransmiten.
+
+#### Aplicación Android
+
+Android utiliza el modo devuelto por Node.
+
+- `simple`: transferencia simple mediante la API;
+- `direct_backend`: flujo compatible cuando Node lo devuelve;
+- `multipart`: transferencia reanudable por partes mediante la API compartida.
+
+Room conserva:
+
+- sesión remota;
+- clave estable de cliente;
+- tamaño de parte;
+- total de partes;
+- caducidad;
+- ETags confirmados.
+
+El servidor continúa siendo la fuente de verdad de las partes existentes.
+
+La decisión del modo de subida pertenece siempre a Node.
 
 ## Duplicados
 
@@ -149,6 +208,26 @@ como advertencias. El procesamiento aplazado y el reconciliador continúan usand
 el flujo existente de `processStoredOrangePhotoVideo()`.
 
 El propietario puede solicitar desde el visor **Generar miniatura** cuando un vídeo conserva su original pero no dispone de variante `poster`, y **Recrear miniatura** cuando ya existe. La recreación sustituye exclusivamente la variante `poster` de forma segura y transaccional: el original no se modifica, el póster anterior se conserva si la operación falla antes del commit y su objeto se elimina de Wasabi únicamente después del commit. Esta operación no permite sustituir las variantes `original`, `preview` ni `thumbnail`.
+
+### Reanudación Android
+
+Un error de red durante multipart no elimina automáticamente la sesión local ni
+las partes confirmadas.
+
+En una ejecución posterior, Android:
+
+1. consulta la sesión remota;
+2. obtiene las partes presentes;
+3. compara las partes remotas con Room;
+4. transfiere únicamente las ausentes;
+5. completa la sesión cuando están todas;
+6. limpia el estado multipart local después de la confirmación.
+
+Si la sesión ha expirado, ha desaparecido o no puede reutilizarse, Android limpia
+su referencia local y crea una nueva sesión siguiendo la decisión del backend.
+
+Un worker secundario que encuentra el lock local ocupado termina sin modificar
+la sesión multipart.
 
 ## Biblioteca, compartición y selección
 
