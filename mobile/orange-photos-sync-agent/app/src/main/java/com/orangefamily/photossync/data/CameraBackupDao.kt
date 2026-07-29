@@ -13,6 +13,9 @@ interface CameraBackupDao {
     @Query("SELECT * FROM agent_configs WHERE account_user_id = :accountUserId LIMIT 1")
     suspend fun getConfig(accountUserId: String): AgentConfig?
 
+    @Query("SELECT * FROM agent_configs WHERE account_user_id = :accountUserId LIMIT 1")
+    fun observeConfig(accountUserId: String): Flow<AgentConfig?>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveConfig(config: AgentConfig)
 
@@ -66,6 +69,9 @@ interface CameraBackupDao {
     )
     suspend fun getPendingCounts(accountUserId: String): PendingCounts
 
+    @Query("SELECT COALESCE(SUM(CASE WHEN media_type='image' THEN 1 ELSE 0 END),0) AS image_count, COALESCE(SUM(CASE WHEN media_type='video' THEN 1 ELSE 0 END),0) AS video_count FROM local_media_items WHERE account_user_id=:accountUserId AND local_status='pending'")
+    fun observePendingCounts(accountUserId: String): Flow<PendingCounts>
+
     @Query(
         """
         SELECT * FROM local_media_items
@@ -76,10 +82,28 @@ interface CameraBackupDao {
     )
     suspend fun getLatestPending(accountUserId: String, limit: Int = 10): List<LocalMediaItem>
 
+    @Query("SELECT * FROM local_media_items WHERE account_user_id=:accountUserId AND local_status='pending' ORDER BY detected_at DESC,id DESC LIMIT :limit")
+    fun observeLatestPending(accountUserId: String, limit: Int = 10): Flow<List<LocalMediaItem>>
+
     @Query("SELECT * FROM local_media_items WHERE account_user_id = :accountUserId AND local_status = 'failed' ORDER BY last_attempt_at DESC, id DESC LIMIT :limit")
     suspend fun getLatestFailed(accountUserId: String, limit: Int = 10): List<LocalMediaItem>
 
-    @Query("SELECT * FROM local_media_items WHERE account_user_id = :accountUserId AND local_status IN ('pending', 'failed') ORDER BY detected_at ASC, id ASC LIMIT :limit")
+    @Query("""
+        SELECT * FROM local_media_items
+        WHERE account_user_id = :accountUserId
+          AND (
+            local_status = 'pending'
+            OR (
+              local_status = 'failed'
+              AND (
+                failure_code IS NULL
+                OR failure_code NOT IN ('LOCAL_FILE_UNAVAILABLE', 'INVALID_METADATA', 'UNSUPPORTED_FILE_TYPE', 'FILE_TOO_LARGE', 'UNSUPPORTED_MULTIPART', 'UPLOAD_SUPPRESSED', 'LARGE_UPLOAD_INTERRUPTED', 'DUPLICATE_RECONCILIATION_REQUIRED')
+              )
+            )
+          )
+        ORDER BY detected_at ASC, id ASC
+        LIMIT :limit
+    """)
     suspend fun getSyncBatch(accountUserId: String, limit: Int): List<LocalMediaItem>
 
     @Query("UPDATE local_media_items SET checksum_sha256 = :checksum WHERE id = :id AND account_user_id = :accountUserId")
@@ -103,11 +127,51 @@ interface CameraBackupDao {
     @Query("SELECT COALESCE(SUM(CASE WHEN local_status IN ('pending', 'uploading') THEN 1 ELSE 0 END), 0) AS pending, COALESCE(SUM(CASE WHEN local_status = 'failed' THEN 1 ELSE 0 END), 0) AS failed, COALESCE(SUM(CASE WHEN local_status = 'uploaded' THEN 1 ELSE 0 END), 0) AS uploaded, COALESCE(SUM(CASE WHEN local_status = 'suppressed' THEN 1 ELSE 0 END), 0) AS suppressed, COALESCE(SUM(CASE WHEN local_status = 'restore_available' THEN 1 ELSE 0 END), 0) AS restore_available FROM local_media_items WHERE account_user_id = :accountUserId")
     suspend fun getSyncCounts(accountUserId: String): SyncCounts
 
+    @Query("SELECT COALESCE(SUM(CASE WHEN local_status IN ('pending','uploading') THEN 1 ELSE 0 END),0) AS pending, COALESCE(SUM(CASE WHEN local_status='failed' THEN 1 ELSE 0 END),0) AS failed, COALESCE(SUM(CASE WHEN local_status='uploaded' THEN 1 ELSE 0 END),0) AS uploaded, COALESCE(SUM(CASE WHEN local_status='suppressed' THEN 1 ELSE 0 END),0) AS suppressed, COALESCE(SUM(CASE WHEN local_status='restore_available' THEN 1 ELSE 0 END),0) AS restore_available FROM local_media_items WHERE account_user_id=:accountUserId")
+    fun observeSyncCounts(accountUserId: String): Flow<SyncCounts>
+
+    @Query("SELECT COALESCE(SUM(CASE WHEN local_status='pending' THEN 1 ELSE 0 END),0) AS pending, COALESCE(SUM(CASE WHEN local_status='uploading' THEN 1 ELSE 0 END),0) AS uploading, COALESCE(SUM(CASE WHEN local_status='failed' THEN 1 ELSE 0 END),0) AS failed FROM local_media_items WHERE account_user_id=:accountUserId")
+    fun observeUploadHeaderCounts(accountUserId: String): Flow<UploadHeaderCounts>
+
     @Query("UPDATE agent_configs SET sync_lock_token = :token, sync_lock_expires_at = :expiresAt WHERE account_user_id = :accountUserId AND enabled = 1 AND (sync_lock_token IS NULL OR sync_lock_expires_at IS NULL OR sync_lock_expires_at <= :now)")
     suspend fun tryAcquireSyncLock(accountUserId: String, token: String, now: Long, expiresAt: Long): Int
 
+    @Query("""
+        UPDATE agent_configs
+        SET sync_lock_token = NULL, sync_lock_expires_at = NULL
+        WHERE account_user_id = :accountUserId
+          AND sync_lock_token IS NOT NULL
+          AND (
+            sync_lock_expires_at IS NULL
+            OR sync_lock_expires_at <= :now
+            OR sync_lock_expires_at > :maximumAllowedExpiry
+          )
+    """)
+    suspend fun recoverAbandonedSyncLock(accountUserId: String, now: Long, maximumAllowedExpiry: Long): Int
+
     @Query("UPDATE agent_configs SET sync_lock_token = NULL, sync_lock_expires_at = NULL WHERE account_user_id = :accountUserId AND sync_lock_token = :token")
     suspend fun releaseSyncLock(accountUserId: String, token: String)
+
+    @Query("UPDATE agent_configs SET sync_lock_expires_at=:expiresAt WHERE account_user_id=:accountUserId AND sync_lock_token=:token")
+    suspend fun refreshSyncLock(accountUserId: String, token: String, expiresAt: Long): Int
+
+    @Query("SELECT * FROM multipart_upload_sessions WHERE local_media_item_id=:localMediaItemId LIMIT 1")
+    suspend fun getMultipartSession(localMediaItemId: Long): MultipartUploadSession?
+
+    @Upsert
+    suspend fun saveMultipartSession(session: MultipartUploadSession)
+
+    @Query("SELECT * FROM multipart_upload_parts WHERE local_media_item_id=:localMediaItemId ORDER BY part_number")
+    suspend fun getMultipartParts(localMediaItemId: Long): List<MultipartUploadPart>
+
+    @Upsert
+    suspend fun saveMultipartPart(part: MultipartUploadPart)
+
+    @Query("DELETE FROM multipart_upload_parts WHERE local_media_item_id=:localMediaItemId")
+    suspend fun deleteMultipartParts(localMediaItemId: Long)
+
+    @Query("DELETE FROM multipart_upload_sessions WHERE local_media_item_id=:localMediaItemId")
+    suspend fun deleteMultipartSession(localMediaItemId: Long)
 }
 
 data class SyncCounts(
@@ -117,3 +181,5 @@ data class SyncCounts(
     val suppressed: Int,
     @ColumnInfo(name = "restore_available") val restoreAvailable: Int,
 )
+
+data class UploadHeaderCounts(val pending:Int,val uploading:Int,val failed:Int)

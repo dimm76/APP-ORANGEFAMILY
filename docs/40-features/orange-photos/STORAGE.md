@@ -107,6 +107,12 @@ La futura aplicación Android utilizará la misma API multipart. Los endpoints d
 subida simple y `direct_backend` permanecen temporalmente por compatibilidad,
 pero OrangePhotos web ya no los selecciona.
 
+`POST /api/orange-photos/uploads/check` conserva la decisión centralizada en
+Node y devuelve directamente el modo calculado por los límites anteriores:
+`simple` hasta el umbral de vídeo simple y `multipart` cuando se supera. El modo
+`direct_backend` continúa disponible como endpoint compatible, pero no sustituye
+la decisión multipart del preflight.
+
 ## Duplicados
 
 Antes de subir se busca una posible coincidencia por nombre normalizado y tamaño

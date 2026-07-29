@@ -16,9 +16,13 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.RadioButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -31,6 +35,8 @@ import com.orangefamily.photossync.data.LocalMediaItem
 import com.orangefamily.photossync.data.CameraBackupRepository
 import com.orangefamily.photossync.data.OrangePhotosLocalDatabase
 import com.orangefamily.photossync.media.MediaPermissionAccess
+import com.orangefamily.photossync.sync.UploadNetworkPolicy
+import com.orangefamily.photossync.sync.UploadNetworkPolicyStore
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
@@ -46,6 +52,7 @@ fun StatusScreen(
     onActivate: () -> Unit,
     onScan: () -> Unit,
     onLogout: () -> Unit,
+    onNetworkPolicyChanged:(UploadNetworkPolicy)->Unit,
     modifier: Modifier = Modifier,
 ) {
     val family = user.families.firstOrNull()
@@ -92,6 +99,8 @@ fun StatusScreen(
             onScan = onScan,
         )
 
+        NetworkPolicyCard(user.id,onNetworkPolicyChanged)
+
         Button(onClick = onLogout, enabled = !loggingOut) {
             Text(
                 stringResource(if (loggingOut) R.string.logout_loading else R.string.logout_action),
@@ -99,6 +108,10 @@ fun StatusScreen(
         }
     }
 }
+
+@Composable private fun NetworkPolicyCard(accountUserId:String,onChanged:(UploadNetworkPolicy)->Unit){val context=LocalContext.current;val store=remember{UploadNetworkPolicyStore(context)};var selected by remember(accountUserId){mutableStateOf(store.get(accountUserId))};Card(Modifier.fillMaxWidth()){Column(Modifier.padding(24.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text(stringResource(R.string.network_usage_title),style=MaterialTheme.typography.titleLarge);NetworkPolicyOption(UploadNetworkPolicy.WIFI_ONLY,selected,R.string.network_wifi_only,R.string.network_wifi_only_detail){selected=it;store.set(accountUserId,it);onChanged(it)};NetworkPolicyOption(UploadNetworkPolicy.MOBILE_UP_TO_800_MB,selected,R.string.network_mobile_800,R.string.network_mobile_800_detail){selected=it;store.set(accountUserId,it);onChanged(it)};NetworkPolicyOption(UploadNetworkPolicy.ANY_NETWORK,selected,R.string.network_any,R.string.network_any_detail){selected=it;store.set(accountUserId,it);onChanged(it)};if(selected==UploadNetworkPolicy.ANY_NETWORK)Text(stringResource(R.string.network_any_warning),color=MaterialTheme.colorScheme.error)}}}
+
+@Composable private fun NetworkPolicyOption(value:UploadNetworkPolicy,selected:UploadNetworkPolicy,title:Int,detail:Int,onSelect:(UploadNetworkPolicy)->Unit){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){RadioButton(selected=value==selected,onClick={onSelect(value)});Column{Text(stringResource(title),style=MaterialTheme.typography.labelLarge);Text(stringResource(detail),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}}}
 
 @Composable
 private fun CameraBackupCard(

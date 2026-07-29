@@ -685,6 +685,44 @@ campos `local_status`, `cloud_status=backed_up`, `remotePhotoId`, checksum y fec
 de verificación. El Flow observado por la cuadrícula refleja inmediatamente la
 nube confirmada sin exigir una reconciliación manual.
 
+El lock local de sincronización dura 30 minutos. Antes de adquirirlo, el worker
+recupera únicamente locks caducados, sin expiración o heredados cuya expiración
+supere ese máximo; un lock activo válido provoca un reintento de WorkManager. La
+cola mantiene pendientes y fallos reintentables, pero excluye fallos permanentes
+sin bloquear elementos posteriores.
+
+La interfaz separa los estados locales `pending`, `uploading`, `failed` y
+`uploaded`. Los fallos permanentes no se reintentan automáticamente, pero el
+usuario puede seleccionarlos y devolverlos explícitamente a `pending`, limpiando
+su código de fallo. El progreso de la ejecución activa se mantiene únicamente en
+memoria mediante `StateFlow` y muestra los bytes enviados por el stream HTTP; Room
+continúa siendo la fuente persistente. La cabecera permite consultar actividad,
+pendientes y resultados sin iniciar otra subida al tocar el indicador.
+
+La política de red se guarda por usuario en preferencias privadas y parte de
+`WIFI_ONLY`. El worker decide por archivo usando la capacidad Android
+`NET_CAPABILITY_NOT_METERED`; los elementos aplazados permanecen `pending` y se
+programa un trabajo único `UNMETERED`. En red medida, el modo intermedio admite
+hasta 800 MB y el extremo cualquier tamaño. Los errores inciertos y
+`DUPLICATE_FILE` se reconcilian por checksum antes de permitir otra transmisión.
+
+El `ContentObserver` de imágenes y vídeos pertenece a `Application`, no a una
+`Activity`. Agrupa cambios durante 1,5 segundos y agenda el trabajo único
+`orange_photos_media_change_<userId>`. Cada ejecución del worker vuelve a leer
+MediaStore y registra los elementos detectados en Room antes de recuperar estados
+`uploading` y seleccionar el lote. Las acciones manuales convergen en
+`orange_photos_sync_<userId>`; la espera de Wi-Fi y el mantenimiento periódico
+usan nombres únicos separados para no multiplicar workers.
+
+Cuando Node devuelve `upload_mode=multipart`, Android usa la misma API reanudable
+que la web. Room 5 conserva el identificador remoto de sesión, la clave estable de
+cliente, tamaño y total de partes, caducidad y cada ETag confirmado. Al reanudar,
+el servidor vuelve a ser la fuente de verdad de las partes presentes y el agente
+transfiere únicamente las ausentes. La migración 4→5 crea estas tablas sin borrar
+el inventario, la configuración ni la cola existentes. `simple` y
+`direct_backend` siguen implementados por compatibilidad y solo se usan cuando
+Node devuelve expresamente esos modos.
+
 La carpeta usa una cuadrícula con miniaturas solicitadas a `ContentResolver`,
 carga incremental en páginas de 200 y estados observados desde Room. El estado
 remoto caduca a las 24 horas y puede renovarse con «Verificar». «Todo» selecciona
@@ -870,8 +908,8 @@ Actualizaciones futuras:
 Ejemplo:
 
 ```kotlin
-versionCode = 2
-versionName = "1.1"
+versionCode = 3
+versionName = "1.1.0"
 ```
 
 ### Pruebas habituales con Android Studio

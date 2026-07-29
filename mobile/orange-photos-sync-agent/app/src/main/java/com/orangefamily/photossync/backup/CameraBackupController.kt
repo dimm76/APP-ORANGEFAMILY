@@ -13,8 +13,8 @@ import com.orangefamily.photossync.media.MediaPermissionAccess
 import com.orangefamily.photossync.sync.OrangePhotosSyncScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -27,7 +27,7 @@ class CameraBackupController(
         private set
 
     private var accountUserId: String? = null
-    private var mediaStoreDebounceJob: Job? = null
+    private var observationJob: Job? = null
 
     fun load(scope: CoroutineScope, userId: String, permission: MediaPermissionAccess) {
         accountUserId = userId
@@ -36,6 +36,21 @@ class CameraBackupController(
             permission = permission,
             loading = true,
         )
+        observationJob?.cancel()
+        observationJob = scope.launch {
+            combine(
+                repository.observeConfig(userId),
+                repository.observePendingCounts(userId),
+                repository.observeLatestPending(userId),
+                repository.observeSyncCounts(userId),
+            ) { config, counts, latest, syncCounts ->
+                CameraBackupState(userId, permission, config, counts, latest, syncCounts)
+            }.collect { live ->
+                if (accountUserId == userId) {
+                    state = live.copy(permission = state.permission, busy = state.busy, error = state.error)
+                }
+            }
+        }
         scope.launch {
             val snapshot = withContext(Dispatchers.IO) { repository.snapshot(userId) }
             if (accountUserId != userId) return@launch
@@ -46,7 +61,7 @@ class CameraBackupController(
                 syncCounts = snapshot.syncCounts,
                 loading = false,
             )
-            if (snapshot.config?.enabled == true) scheduler.ensurePeriodic(userId)
+            if (snapshot.config?.enabled == true) scheduler.schedulePeriodicSync(userId)
         }
     }
 
@@ -69,8 +84,8 @@ class CameraBackupController(
             if (outcome.isFailure) {
                 state = state.copy(busy = false, error = SCAN_ERROR)
             } else {
-                scheduler.ensurePeriodic(userId)
-                scheduler.enqueueNow(userId)
+                scheduler.schedulePeriodicSync(userId)
+                scheduler.scheduleImmediateSync(userId)
                 refresh(userId)
             }
         }
@@ -82,44 +97,14 @@ class CameraBackupController(
         if (!config.enabled || state.permission != MediaPermissionAccess.FULL || state.busy) return
         state = state.copy(busy = true, error = null)
         scope.launch {
-            val outcome = runCatching { scheduler.enqueueNow(userId) }
+            val outcome = runCatching { scheduler.scheduleImmediateSync(userId) }
             if (accountUserId != userId) return@launch
             if (outcome.isFailure) {
                 state = state.copy(busy = false, error = SCAN_ERROR)
             } else {
-                delay(1_500)
                 refresh(userId)
             }
         }
-    }
-
-    fun onMediaStoreChanged(scope: CoroutineScope) {
-        val userId = accountUserId ?: return
-        if (state.config?.enabled != true || state.permission != MediaPermissionAccess.FULL) return
-        mediaStoreDebounceJob?.cancel()
-        mediaStoreDebounceJob = scope.launch {
-            delay(MEDIA_STORE_DEBOUNCE_MS)
-            if (accountUserId != userId || state.config?.enabled != true || state.permission != MediaPermissionAccess.FULL) return@launch
-            val outcome = withContext(Dispatchers.IO) {
-                runCatching {
-                    val snapshot = repository.snapshot(userId)
-                    val result = scanner.scan(userId, snapshot.baselines)
-                    repository.recordScan(userId, result, System.currentTimeMillis())
-                }
-            }
-            if (accountUserId != userId) return@launch
-            if (outcome.isSuccess) {
-                scheduler.enqueueNow(userId)
-                refresh(userId)
-            } else {
-                state = state.copy(error = SCAN_ERROR)
-            }
-        }
-    }
-
-    fun cancelMediaStoreChanges() {
-        mediaStoreDebounceJob?.cancel()
-        mediaStoreDebounceJob = null
     }
 
     private suspend fun refresh(userId: String) {
@@ -149,7 +134,6 @@ class CameraBackupController(
     )
 
     private companion object {
-        const val MEDIA_STORE_DEBOUNCE_MS = 1_500L
         const val SCAN_ERROR = "No se pudo analizar la carpeta Cámara. Revisa el acceso e inténtalo de nuevo."
     }
 }

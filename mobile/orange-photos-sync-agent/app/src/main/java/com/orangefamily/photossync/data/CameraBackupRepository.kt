@@ -27,14 +27,14 @@ class CameraBackupRepository(
         }
     }
 
-    suspend fun recordScan(accountUserId: String, result: MediaScanResult, scannedAt: Long) {
+    suspend fun recordScan(accountUserId: String, result: MediaScanResult, scannedAt: Long): Int =
         database.withTransaction {
             val config = dao.getConfig(accountUserId)
                 ?: error("El agente no está activado para esta cuenta.")
             check(config.enabled)
             val image = result.baseline.maximum(LocalMediaItem.TYPE_IMAGE)
             val video = result.baseline.maximum(LocalMediaItem.TYPE_VIDEO)
-            dao.insertPending(result.items)
+            val inserted = dao.insertPending(result.items).count { it != -1L }
             dao.saveBaselines(result.baseline.baselines)
             dao.saveConfig(
                 config.copy(
@@ -45,8 +45,8 @@ class CameraBackupRepository(
                     lastScanAt = scannedAt,
                 ),
             )
+            inserted
         }
-    }
 
     suspend fun snapshot(accountUserId: String): LocalInventorySnapshot = LocalInventorySnapshot(
         config = dao.getConfig(accountUserId),
@@ -57,18 +57,33 @@ class CameraBackupRepository(
     )
 
     suspend fun config(accountUserId: String) = dao.getConfig(accountUserId)
+    fun observeConfig(accountUserId: String) = dao.observeConfig(accountUserId)
+    fun observePendingCounts(accountUserId: String) = dao.observePendingCounts(accountUserId)
+    fun observeLatestPending(accountUserId: String) = dao.observeLatestPending(accountUserId)
+    fun observeSyncCounts(accountUserId: String) = dao.observeSyncCounts(accountUserId)
     suspend fun baselines(accountUserId: String) = dao.getBaselines(accountUserId)
     suspend fun recoverUploading(accountUserId: String) = dao.recoverUploading(accountUserId)
     suspend fun syncBatch(accountUserId: String, limit: Int) = dao.getSyncBatch(accountUserId, limit)
     suspend fun latestFailed(accountUserId: String, limit: Int = 10) = dao.getLatestFailed(accountUserId, limit)
     suspend fun syncCounts(accountUserId: String) = dao.getSyncCounts(accountUserId)
+    fun observeUploadHeaderCounts(accountUserId: String) = dao.observeUploadHeaderCounts(accountUserId)
     suspend fun updateChecksum(accountUserId: String, id: Long, checksum: String) = dao.updateChecksum(accountUserId, id, checksum)
     suspend fun markAttempt(accountUserId: String, id: Long, status: String, at: Long, code: String?) = dao.markAttempt(accountUserId, id, status, at, code)
     suspend fun markUploaded(accountUserId: String, id: Long, remoteId: String, checksum: String, at: Long) = dao.markUploaded(accountUserId, id, remoteId, checksum, at)
     suspend fun markSuppressed(accountUserId: String, id: Long, checksum: String, at: Long) = dao.markSuppressed(accountUserId, id, checksum, at)
     suspend fun markRestoreAvailable(accountUserId: String, id: Long, remoteId: String, checksum: String, at: Long) = dao.markRestoreAvailable(accountUserId, id, remoteId, checksum, at)
     suspend fun tryAcquireSyncLock(accountUserId: String, token: String, now: Long, expiresAt: Long) = dao.tryAcquireSyncLock(accountUserId, token, now, expiresAt) == 1
+    suspend fun recoverAbandonedSyncLock(accountUserId: String, now: Long, maximumAllowedExpiry: Long) = dao.recoverAbandonedSyncLock(accountUserId, now, maximumAllowedExpiry)
     suspend fun releaseSyncLock(accountUserId: String, token: String) = dao.releaseSyncLock(accountUserId, token)
+    suspend fun refreshSyncLock(accountUserId: String, token: String, expiresAt: Long) = dao.refreshSyncLock(accountUserId, token, expiresAt) == 1
+    suspend fun multipartSession(localMediaItemId: Long) = dao.getMultipartSession(localMediaItemId)
+    suspend fun multipartParts(localMediaItemId: Long) = dao.getMultipartParts(localMediaItemId)
+    suspend fun saveMultipartSession(session: MultipartUploadSession) = dao.saveMultipartSession(session)
+    suspend fun saveMultipartPart(part: MultipartUploadPart) = dao.saveMultipartPart(part)
+    suspend fun clearMultipart(localMediaItemId: Long) = database.withTransaction {
+        dao.deleteMultipartParts(localMediaItemId)
+        dao.deleteMultipartSession(localMediaItemId)
+    }
     fun observeBucketItems(accountUserId: String, bucketId: String) = dao.observeBucketItems(accountUserId, bucketId)
     suspend fun bucketItems(accountUserId: String, bucketId: String) = dao.getBucketItems(accountUserId, bucketId)
     suspend fun findMediaItem(accountUserId: String, collection: String, mediaType: String, mediaStoreId: Long) = dao.findMediaItem(accountUserId, collection, mediaType, mediaStoreId)

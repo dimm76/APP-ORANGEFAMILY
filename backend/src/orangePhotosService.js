@@ -108,7 +108,7 @@ async function checkUpload(req, body = {}) {
   const filename=normalizeDuplicateFilename(body.original_filename), size=Number(body.size_bytes), mime=String(body.mime_type||"").toLowerCase();
   if(!filename)return bad(400,"INVALID_METADATA","Nombre original obligatorio.");
   const mode=uploadModeFor(mime,size); if(!mode.ok)return mode;
-  const uploadMode=mode.payload.upload_mode==="multipart"?"direct_backend":mode.payload.upload_mode;
+  const uploadMode=mode.payload.upload_mode;
   const limits={max_image_bytes:MAX_IMAGE_BYTES,simple_video_max_bytes:SIMPLE_VIDEO_MAX_BYTES,max_video_bytes:MAX_VIDEO_BYTES,multipart_part_bytes:MULTIPART_PART_BYTES};
   if(Object.prototype.hasOwnProperty.call(body,"checksum_sha256")){
     const checksum=String(body.checksum_sha256||"").trim().toLowerCase();

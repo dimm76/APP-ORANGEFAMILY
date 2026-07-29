@@ -4,11 +4,8 @@ import android.content.Intent
 import android.app.Activity
 import android.Manifest
 import android.content.pm.PackageManager
-import android.database.ContentObserver
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.provider.MediaStore
 import android.provider.Settings
 import android.os.Build
@@ -56,6 +53,7 @@ import com.orangefamily.photossync.device.DeviceMediaHashService
 import com.orangefamily.photossync.device.DeviceMediaThumbnailLoader
 import com.orangefamily.photossync.device.InstallationIdStore
 import com.orangefamily.photossync.sync.OrangePhotosSyncApi
+import com.orangefamily.photossync.sync.UploadNetworkPolicy
 import com.orangefamily.photossync.ui.device.DeviceMediaScreen
 import com.orangefamily.photossync.ui.device.DeviceTrashScreen
 import android.content.ActivityNotFoundException
@@ -79,14 +77,6 @@ class MainActivity : ComponentActivity() {
     private var pendingDeleteItems: List<LocalMediaItem> = emptyList()
     private var pendingMediaOperation: MediaOperation? = null
     private var mediaRefreshVersion by mutableStateOf(0)
-    private var mediaObserverRegistered = false
-    private val mediaObserver by lazy {
-        object : ContentObserver(Handler(Looper.getMainLooper())) {
-            override fun onChange(selfChange: Boolean) {
-                cameraBackupController.onMediaStoreChanged(lifecycleScope)
-            }
-        }
-    }
     private var mediaPermissionAccess by mutableStateOf(MediaPermissionAccess.NOT_REQUESTED)
     private val mediaPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -140,7 +130,7 @@ class MainActivity : ComponentActivity() {
                             authController.login(lifecycleScope, email, password)
                         },
                         onLogout = {
-                            stopMediaObservation()
+                            (application as OrangePhotosSyncApplication).configureMediaObservation(null)
                             authController.logout(lifecycleScope)
                         },
                         onMediaObservationChanged = ::updateMediaObservation,
@@ -162,6 +152,8 @@ class MainActivity : ComponentActivity() {
                         thumbnailLoader = thumbnailLoader,
                         onOpenMedia = ::openMedia,
                         onUploadMedia = ::enqueueMedia,
+                        onSyncNow = scheduler::scheduleImmediateSync,
+                        onNetworkPolicyChanged = scheduler::rescheduleForPolicy,
                         onDeleteMedia = ::deleteMedia,
                         onRestoreMedia = ::restoreMedia,
                         onDeleteForever = ::deleteForever,
@@ -185,7 +177,7 @@ class MainActivity : ComponentActivity() {
         if (items.isEmpty()) return
         lifecycleScope.launch(Dispatchers.IO) {
             repository.enqueueDeviceMedia(items, forceDuplicate)
-            scheduler.enqueueNow(items.first().accountUserId)
+            scheduler.scheduleImmediateSync(items.first().accountUserId)
         }
     }
 
@@ -212,11 +204,6 @@ class MainActivity : ComponentActivity() {
         if (::cameraBackupController.isInitialized) refreshMediaPermission()
     }
 
-    override fun onDestroy() {
-        stopMediaObservation()
-        super.onDestroy()
-    }
-
     private fun refreshMediaPermission() {
         mediaPermissionAccess = MediaPermissions.evaluate(this)
         if (::cameraBackupController.isInitialized) {
@@ -225,29 +212,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun updateMediaObservation(enabled: Boolean) {
-        if (enabled == mediaObserverRegistered) return
-        if (enabled) {
-            contentResolver.registerContentObserver(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                true,
-                mediaObserver,
-            )
-            contentResolver.registerContentObserver(
-                MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                true,
-                mediaObserver,
-            )
-            mediaObserverRegistered = true
-        } else {
-            stopMediaObservation()
-        }
-    }
-
-    private fun stopMediaObservation() {
-        cameraBackupController.cancelMediaStoreChanges()
-        if (!mediaObserverRegistered) return
-        contentResolver.unregisterContentObserver(mediaObserver)
-        mediaObserverRegistered = false
+        val userId = (authController.state as? AuthController.AuthState.Authenticated)?.user?.id
+        (application as OrangePhotosSyncApplication).configureMediaObservation(userId.takeIf { enabled })
     }
 }
 
@@ -268,6 +234,8 @@ private fun AuthContent(
     thumbnailLoader: DeviceMediaThumbnailLoader,
     onOpenMedia: (LocalMediaItem) -> Unit,
     onUploadMedia: (List<LocalMediaItem>, Boolean) -> Unit,
+    onSyncNow: (String) -> Unit,
+    onNetworkPolicyChanged:(String,UploadNetworkPolicy)->Unit,
     onDeleteMedia: (List<LocalMediaItem>) -> Unit,
     onRestoreMedia: (List<LocalMediaItem>) -> Unit,
     onDeleteForever: (List<LocalMediaItem>) -> Unit,
@@ -320,6 +288,7 @@ private fun AuthContent(
                     onTrash={screen=AgentScreen.TRASH},
                     onOpen=onOpenMedia,
                     onUpload=onUploadMedia,
+                    onSyncNow={onSyncNow(state.user.id)},
                     onDelete=onDeleteMedia,
                     refreshVersion=mediaRefreshVersion,
                     modifier=modifier,
@@ -341,6 +310,7 @@ private fun AuthContent(
                 onActivate = { cameraBackupController.activate(scope) },
                 onScan = { cameraBackupController.syncNow(scope) },
                 onLogout = onLogout,
+                onNetworkPolicyChanged={onNetworkPolicyChanged(state.user.id,it)},
                 modifier = modifier.padding(settingsPadding),
             ) }
         }
