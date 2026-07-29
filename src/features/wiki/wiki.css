@@ -116,6 +116,37 @@
   cursor: grabbing;
 }
 
+.od-wiki-tree__expand,
+.od-wiki-tree__expand-placeholder {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 28px;
+}
+
+.od-wiki-tree__expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.od-wiki-tree__expand ion-icon {
+  font-size: 13px;
+  transition: transform 140ms ease;
+}
+
+.od-wiki-tree__expand.is-expanded ion-icon {
+  transform: rotate(90deg);
+}
+
+.od-wiki-tree__expand:hover {
+  color: var(--od-color-primary, #fc4200);
+}
+
 .od-wiki-tree__row.is-dragging {
   opacity: 0.55;
 }

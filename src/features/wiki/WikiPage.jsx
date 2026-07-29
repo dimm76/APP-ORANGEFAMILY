@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { IonButton, IonContent, IonIcon, IonItem, IonList, IonPopover } from "@ionic/react";
+import { chevronForwardOutline } from "ionicons/icons";
 import WikiTiptapEditor from "../../shared/components/WikiTiptapEditor.jsx";
 import ODFilterSelect from "../../shared/components/ODFilterSelect.jsx";
 import { OD_ICONS } from "../../shared/ui/odIcons.js";
@@ -236,6 +237,15 @@ function buildTreeNodes(flat) {
   return roots;
 }
 
+function collectAncestorIds(nodes, targetId, ancestors = []) {
+  for (const node of nodes || []) {
+    if (node.id === targetId) return ancestors;
+    const found = collectAncestorIds(node.children, targetId, [...ancestors, node.id]);
+    if (found) return found;
+  }
+  return null;
+}
+
 function collectSubtreeIds(flat, rootId) {
   const root = String(rootId ?? "").trim();
   if (!root) return new Set();
@@ -379,6 +389,7 @@ function WikiDocumentSidebarContent({
   publicMode = false,
   readOnly = false,
 }) {
+  const [expandedPageIds, setExpandedPageIds] = useState(() => new Set());
   const treeMenusDisabled =
     publicMode || readOnly || Boolean(documentRoot?.is_archived || detail?.is_archived);
   const canDragTree =
@@ -386,6 +397,26 @@ function WikiDocumentSidebarContent({
     !publicMode &&
     !readOnly &&
     !(documentRoot?.is_archived || detail?.is_archived);
+
+  useEffect(() => {
+    const ancestors = collectAncestorIds(treeRoots, pageId);
+    if (!ancestors?.length) return;
+
+    setExpandedPageIds((current) => {
+      const next = new Set(current);
+      ancestors.forEach((id) => next.add(id));
+      return next;
+    });
+  }, [treeRoots, pageId]);
+
+  function togglePageExpanded(pageIdToToggle) {
+    setExpandedPageIds((current) => {
+      const next = new Set(current);
+      if (next.has(pageIdToToggle)) next.delete(pageIdToToggle);
+      else next.add(pageIdToToggle);
+      return next;
+    });
+  }
 
   return (
     <>
@@ -434,6 +465,8 @@ function WikiDocumentSidebarContent({
                   depth={0}
                   selectedId={pageId}
                   onPick={onPickPage}
+                  expandedPageIds={expandedPageIds}
+                  onToggleExpanded={togglePageExpanded}
                   menusDisabled={treeMenusDisabled}
                   dragEnabled={canDragTree}
                   dragState={dragState}
@@ -455,6 +488,8 @@ function WikiDocumentSidebarContent({
                   depth={0}
                   selectedId={pageId}
                   onPick={onPickPage}
+                  expandedPageIds={expandedPageIds}
+                  onToggleExpanded={togglePageExpanded}
                   menusDisabled={treeMenusDisabled}
                   onCreateSubpageFor={onCreateSubpageFor}
                   onRenamePage={onRenamePage}
@@ -491,6 +526,8 @@ function WikiTree({
   depth,
   selectedId,
   onPick,
+  expandedPageIds,
+  onToggleExpanded,
   menusDisabled,
   onCreateSubpageFor,
   onRenamePage,
@@ -510,6 +547,8 @@ function WikiTree({
         const depthClass = `od-wiki-tree__btn--depth-${Math.min(depth, 6)}`;
         const menuId = `od-wiki-page-menu-${n.id}`;
         const pageTitle = String(n.title ?? "").trim() || "Sin título";
+        const hasChildren = Boolean(n.children?.length);
+        const expanded = hasChildren && expandedPageIds.has(n.id);
         return (
           <li key={n.id} className="od-wiki-tree__item">
             <div
@@ -536,6 +575,24 @@ function WikiTree({
                   <IonIcon icon={OD_ICONS.reorder} aria-hidden="true" />
                 </button>
               ) : null}
+              {hasChildren ? (
+                <button
+                  type="button"
+                  className={`od-wiki-tree__expand${expanded ? " is-expanded" : ""}`}
+                  aria-label={expanded ? `Contraer ${pageTitle}` : `Expandir ${pageTitle}`}
+                  aria-expanded={expanded}
+                  title={expanded ? "Contraer" : "Expandir"}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onToggleExpanded(n.id);
+                  }}
+                >
+                  <IonIcon icon={chevronForwardOutline} aria-hidden="true" />
+                </button>
+              ) : (
+                <span className="od-wiki-tree__expand-placeholder" aria-hidden="true" />
+              )}
               <button
                 type="button"
                 className={`od-wiki-tree__btn ${depthClass}${active ? " is-active" : ""}${muted ? " is-muted" : ""}`}
@@ -571,12 +628,14 @@ function WikiTree({
                 />
               ) : null}
             </div>
-            {n.children?.length ? (
+            {hasChildren && expanded ? (
               <WikiTree
                 nodes={n.children}
                 depth={depth + 1}
                 selectedId={selectedId}
                 onPick={onPick}
+                expandedPageIds={expandedPageIds}
+                onToggleExpanded={onToggleExpanded}
                 menusDisabled={menusDisabled}
                 onCreateSubpageFor={onCreateSubpageFor}
                 onRenamePage={onRenamePage}
