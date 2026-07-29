@@ -3,9 +3,14 @@ import { ReactNodeViewRenderer, NodeViewContent, NodeViewWrapper } from "@tiptap
 import { IonIcon } from "@ionic/react";
 import { OD_ICONS } from "../ui/odIcons.js";
 
-function OdDisclosureNodeView({ node, updateAttributes }) {
+// eslint-disable-next-line react-refresh/only-export-components
+function OdDisclosureNodeView({ node, updateAttributes, editor, getPos }) {
   const title = node.attrs.title || "Título del desplegable";
   const open = Boolean(node.attrs.open);
+  const titleLevel = [2, 3, 4].includes(Number(node.attrs.titleLevel))
+    ? Number(node.attrs.titleLevel)
+    : 2;
+  const TitleTag = `h${titleLevel}`;
 
   function toggleOpen() {
     updateAttributes({ open: !open });
@@ -22,8 +27,25 @@ function OdDisclosureNodeView({ node, updateAttributes }) {
       className={`od-editor-block od-editor-disclosure${open ? " is-open" : ""}`}
       data-od-node="disclosure"
       data-open={open ? "true" : "false"}
+      data-node-pos={typeof getPos === "function" ? getPos() : undefined}
     >
       <div className="od-editor-disclosure__summary" contentEditable={false}>
+        {editor.isEditable ? (
+          <button
+            type="button"
+            className="od-editor-block__drag-handle"
+            aria-label="Arrastrar desplegable"
+            data-drag-handle
+            contentEditable={false}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+          >
+            <IonIcon icon={OD_ICONS.reorder} aria-hidden="true" />
+          </button>
+        ) : null}
+
         <button
           type="button"
           className="od-editor-disclosure__toggle od-editor-icon-button"
@@ -34,13 +56,17 @@ function OdDisclosureNodeView({ node, updateAttributes }) {
           <IonIcon icon={open ? OD_ICONS.chevronUp : OD_ICONS.chevronDown} aria-hidden="true" />
         </button>
 
-        <input
-          className="od-editor-disclosure__title"
-          value={title}
-          aria-label="Título del desplegable"
-          placeholder="Título del desplegable"
-          onChange={updateTitle}
-        />
+        <TitleTag
+          className={`od-editor-disclosure__heading od-editor-disclosure__heading--h${titleLevel}`}
+        >
+          <input
+            className="od-editor-disclosure__title"
+            value={title}
+            aria-label="Título del desplegable"
+            placeholder="Título del desplegable"
+            onChange={updateTitle}
+          />
+        </TitleTag>
       </div>
 
       <NodeViewContent className="od-editor-disclosure__content" />
@@ -59,6 +85,8 @@ export const OdDisclosure = Node.create({
 
   isolating: true,
 
+  draggable: true,
+
   addAttributes() {
     return {
       title: {
@@ -72,7 +100,7 @@ export const OdDisclosure = Node.create({
         }),
       },
       open: {
-        default: true,
+        default: false,
         parseHTML: (element) => element.hasAttribute("open") || element.getAttribute("data-open") === "true",
         renderHTML: (attributes) => {
           if (!attributes.open) return { "data-open": "false" };
@@ -81,6 +109,18 @@ export const OdDisclosure = Node.create({
             "data-open": "true",
           };
         },
+      },
+      titleLevel: {
+        default: 2,
+        parseHTML: (element) => {
+          const value = Number(element.getAttribute("data-title-level"));
+          return [2, 3, 4].includes(value) ? value : 2;
+        },
+        renderHTML: (attributes) => ({
+          "data-title-level": [2, 3, 4].includes(Number(attributes.titleLevel))
+            ? String(attributes.titleLevel)
+            : "2",
+        }),
       },
     };
   },
@@ -97,13 +137,27 @@ export const OdDisclosure = Node.create({
   },
 
   renderHTML({ node, HTMLAttributes }) {
+    const validLevel = [2, 3, 4].includes(Number(node.attrs.titleLevel))
+      ? Number(node.attrs.titleLevel)
+      : 2;
+    const titleTag = `h${validLevel}`;
     return [
       "details",
       mergeAttributes(HTMLAttributes, {
         "data-od-node": "disclosure",
         class: "od-editor-disclosure",
       }),
-      ["summary", { class: "od-editor-disclosure__summary" }, node.attrs.title || "Título del desplegable"],
+      [
+        "summary",
+        { class: "od-editor-disclosure__summary" },
+        [
+          titleTag,
+          {
+            class: `od-editor-disclosure__heading od-editor-disclosure__heading--h${validLevel}`,
+          },
+          node.attrs.title || "Título del desplegable",
+        ],
+      ],
       ["div", { class: "od-editor-disclosure__content" }, 0],
     ];
   },
@@ -121,7 +175,8 @@ export const OdDisclosure = Node.create({
             type: this.name,
             attrs: {
               title: "Título del desplegable",
-              open: true,
+              open: false,
+              titleLevel: 2,
             },
             content: [
               {
