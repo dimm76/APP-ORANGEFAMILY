@@ -21,13 +21,13 @@ const OD_NAV_EVENT = "od-spa-navigate";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/", icon: homeOutline },
-  { label: "Personas", href: "/app/personas", icon: peopleOutline },
-  { label: "Proyectos", href: "/app/proyectos", icon: folderOpenOutline },
-  { label: "Finanzas", href: "/app/finanzas", icon: walletOutline },
-  { label: "Documentos", href: "/app/documentos", icon: folderOutline },
-  { label: "Wiki", href: "/app/wiki", icon: bookOutline },
-  { label: "OrangePhotos", href: "/app/orangephotos", icon: imagesOutline },
-  { label: "Notas", href: "/app/notas", icon: documentTextOutline },
+  { label: "Personas", href: "/app/personas", icon: peopleOutline, ownerOnly: true },
+  { label: "Proyectos", href: "/app/proyectos", icon: folderOpenOutline, ownerOnly: true },
+  { label: "Finanzas", href: "/app/finanzas", icon: walletOutline, moduleKey: "finances" },
+  { label: "Documentos", href: "/app/documentos", icon: folderOutline, moduleKey: "documents" },
+  { label: "Wiki", href: "/app/wiki", icon: bookOutline, moduleKey: "wiki" },
+  { label: "OrangePhotos", href: "/app/orangephotos", icon: imagesOutline, moduleKey: "orange_photos" },
+  { label: "Notas", href: "/app/notas", icon: documentTextOutline, moduleKey: "notes" },
   { label: "Ajustes", href: "/app/settings/family", icon: settingsOutline },
 ];
 
@@ -41,7 +41,7 @@ function spaNavigate(href) {
 }
 
 export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
-  const { user, logout } = useAuth();
+  const { user, hasModuleAccess, logout } = useAuth();
   const [pathname, setPathname] = useState(currentPathname);
 
   useEffect(() => {
@@ -60,9 +60,13 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
   }
 
   const isOwner = user?.families?.some((family) => family.role === "owner");
-  const visibleItems = isOwner ? NAV_ITEMS : NAV_ITEMS.filter((item) => item.href === "/app/orangephotos");
+  const visibleItems = NAV_ITEMS.filter(
+    (item) =>
+      (!item.ownerOnly || isOwner) &&
+      (!item.moduleKey || hasModuleAccess(item.moduleKey))
+  );
 
-  if (isOwner && pathname.startsWith("/app/orangephotos")) {
+  if (hasModuleAccess("orange_photos") && pathname.startsWith("/app/orangephotos")) {
     return <OrangePhotosSidebar pathname={pathname} onNavigate={onNavigate} />;
   }
 

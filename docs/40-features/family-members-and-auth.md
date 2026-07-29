@@ -2,9 +2,13 @@
 
 ## Alcance
 
-El propietario de una familia (`family_memberships.role = 'owner'`) administra sus familiares. Los familiares usan el rol `member`. No existe registro público ni permisos configurables por módulo.
+El propietario de una familia (`family_memberships.role = 'owner'`) administra sus familiares. Los familiares usan el rol `member`. No existe registro público. Los permisos configurables por módulo pertenecen a `family_memberships.module_access`.
 
-Un `owner` con membership activa conserva el acceso completo actual. Un `member` necesita membership activa y `auth_users.status = 'active'`; en esta primera versión solo puede acceder a OrangePhotos. Wiki, Attachments, Ajustes y los demás módulos permanecen reservados al propietario tanto en la interfaz como en la API.
+Un `owner` con membership activa conserva siempre acceso a todos los módulos, independientemente del JSON almacenado. Un `member` necesita membership activa, `auth_users.status = 'active'` y el permiso de módulo correspondiente. Las claves oficiales son `orange_photos`, `wiki`, `notes`, `documents` y `finances`.
+
+React adapta la navegación, pero no constituye una frontera de seguridad. Node normaliza y valida `module_access` y aplica el middleware de cada módulo antes de sus rutas. La futura aplicación Android utilizará exactamente la misma API y los mismos permisos.
+
+Todos los endpoints actuales de attachments pertenecen funcionalmente a Wiki y se autorizan con `wiki`. Permanecerán así hasta que exista un módulo Documentos operativo y puedan identificarse rutas exclusivas bajo `documents`.
 
 ## Administración
 

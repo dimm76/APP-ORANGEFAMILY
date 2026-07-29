@@ -32,6 +32,10 @@
 .of-family-form { padding:14px; border:1px solid #dce3f5; border-radius:10px; background:#fff; }
 .of-family-form__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
 .of-family-form__check { display:flex; align-items:center; gap:7px; margin-top:12px; color:#334155; font-size:13px; }
+.of-family-modules { margin:14px 0 0; padding:12px; border:1px solid #dce3f5; border-radius:8px; }
+.of-family-modules__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 16px; }
+.of-family-modules__grid .of-family-form__check { margin-top:0; }
+.of-family-module-badges { display:flex; flex-wrap:wrap; gap:4px; }
 .of-family-actions { display:flex; flex-wrap:wrap; gap:6px; }
 @media (max-width: 700px) {
   .of-family-form__grid {

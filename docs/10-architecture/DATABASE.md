@@ -28,6 +28,8 @@ La lógica de negocio permanecerá en Node salvo casos técnicamente justificado
 
 El modelo deberá representar el dominio familiar y no la estructura visual de los módulos.
 
+`family_memberships.module_access` almacena como `jsonb` los permisos binarios de acceso a módulos de una persona dentro de una familia. Las claves oficiales son `orange_photos`, `wiki`, `notes`, `documents` y `finances`. Node normaliza el objeto y garantiza que un `owner` disponga siempre de todos los módulos, con independencia del valor almacenado.
+
 Las entidades podrán relacionarse entre sí.
 
 Ejemplos:

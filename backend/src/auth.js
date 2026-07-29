@@ -3,6 +3,7 @@ const { isIP } = require("node:net");
 const pool = require("../db");
 const { hashPassword, verifyPassword } = require("./passwordCrypto");
 const { sendPasswordResetEmail } = require("./mailService");
+const { normalizeModuleAccess } = require("./moduleAccess");
 
 const SESSION_COOKIE_NAME = "of_session";
 const MAX_FAILED_LOGINS = 8;
@@ -129,6 +130,7 @@ function mapUser(row, memberships = []) {
       id: String(membership.family_id),
       name: String(membership.family_name),
       role: String(membership.role),
+      module_access: normalizeModuleAccess(membership.module_access, membership.role),
     })),
   };
 }
@@ -136,7 +138,7 @@ function mapUser(row, memberships = []) {
 async function loadUserMemberships(queryable, personId) {
   if (!personId) return [];
   const result = await queryable.query(
-    `SELECT f.id AS family_id, f.name AS family_name, fm.role
+    `SELECT f.id AS family_id, f.name AS family_name, fm.role, fm.module_access
      FROM public.family_memberships fm
      INNER JOIN public.families f ON f.id = fm.family_id
      WHERE fm.person_id = $1::uuid

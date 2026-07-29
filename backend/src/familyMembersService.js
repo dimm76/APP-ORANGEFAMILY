@@ -1,6 +1,7 @@
 const pool = require("../db");
 const { createPasswordResetForUser, createSecureToken, hashToken } = require("./auth");
 const { sendActivationEmail, sendPasswordResetEmail } = require("./mailService");
+const { FAMILY_MODULES, normalizeModuleAccess } = require("./moduleAccess");
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ok = (payload = {}) => ({ ok: true, payload });
@@ -17,7 +18,7 @@ function resolveOwner(req) {
 function normalizeInput(body, partial = false) {
   const value = body && typeof body === "object" ? body : {};
   const allowed = new Set(partial
-    ? ["first_name", "last_name", "email", "membership_status", "has_access"]
+    ? ["first_name", "last_name", "email", "membership_status", "has_access", "module_access"]
     : ["first_name", "last_name", "email"]);
   if (Object.keys(value).some((key) => !allowed.has(key))) return bad(400, "El formulario contiene campos no permitidos.");
   const result = {};
@@ -41,15 +42,30 @@ function normalizeInput(body, partial = false) {
     if (!["active", "inactive"].includes(value.membership_status)) return bad(400, "El estado del familiar no es válido.");
     result.membership_status = value.membership_status;
   }
+  if (partial && Object.hasOwn(value, "module_access")) {
+    if (!value.module_access || typeof value.module_access !== "object" || Array.isArray(value.module_access)) {
+      return bad(400, "Los permisos de módulos deben ser un objeto.");
+    }
+    if (Object.keys(value.module_access).some((key) => !FAMILY_MODULES.includes(key))) {
+      return bad(400, "Los permisos contienen módulos no permitidos.");
+    }
+    if (Object.values(value.module_access).some((item) => typeof item !== "boolean")) {
+      return bad(400, "Todos los permisos de módulos deben ser booleanos.");
+    }
+    result.module_access = normalizeModuleAccess(value.module_access, "member");
+  }
   if (!partial && !result.email) return bad(400, "El email es obligatorio.");
   return { ok: true, value: result };
 }
 
 const selectMembers = `SELECT p.id AS person_id,fm.id AS membership_id,u.id AS auth_user_id,p.first_name,p.last_name,u.email,
-  fm.role,fm.status AS membership_status,u.status AS auth_status,COALESCE(u.email_verified,false) AS email_verified,u.last_login_at,
+  fm.role,fm.status AS membership_status,fm.module_access,u.status AS auth_status,COALESCE(u.email_verified,false) AS email_verified,u.last_login_at,
   (u.id IS NOT NULL AND u.status <> 'disabled') AS has_access,(u.password_hash IS NOT NULL) AS has_password
  FROM public.family_memberships fm JOIN public.persons p ON p.id=fm.person_id LEFT JOIN public.auth_users u ON u.person_id=p.id`;
-function publicMember(row) { const { has_password: _hasPassword, ...item } = row; return item; }
+function publicMember(row) {
+  const { has_password: _hasPassword, ...item } = row;
+  return { ...item, module_access: normalizeModuleAccess(row.module_access, row.role) };
+}
 
 async function list(req) {
   const owner = resolveOwner(req); if (!owner.ok) return owner;
@@ -80,10 +96,11 @@ async function create(req, body) {
   try {
     await client.query("BEGIN");
     const person = await client.query(`INSERT INTO public.persons(first_name,last_name) VALUES($1,$2) RETURNING id`, [input.value.first_name, input.value.last_name]);
-    await client.query(`INSERT INTO public.family_memberships(family_id,person_id,role,status) VALUES($1,$2,'member','active')`, [owner.familyId, person.rows[0].id]);
+    const moduleAccess = normalizeModuleAccess({ orange_photos: true }, "member");
+    await client.query(`INSERT INTO public.family_memberships(family_id,person_id,role,status,module_access) VALUES($1,$2,'member','active',$3::jsonb)`, [owner.familyId, person.rows[0].id, JSON.stringify(moduleAccess)]);
     const user = await client.query(`INSERT INTO public.auth_users(person_id,email,status,password_hash,email_verified) VALUES($1,$2,'pending',NULL,false) RETURNING id`, [person.rows[0].id, input.value.email]);
     token = await activationToken(client, user.rows[0].id);
-    await audit(client, owner, "family_member_created", person.rows[0].id, null, { first_name: input.value.first_name, last_name: input.value.last_name, email: input.value.email });
+    await audit(client, owner, "family_member_created", person.rows[0].id, null, { first_name: input.value.first_name, last_name: input.value.last_name, email: input.value.email, module_access: moduleAccess });
     row = (await client.query(`${selectMembers} WHERE fm.family_id=$1 AND p.id=$2`, [owner.familyId, person.rows[0].id])).rows[0];
     await client.query("COMMIT");
   } catch (error) {
@@ -127,6 +144,7 @@ async function update(req, personId, body) {
     if (nextAccess && !nextEmail) { await client.query("ROLLBACK"); return bad(400, "El email es obligatorio para permitir acceso."); }
     await client.query(`UPDATE public.persons SET first_name=COALESCE($2,first_name),last_name=CASE WHEN $3 THEN $4 ELSE last_name END WHERE id=$1`, [personId, input.value.first_name || null, Object.hasOwn(input.value, "last_name"), input.value.last_name || null]);
     if (input.value.membership_status) await client.query(`UPDATE public.family_memberships SET status=$3 WHERE family_id=$1 AND person_id=$2`, [owner.familyId, personId, input.value.membership_status]);
+    if (input.value.module_access) await client.query(`UPDATE public.family_memberships SET module_access=$3::jsonb WHERE family_id=$1::uuid AND person_id=$2::uuid`, [owner.familyId, personId, JSON.stringify(input.value.module_access)]);
     if (!before.auth_user_id && nextAccess) {
       const user = await client.query(`INSERT INTO public.auth_users(person_id,email,status,password_hash,email_verified) VALUES($1,$2,'pending',NULL,false) RETURNING id`, [personId, nextEmail]);
       token = await activationToken(client, user.rows[0].id);
@@ -146,7 +164,7 @@ async function update(req, personId, body) {
       }
     }
     after = await getMember(client, owner, personId);
-    await audit(client, owner, "family_member_updated", personId, { first_name: before.first_name, last_name: before.last_name, email: before.email, membership_status: before.membership_status, has_access: before.has_access }, { first_name: after.first_name, last_name: after.last_name, email: after.email, membership_status: after.membership_status, has_access: after.has_access });
+    await audit(client, owner, "family_member_updated", personId, { first_name: before.first_name, last_name: before.last_name, email: before.email, membership_status: before.membership_status, has_access: before.has_access, module_access: normalizeModuleAccess(before.module_access, before.role) }, { first_name: after.first_name, last_name: after.last_name, email: after.email, membership_status: after.membership_status, has_access: after.has_access, module_access: normalizeModuleAccess(after.module_access, after.role) });
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});

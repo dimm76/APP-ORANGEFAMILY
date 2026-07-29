@@ -49,7 +49,9 @@ auth_users.person_id
 
 Los roles familiares proceden de `family_memberships.role`. No existe ni se utiliza una tabla `profiles`.
 
-La respuesta pública limita los datos a identificador, email, estado, identidad básica de la persona y familias activas con su rol. No devuelve hashes, tokens ni campos internos de sesión.
+La respuesta pública limita los datos a identificador, email, estado, identidad básica de la persona y familias activas con su rol y `module_access` normalizado. No devuelve hashes, tokens ni campos internos de sesión.
+
+`module_access` contiene las claves `orange_photos`, `wiki`, `notes`, `documents` y `finances`. Los propietarios reciben siempre las cinco como `true`; para los demás roles solo es efectivo un valor booleano `true` almacenado en su membership.
 
 ## Seguridad implementada
 

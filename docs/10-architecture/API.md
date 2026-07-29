@@ -81,6 +81,12 @@ No deberán exponerse:
 ## Estado actual
 
 OrangeFamily dispone de una API Node operativa, implementada parcialmente y en evolución por módulos. Orange Photos ya utiliza rutas implementadas; sus contratos específicos se documentan junto al módulo.
+
+## Permisos por módulo familiar
+
+Node aplica los permisos de `family_memberships.module_access` a las APIs de los módulos operativos. Las claves oficiales son `orange_photos`, `wiki`, `notes`, `documents` y `finances`; un `owner` obtiene siempre acceso efectivo a todas ellas. React solo usa el mismo contrato para adaptar la navegación.
+
+Los endpoints actuales `/api/attachments` pertenecen funcionalmente a Wiki y requieren el permiso `wiki`. La ruta `/api/public/wiki/:token` permanece pública. Cuando exista un módulo Documentos operativo, sus rutas exclusivas deberán usar `documents`; no se crean endpoints anticipados.
 # Comprobación masiva de almacenamiento de Orange Photos
 
 `POST /api/orange-photos/check-storage-status` requiere sesión. Acepta

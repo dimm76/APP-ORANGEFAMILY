@@ -6,7 +6,7 @@ import {
 } from "react";
 import { IonApp, IonContent, IonPage, IonSpinner } from "@ionic/react";
 import { fetchAuthMe, postAuthLogin, postAuthLogout } from "../shared/api/authApi.js";
-import { AuthContext } from "./authContext.js";
+import { AuthContext, hasFamilyModuleAccess } from "./authContext.js";
 import LoginPage from "./LoginPage.jsx";
 import "./app-login.css";
 
@@ -52,7 +52,13 @@ export default function AuthGate({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, login, logout, refreshMe }),
+    () => ({
+      user,
+      login,
+      logout,
+      refreshMe,
+      hasModuleAccess: (moduleKey) => hasFamilyModuleAccess(user, moduleKey),
+    }),
     [user, login, logout, refreshMe]
   );
 
