@@ -28,6 +28,27 @@ interface CameraBackupDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertPending(items: List<LocalMediaItem>): List<Long>
 
+    @Query(
+        """
+        UPDATE local_media_items
+        SET local_status = 'pending',
+            failure_code = NULL,
+            detected_at = :detectedAt
+        WHERE account_user_id = :accountUserId
+          AND media_collection = :mediaCollection
+          AND media_type = :mediaType
+          AND media_store_id = :mediaStoreId
+          AND local_status = 'discovered'
+        """,
+    )
+    suspend fun promoteDiscoveredToPending(
+        accountUserId: String,
+        mediaCollection: String,
+        mediaType: String,
+        mediaStoreId: Long,
+        detectedAt: Long,
+    ): Int
+
     @Upsert
     suspend fun upsertDeviceMedia(items: List<LocalMediaItem>)
 

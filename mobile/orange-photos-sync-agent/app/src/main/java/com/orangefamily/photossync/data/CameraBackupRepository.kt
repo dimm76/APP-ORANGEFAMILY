@@ -34,7 +34,21 @@ class CameraBackupRepository(
             check(config.enabled)
             val image = result.baseline.maximum(LocalMediaItem.TYPE_IMAGE)
             val video = result.baseline.maximum(LocalMediaItem.TYPE_VIDEO)
-            val inserted = dao.insertPending(result.items).count { it != -1L }
+            val insertResults = dao.insertPending(result.items)
+            var imported = 0
+            result.items.forEachIndexed { index, item ->
+                if (insertResults[index] != -1L) {
+                    imported += 1
+                } else {
+                    imported += dao.promoteDiscoveredToPending(
+                        accountUserId = item.accountUserId,
+                        mediaCollection = item.mediaCollection,
+                        mediaType = item.mediaType,
+                        mediaStoreId = item.mediaStoreId,
+                        detectedAt = item.detectedAt,
+                    )
+                }
+            }
             dao.saveBaselines(result.baseline.baselines)
             dao.saveConfig(
                 config.copy(
@@ -45,7 +59,7 @@ class CameraBackupRepository(
                     lastScanAt = scannedAt,
                 ),
             )
-            inserted
+            imported
         }
 
     suspend fun snapshot(accountUserId: String): LocalInventorySnapshot = LocalInventorySnapshot(

@@ -54,7 +54,7 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
         }
         if (!repository.tryAcquireSyncLock(accountUserId, lockToken, lockNow, lockNow + LOCK_TTL_MS)) {
             Log.d(TAG, "Worker skipped because sync lock is active accountUserId=$accountUserId")
-            return retry()
+            return success()
         }
 
         try {
@@ -98,7 +98,11 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
                 val forceDuplicate = item.failureCode == "FORCE_DUPLICATE"
                 val check = api.checkUpload(item, checksum, forceDuplicate)
                 uploadMode=check.uploadMode
-                Log.d(TAG, "Preflight decision=${check.decision} mode=${check.uploadMode}")
+                Log.d(
+                    TAG,
+                    "Preflight decision=${check.decision} mode=${check.uploadMode} " +
+                        "item=${item.id} sizeBytes=${item.sizeBytes}",
+                )
                 when (check.decision) {
                     "already_owned" -> {
                         repository.clearMultipart(item.id)

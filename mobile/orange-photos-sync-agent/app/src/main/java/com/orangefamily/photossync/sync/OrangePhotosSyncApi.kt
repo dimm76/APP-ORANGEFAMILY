@@ -30,7 +30,12 @@ class OrangePhotosSyncApi(apiBaseUrl: String, private val sessionToken: String, 
         if (!Regex("^[0-9a-f]{64}$").matches(checksum)) {
             throw SyncApiException(0, "INVALID_LOCAL_CHECKSUM", "El checksum local no es válido.", transient = false)
         }
-        Log.d(TAG, "Preflight request item=${item.id} checksumPresent=${body.has("checksum_sha256")} checksumLength=${checksum.length}")
+        Log.d(
+            TAG,
+            "Preflight request item=${item.id} sizeBytes=${item.sizeBytes} " +
+                "mime=${item.mimeType} checksumPresent=${body.has("checksum_sha256")} " +
+                "checksumLength=${checksum.length}",
+        )
         val bodyBytes = body.toString().toByteArray(Charsets.UTF_8)
         val json = try {
             requestJson(

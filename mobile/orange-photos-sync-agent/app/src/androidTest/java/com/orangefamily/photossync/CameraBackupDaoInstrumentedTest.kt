@@ -54,5 +54,17 @@ class CameraBackupDaoInstrumentedTest {
         upgraded.close();context.deleteDatabase(name)
     }
 
+    @Test fun cameraScanPromotesExistingDiscoveredItemToPending()=runBlocking{
+        val dao=database.cameraBackupDao()
+        val discovered=item(700,LocalMediaItem.STATUS_DISCOVERED,null)
+        dao.upsertDeviceMedia(listOf(discovered))
+        val insertResult=dao.insertPending(listOf(discovered.copy(localStatus=LocalMediaItem.STATUS_PENDING)))
+        assertEquals(-1L,insertResult.single())
+        val promoted=dao.promoteDiscoveredToPending(discovered.accountUserId,discovered.mediaCollection,discovered.mediaType,discovered.mediaStoreId,discovered.detectedAt+1)
+        assertEquals(1,promoted)
+        val stored=dao.findMediaItem(discovered.accountUserId,discovered.mediaCollection,discovered.mediaType,discovered.mediaStoreId)
+        assertEquals(LocalMediaItem.STATUS_PENDING,stored?.localStatus)
+    }
+
     private fun item(mediaStoreId:Long,status:String,failureCode:String?)=LocalMediaItem(accountUserId="user",mediaStoreId=mediaStoreId,mediaCollection="external",mediaType=LocalMediaItem.TYPE_VIDEO,contentUri="content://media/$mediaStoreId",displayName="$mediaStoreId.mp4",mimeType="video/mp4",sizeBytes=1,dateAdded=mediaStoreId,dateTaken=null,relativePath="DCIM/Camera/",width=null,height=null,durationMs=null,detectedAt=mediaStoreId,localStatus=status,failureCode=failureCode)
 }
