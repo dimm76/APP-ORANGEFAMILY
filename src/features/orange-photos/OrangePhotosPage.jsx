@@ -231,7 +231,11 @@ export default function OrangePhotosPage() {
     const key = `${period.year}-${String(period.month).padStart(2, "0")}`;
     if (timelineScrubRef.current.key === key && activePeriod === key) return;
     timelineScrubRef.current.key = key;
-    clearSelection();
+
+    if (!addToAlbumId) {
+      clearSelection();
+    }
+
     clearWindowPagination();
     setTimelineScrubbing(true);
     setActivePeriod(key);
@@ -245,7 +249,7 @@ export default function OrangePhotosPage() {
     timelineScrubRef.current.timer = window.setTimeout(() => {
       setTimelineScrubbing(false);
     }, 500);
-  }, [activePeriod]);
+  }, [activePeriod, addToAlbumId, clearSelection]);
   const handleScrollerScroll = (event) => {
     const element = event.currentTarget;
     if(element.scrollTop<300&&windowPagination.active&&windowPagination.hasNewer)void loadNewer();
