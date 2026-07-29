@@ -11,7 +11,7 @@ class DeviceMediaVerifier(
     private val hashService:DeviceMediaHashService,
     private val apiProvider:suspend()->OrangePhotosSyncApi?,
 ) {
-    suspend fun importBucket(scannedItems:List<LocalMediaItem>) {
+    suspend fun importBucket(scannedItems:List<LocalMediaItem>):List<LocalMediaItem> {
         val merged=scannedItems.map { scanned ->
             val existing=repository.findMediaItem(scanned.accountUserId,scanned.mediaCollection,scanned.mediaType,scanned.mediaStoreId)
             if(existing==null)scanned.copy(cloudStatus=LocalMediaItem.CLOUD_UNKNOWN)
@@ -21,6 +21,7 @@ class DeviceMediaVerifier(
             }
         }
         repository.upsertDeviceMedia(merged)
+        return merged
     }
 
     suspend fun verifyItems(items:List<LocalMediaItem>,force:Boolean=false) {
