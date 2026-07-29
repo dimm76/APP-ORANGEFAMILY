@@ -78,6 +78,19 @@ class CameraBackupRepository(
     suspend fun baselines(accountUserId: String) = dao.getBaselines(accountUserId)
     suspend fun recoverUploading(accountUserId: String) = dao.recoverUploading(accountUserId)
     suspend fun syncBatch(accountUserId: String, limit: Int) = dao.getSyncBatch(accountUserId, limit)
+    suspend fun countSyncCandidates(accountUserId: String) =
+        dao.countSyncCandidates(accountUserId)
+    suspend fun syncBatchAfter(
+        accountUserId: String,
+        afterDetectedAt: Long?,
+        afterId: Long?,
+        limit: Int,
+    ) = dao.getSyncBatchAfter(
+        accountUserId = accountUserId,
+        afterDetectedAt = afterDetectedAt,
+        afterId = afterId,
+        limit = limit,
+    )
     suspend fun latestFailed(accountUserId: String, limit: Int = 10) = dao.getLatestFailed(accountUserId, limit)
     suspend fun syncCounts(accountUserId: String) = dao.getSyncCounts(accountUserId)
     fun observeUploadHeaderCounts(accountUserId: String) = dao.observeUploadHeaderCounts(accountUserId)

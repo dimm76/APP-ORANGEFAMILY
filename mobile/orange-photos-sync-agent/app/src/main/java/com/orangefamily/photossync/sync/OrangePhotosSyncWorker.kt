@@ -78,10 +78,22 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
             var transientFailure = false
             var uploadedThisRun = 0
             var failedThisRun = 0
-            val batch=repository.syncBatch(accountUserId,BATCH_SIZE)
-            Log.d(TAG, "Batch selected size=${batch.size} accountUserId=$accountUserId")
-            OrangePhotosUploadProgress.update(UploadProgressState(running=batch.isNotEmpty(),totalThisRun=batch.size,pendingThisRun=batch.size))
+            val totalThisRun = repository.countSyncCandidates(accountUserId)
+            Log.d(TAG, "Sync run selected total=$totalThisRun accountUserId=$accountUserId")
+            OrangePhotosUploadProgress.update(UploadProgressState(running=totalThisRun>0,totalThisRun=totalThisRun,pendingThisRun=totalThisRun))
+            var afterDetectedAt: Long? = null
+            var afterId: Long? = null
+            var visitedThisRun = 0
+            while (visitedThisRun < totalThisRun) {
+            val remaining = totalThisRun - visitedThisRun
+            val batch=repository.syncBatchAfter(accountUserId,afterDetectedAt,afterId,minOf(BATCH_SIZE,remaining))
+            Log.d(TAG, "Batch selected size=${batch.size} visited=$visitedThisRun total=$totalThisRun accountUserId=$accountUserId")
+            if (batch.isEmpty()) break
             for (item in batch) {
+            visitedThisRun += 1
+            afterDetectedAt = item.detectedAt
+            afterId = item.id
+            OrangePhotosUploadProgress.update(OrangePhotosUploadProgress.state.value.copy(pendingThisRun=(totalThisRun-visitedThisRun).coerceAtLeast(0)))
             if (item.failureCode in NON_RETRYABLE_CODES) continue
             if(!UploadNetworkRules.canUpload(networkPolicy,isUnmetered,item.sizeBytes)){OrangePhotosUploadProgress.update(OrangePhotosUploadProgress.state.value.copy(deferredByNetwork=OrangePhotosUploadProgress.state.value.deferredByNetwork+1));continue}
             OrangePhotosUploadProgress.update(OrangePhotosUploadProgress.state.value.copy(running=true,itemId=item.id,displayName=item.displayName,bytesSent=0,totalBytes=item.sizeBytes))
@@ -126,7 +138,7 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
                 }
                 completed=true
                 uploadedThisRun+=1
-                OrangePhotosUploadProgress.update(OrangePhotosUploadProgress.state.value.withCompleted(uploadedThisRun,failedThisRun).copy(bytesSent=item.sizeBytes,totalBytes=item.sizeBytes))
+                OrangePhotosUploadProgress.update(OrangePhotosUploadProgress.state.value.withCompleted(uploadedThisRun,failedThisRun).copy(bytesSent=item.sizeBytes,totalBytes=item.sizeBytes,pendingThisRun=(totalThisRun-visitedThisRun).coerceAtLeast(0)))
             } catch (error: OrangePhotosSyncApi.LocalFileUnavailableException) {
                 val failureCode = "LOCAL_FILE_UNAVAILABLE"
                 repository.markAttempt(accountUserId, item.id, LocalMediaItem.STATUS_FAILED, attemptedAt, failureCode)
@@ -147,12 +159,13 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
                 Log.e(TAG, "Item failed id=${item.id} code=$failureCode exception=${error.javaClass.simpleName} message=${error.message}", error)
                 transientFailure = true
             } finally {
-                if(!completed)failedThisRun+=1;OrangePhotosUploadProgress.update(OrangePhotosUploadProgress.state.value.withCompleted(uploadedThisRun,failedThisRun))
+                if(!completed)failedThisRun+=1;OrangePhotosUploadProgress.update(OrangePhotosUploadProgress.state.value.withCompleted(uploadedThisRun,failedThisRun).copy(pendingThisRun=(totalThisRun-visitedThisRun).coerceAtLeast(0)))
+            }
+            }
             }
             if(OrangePhotosUploadProgress.state.value.deferredByNetwork>0) {
                 Log.d(TAG, "Deferred by network count=${OrangePhotosUploadProgress.state.value.deferredByNetwork}")
                 OrangePhotosSyncScheduler(applicationContext).scheduleUnmeteredSync(accountUserId)
-            }
             }
             OrangePhotosSyncNotifier(applicationContext).notifyResult(uploadedThisRun, repository.syncCounts(accountUserId).failed)
             return if (transientFailure) retry() else success()

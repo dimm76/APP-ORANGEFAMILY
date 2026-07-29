@@ -127,6 +127,73 @@ interface CameraBackupDao {
     """)
     suspend fun getSyncBatch(accountUserId: String, limit: Int): List<LocalMediaItem>
 
+    @Query("""
+        SELECT COUNT(*)
+        FROM local_media_items
+        WHERE account_user_id = :accountUserId
+          AND (
+            local_status = 'pending'
+            OR (
+              local_status = 'failed'
+              AND (
+                failure_code IS NULL
+                OR failure_code NOT IN (
+                  'LOCAL_FILE_UNAVAILABLE',
+                  'INVALID_METADATA',
+                  'UNSUPPORTED_FILE_TYPE',
+                  'FILE_TOO_LARGE',
+                  'UNSUPPORTED_MULTIPART',
+                  'UPLOAD_SUPPRESSED',
+                  'LARGE_UPLOAD_INTERRUPTED',
+                  'DUPLICATE_RECONCILIATION_REQUIRED'
+                )
+              )
+            )
+          )
+    """)
+    suspend fun countSyncCandidates(accountUserId: String): Int
+
+    @Query("""
+        SELECT *
+        FROM local_media_items
+        WHERE account_user_id = :accountUserId
+          AND (
+            local_status = 'pending'
+            OR (
+              local_status = 'failed'
+              AND (
+                failure_code IS NULL
+                OR failure_code NOT IN (
+                  'LOCAL_FILE_UNAVAILABLE',
+                  'INVALID_METADATA',
+                  'UNSUPPORTED_FILE_TYPE',
+                  'FILE_TOO_LARGE',
+                  'UNSUPPORTED_MULTIPART',
+                  'UPLOAD_SUPPRESSED',
+                  'LARGE_UPLOAD_INTERRUPTED',
+                  'DUPLICATE_RECONCILIATION_REQUIRED'
+                )
+              )
+            )
+          )
+          AND (
+            :afterDetectedAt IS NULL
+            OR detected_at > :afterDetectedAt
+            OR (
+              detected_at = :afterDetectedAt
+              AND id > :afterId
+            )
+          )
+        ORDER BY detected_at ASC, id ASC
+        LIMIT :limit
+    """)
+    suspend fun getSyncBatchAfter(
+        accountUserId: String,
+        afterDetectedAt: Long?,
+        afterId: Long?,
+        limit: Int,
+    ): List<LocalMediaItem>
+
     @Query("UPDATE local_media_items SET checksum_sha256 = :checksum WHERE id = :id AND account_user_id = :accountUserId")
     suspend fun updateChecksum(accountUserId: String, id: Long, checksum: String)
 

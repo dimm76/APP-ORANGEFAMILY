@@ -42,6 +42,31 @@ class CameraBackupDaoInstrumentedTest {
         assertEquals(listOf(1L,2L,3L),dao.getSyncBatch("user",20).map{it.mediaStoreId})
     }
 
+    @Test fun syncCandidatesArePagedWithoutDuplicatesInStableOrder()=runBlocking{
+        val dao=database.cameraBackupDao()
+        dao.insertPending((1L..24L).map{item(it,LocalMediaItem.STATUS_PENDING,null)})
+        assertEquals(24,dao.countSyncCandidates("user"))
+        val first=dao.getSyncBatchAfter("user",null,null,20)
+        assertEquals(20,first.size)
+        val last=first.last()
+        val second=dao.getSyncBatchAfter("user",last.detectedAt,last.id,20)
+        assertEquals(4,second.size)
+        val all=first+second
+        assertEquals(24,all.map{it.id}.distinct().size)
+        assertEquals(all.sortedWith(compareBy<LocalMediaItem>{it.detectedAt}.thenBy{it.id}).map{it.id},all.map{it.id})
+    }
+
+    @Test fun syncCandidateCountAndPagingUseTheSameInclusionRule()=runBlocking{
+        val dao=database.cameraBackupDao()
+        dao.insertPending(listOf(
+            item(1,LocalMediaItem.STATUS_FAILED,"UNSUPPORTED_MULTIPART"),
+            item(2,LocalMediaItem.STATUS_FAILED,"NETWORK_ERROR"),
+            item(3,LocalMediaItem.STATUS_PENDING,null),
+        ))
+        assertEquals(2,dao.countSyncCandidates("user"))
+        assertEquals(listOf(2L,3L),dao.getSyncBatchAfter("user",null,null,20).map{it.mediaStoreId})
+    }
+
     @Test fun migrationFourToFivePreservesExistingDataAndCreatesMultipartTables(){
         val context=ApplicationProvider.getApplicationContext<android.content.Context>()
         val name="migration-4-5-${System.nanoTime()}.db"
