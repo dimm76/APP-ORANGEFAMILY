@@ -23,10 +23,9 @@ class DeviceMediaVerifier(
         repository.upsertDeviceMedia(merged)
     }
 
-    suspend fun verifyBucket(accountUserId:String,bucketId:String,force:Boolean=false) {
-        if(force)repository.invalidateBucketVerification(accountUserId,bucketId)
+    suspend fun verifyItems(items:List<LocalMediaItem>,force:Boolean=false) {
         val now=System.currentTimeMillis()
-        val candidates=repository.bucketItems(accountUserId,bucketId).filter{DeviceMediaRules.needsVerification(it,now,force)}
+        val candidates=items.filter{DeviceMediaRules.needsVerification(it,now,force)}
         val hashed=mutableListOf<Pair<LocalMediaItem,String>>()
         for(item in candidates){
             repository.markChecking(item)
@@ -41,6 +40,11 @@ class DeviceMediaVerifier(
                 batch.forEach { (item,_) -> val result=byId[DeviceMediaRules.stableId(item)]; repository.updateCloudStatus(item,mapStatus(result?.status),result?.remotePhotoId,now) }
             } catch(_:Exception){ batch.forEach{repository.updateCloudStatus(it.first,LocalMediaItem.CLOUD_ERROR,null,now)} }
         }
+    }
+
+    suspend fun verifyBucket(accountUserId:String,bucketId:String,force:Boolean=false) {
+        if(force)repository.invalidateBucketVerification(accountUserId,bucketId)
+        verifyItems(repository.bucketItems(accountUserId,bucketId),force)
     }
 
     private fun mapStatus(value:String?)=when(value){

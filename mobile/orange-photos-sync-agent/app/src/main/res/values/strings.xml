@@ -112,6 +112,16 @@
     <string name="network_any_warning">Puede consumir muchos datos. Las subidas grandes todavía no son reanudables y un reinicio exige comenzar de nuevo.</string>
     <string name="verify_action">Verificar</string>
     <string name="verifying_status">Verificando…</string>
+    <string name="verify_copies">Verificar copias</string>
+    <string name="show_grid_view">Mostrar como cuadrícula</string>
+    <string name="show_list_view">Mostrar como lista</string>
+    <string name="sort_options">Ordenar</string>
+    <string name="sort_date_desc">Fecha: más reciente primero</string>
+    <string name="sort_date_asc">Fecha: más antigua primero</string>
+    <string name="sort_size_desc">Tamaño: más grande primero</string>
+    <string name="sort_size_asc">Tamaño: más pequeño primero</string>
+    <string name="sort_name_asc">Nombre: de la A a la Z</string>
+    <string name="sort_name_desc">Nombre: de la Z a la A</string>
     <plurals name="selected_media_count">
         <item quantity="one">%d seleccionada</item>
         <item quantity="other">%d seleccionadas</item>

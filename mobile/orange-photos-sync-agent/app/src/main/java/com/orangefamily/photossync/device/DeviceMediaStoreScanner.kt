@@ -22,6 +22,15 @@ data class DeviceMediaFolder(
 
 data class DeviceTrashItem(val media:LocalMediaItem,val expiresAtSeconds:Long?)
 
+enum class DeviceMediaSort {
+    DATE_DESC,
+    DATE_ASC,
+    SIZE_DESC,
+    SIZE_ASC,
+    NAME_ASC,
+    NAME_DESC,
+}
+
 class DeviceMediaStoreScanner(context: Context) {
     private val appContext = context.applicationContext
     private val resolver = appContext.contentResolver
@@ -36,13 +45,21 @@ class DeviceMediaStoreScanner(context: Context) {
 
     suspend fun scanFolders(accountUserId:String):List<DeviceMediaFolder> = withContext(Dispatchers.IO){ folders(scan(accountUserId)) }
 
-    suspend fun scanBucket(accountUserId:String,bucketId:String,limit:Int,offset:Int):List<LocalMediaItem> = withContext(Dispatchers.IO){
+    suspend fun scanBucket(accountUserId:String,bucketId:String,limit:Int,offset:Int,sort:DeviceMediaSort=DeviceMediaSort.DATE_DESC):List<LocalMediaItem> = withContext(Dispatchers.IO){
         val parsed=parseBucketId(bucketId)
-        listOf(LocalMediaItem.TYPE_IMAGE,LocalMediaItem.TYPE_VIDEO).flatMap{query(accountUserId,parsed.volume,it,parsed.rawBucketId)}
-            .sortedWith(compareByDescending<LocalMediaItem>{it.dateTaken?:it.dateAdded*1000}.thenByDescending{it.mediaStoreId}).drop(offset).take(limit)
+        val items=listOf(LocalMediaItem.TYPE_IMAGE,LocalMediaItem.TYPE_VIDEO).flatMap{query(accountUserId,parsed.volume,it,parsed.rawBucketId)}
+        val comparator=when(sort){
+            DeviceMediaSort.DATE_DESC->compareByDescending<LocalMediaItem>{it.dateTaken?:it.dateAdded*1000}.thenByDescending{it.mediaStoreId}
+            DeviceMediaSort.DATE_ASC->compareBy<LocalMediaItem>{it.dateTaken?:it.dateAdded*1000}.thenBy{it.mediaStoreId}
+            DeviceMediaSort.SIZE_DESC->compareByDescending<LocalMediaItem>{it.sizeBytes}.thenByDescending{it.mediaStoreId}
+            DeviceMediaSort.SIZE_ASC->compareBy<LocalMediaItem>{it.sizeBytes}.thenBy{it.mediaStoreId}
+            DeviceMediaSort.NAME_ASC->compareBy<LocalMediaItem>{it.displayName.lowercase()}.thenBy{it.mediaStoreId}
+            DeviceMediaSort.NAME_DESC->compareByDescending<LocalMediaItem>{it.displayName.lowercase()}.thenByDescending{it.mediaStoreId}
+        }
+        items.sortedWith(comparator).drop(offset).take(limit)
     }
 
-    suspend fun scanBucketIds(accountUserId:String,bucketId:String)=scanBucket(accountUserId,bucketId,Int.MAX_VALUE,0).map(DeviceMediaRules::stableId)
+    suspend fun scanBucketIds(accountUserId:String,bucketId:String)=scanBucket(accountUserId,bucketId,Int.MAX_VALUE,0,DeviceMediaSort.DATE_DESC).map(DeviceMediaRules::stableId)
     suspend fun exists(item:LocalMediaItem)=withContext(Dispatchers.IO){runCatching{resolver.openFileDescriptor(Uri.parse(item.contentUri),"r")?.use{true}?:false}.getOrDefault(false)}
 
     suspend fun scanTrash(accountUserId:String):List<DeviceTrashItem> = withContext(Dispatchers.IO){
