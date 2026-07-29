@@ -9,6 +9,45 @@ import AttachmentsImageLightbox from "./AttachmentsImageLightbox.jsx";
 
 const HEIGHTS = new Set(["compact", "normal", "large"]);
 
+function AlbumPreviewImage({ photo }) {
+  const candidates = [
+    ...new Set(
+      (
+        photo.media_type === "video"
+          ? [photo.poster_url, photo.thumbnail_url, photo.preview_url]
+          : [photo.thumbnail_url, photo.preview_url, photo.original_url]
+      ).filter(Boolean)
+    ),
+  ];
+  const [candidateIndex, setCandidateIndex] = useState(0);
+
+  useEffect(() => {
+    setCandidateIndex(0);
+  }, [
+    photo.id,
+    photo.poster_url,
+    photo.thumbnail_url,
+    photo.preview_url,
+    photo.original_url,
+  ]);
+
+  const src = candidates[candidateIndex];
+
+  if (!src) {
+    return <span className="od-orange-photo-album-embed__placeholder" />;
+  }
+
+  return (
+    <img
+      src={src}
+      alt=""
+      loading="eager"
+      fetchPriority="auto"
+      onError={() => setCandidateIndex((current) => current + 1)}
+    />
+  );
+}
+
 function OrangePhotoAlbumView({ node, editor, getPos, selected }) {
   const albumId = node.attrs.albumId;
   const height = HEIGHTS.has(node.attrs.height) ? node.attrs.height : "normal";
@@ -61,7 +100,7 @@ function OrangePhotoAlbumView({ node, editor, getPos, selected }) {
   }
   return <NodeViewWrapper className={`od-orange-photo-album-embed is-${height}${selected ? " is-selected" : ""}`} data-orange-photo-album="" contentEditable={false} onMouseDown={(event) => { if (event.target === event.currentTarget) selectNode(event); }}>
     <header className="od-orange-photo-album-embed__header" onMouseDown={selectNode}><span className="od-orange-photo-album-embed__identity"><IonIcon icon={OD_ICONS.richImage} aria-hidden="true" /><span><strong>{album?.title || "Álbum de Orange Photos"}</strong>{album ? <small>{album.photo_count || 0} elementos</small> : null}</span></span></header>
-    <div className="od-orange-photo-album-embed__content">{status === "loading" ? <p className="od-status-line">Cargando álbum…</p> : unavailable ? <div><p className="od-status-line od-status-line--error">Este álbum ya no está disponible o no tienes permiso para verlo.</p><button type="button" className="od-btn od-btn-secondary" onClick={() => setRetryKey((value) => value + 1)}>Reintentar</button></div> : status === "error" ? <div><p className="od-status-line od-status-line--error">No se pudo cargar el álbum.</p><button type="button" className="od-btn od-btn-secondary" onClick={() => setRetryKey((value) => value + 1)}>Reintentar</button></div> : !items.length ? <p className="od-status-line">Este álbum no contiene fotos ni vídeos.</p> : <><div className="od-orange-photo-album-embed__grid">{items.map((photo) => { const src = photo.thumbnail_url || photo.poster_url || photo.preview_url; return <button type="button" className="od-orange-photo-album-embed__item" key={photo.id} aria-label={`Abrir ${photo.title || photo.original_filename || "Sin título"}`} onClick={(event) => { event.stopPropagation(); setViewerId(photo.id); }}>{src ? <img src={src} alt="" loading="lazy" /> : <span className="od-orange-photo-album-embed__placeholder" />}{photo.media_type === "video" ? <span className="od-orange-photo-album-embed__video"><IonIcon icon={OD_ICONS.richVideo} /></span> : null}</button>; })}</div>{hasMore ? <button type="button" className="od-btn od-btn-secondary od-orange-photo-album-embed__more" disabled={loadingMore} onClick={loadMore}>{loadingMore ? "Cargando…" : "Cargar más"}</button> : null}</>}</div>
+    <div className="od-orange-photo-album-embed__content">{status === "loading" ? <p className="od-status-line">Cargando álbum…</p> : unavailable ? <div><p className="od-status-line od-status-line--error">Este álbum ya no está disponible o no tienes permiso para verlo.</p><button type="button" className="od-btn od-btn-secondary" onClick={() => setRetryKey((value) => value + 1)}>Reintentar</button></div> : status === "error" ? <div><p className="od-status-line od-status-line--error">No se pudo cargar el álbum.</p><button type="button" className="od-btn od-btn-secondary" onClick={() => setRetryKey((value) => value + 1)}>Reintentar</button></div> : !items.length ? <p className="od-status-line">Este álbum no contiene fotos ni vídeos.</p> : <><div className="od-orange-photo-album-embed__grid">{items.map((photo) => <button type="button" className="od-orange-photo-album-embed__item" key={photo.id} aria-label={`Abrir ${photo.title || photo.original_filename || "Sin título"}`} onClick={(event) => { event.stopPropagation(); setViewerId(photo.id); }}><AlbumPreviewImage photo={photo} />{photo.media_type === "video" ? <span className="od-orange-photo-album-embed__video"><IonIcon icon={OD_ICONS.richVideo} /></span> : null}</button>)}</div>{hasMore ? <button type="button" className="od-btn od-btn-secondary od-orange-photo-album-embed__more" disabled={loadingMore} onClick={loadMore}>{loadingMore ? "Cargando…" : "Cargar más"}</button> : null}</>}</div>
     {viewer ? <AttachmentsImageLightbox viewer={{ url: viewer.original_url || viewer.preview_url || viewer.thumbnail_url, poster: viewer.poster_url || viewer.thumbnail_url, mediaType: viewer.media_type, title: viewer.title || viewer.original_filename || "Sin título", positionLabel: `${viewerIndex + 1} de ${items.length}` }} onClose={() => setViewerId(null)} onPrevious={() => setViewerId(items[viewerIndex - 1].id)} onNext={() => setViewerId(items[viewerIndex + 1].id)} hasPrevious={viewerIndex > 0} hasNext={viewerIndex < items.length - 1} /> : null}
   </NodeViewWrapper>;
 }
