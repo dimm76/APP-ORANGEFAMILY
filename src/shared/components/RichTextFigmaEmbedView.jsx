@@ -9,11 +9,13 @@ import {
   figmaEmbedSrcFromUrl,
   resolveFigmaModes,
 } from "../utils/figmaEmbedUrl.js";
+import RichTextBlockDragHandle from "./RichTextBlockDragHandle.jsx";
+import RichTextBlockSelectionHandle from "./RichTextBlockSelectionHandle.jsx";
 
 /**
  * @param {import("@tiptap/react").NodeViewProps} props
  */
-export default function RichTextFigmaEmbedView({ node, selected }) {
+export default function RichTextFigmaEmbedView({ node, selected, editor, getPos }) {
   const rootRef = useRef(null);
   const url = String(node.attrs.url ?? "").trim();
   const height = clampFigmaEmbedHeight(node.attrs.height);
@@ -31,7 +33,7 @@ export default function RichTextFigmaEmbedView({ node, selected }) {
   return (
     <NodeViewWrapper
       ref={rootRef}
-      className={`${buildFigmaEmbedClassName(widthMode)}${
+      className={`od-editor-block od-editor-selectable-block ${buildFigmaEmbedClassName(widthMode)}${
         selected ? " is-selected" : ""
       }${!embedSrc ? " od-figma-embed--empty" : ""}${
         isFullWidth ? " od-figma-embed--has-full-metrics" : ""
@@ -42,6 +44,8 @@ export default function RichTextFigmaEmbedView({ node, selected }) {
       data-width-mode={widthMode}
       data-show-toolbar={showToolbar ? "true" : "false"}
     >
+      <RichTextBlockSelectionHandle editor={editor} getPos={getPos} nodeName="figmaEmbed" label="Seleccionar Figma" />
+      <RichTextBlockDragHandle editor={editor} label="Arrastrar Figma" />
       <div className="od-figma-embed__breakout">
         {showToolbar && embedSrc ? (
           <div className="od-figma-embed__toolbar" contentEditable={false}>

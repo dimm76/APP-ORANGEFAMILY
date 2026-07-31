@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { overlayZIndexForStackDepth } from "../overlay/odModalStack.js";
+import { isRichTextNodeSelection } from "../utils/richTextNodeSelection.js";
 import { uploadAttachmentImage } from "../api/attachmentsApi.js";
 import { OD_CORPORATE_COLORS } from "../ui/odCorporateColors.js";
 import {
@@ -197,7 +198,9 @@ export default function RichTextOdContainerBubbleMenu({ editor }) {
     <BubbleMenu
       editor={editor}
       pluginKey="odRichOdContainerMenu"
-      shouldShow={({ editor: ed }) => ed.isActive("odContainer")}
+      shouldShow={({ editor: ed, state }) =>
+        ed.isEditable && isRichTextNodeSelection(state, "odContainer")
+      }
       tippyOptions={{ duration: 100, zIndex: overlayZIndexForStackDepth() }}
       className="od-rich-text-editor__toolbar-popover od-rich-gsheets-menu od-rich-container-menu"
     >

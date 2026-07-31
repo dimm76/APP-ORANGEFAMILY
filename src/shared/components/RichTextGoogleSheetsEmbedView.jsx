@@ -10,11 +10,13 @@ import {
   legacyVisualStyleFromModes,
   resolveGoogleSheetsModes,
 } from "../utils/googleSheetsEmbedUrl.js";
+import RichTextBlockDragHandle from "./RichTextBlockDragHandle.jsx";
+import RichTextBlockSelectionHandle from "./RichTextBlockSelectionHandle.jsx";
 
 /**
  * @param {import("@tiptap/react").NodeViewProps} props
  */
-export default function RichTextGoogleSheetsEmbedView({ node, selected }) {
+export default function RichTextGoogleSheetsEmbedView({ node, selected, editor, getPos }) {
   const rootRef = useRef(null);
   const url = String(node.attrs.url ?? "").trim();
   const height = clampGoogleSheetsEmbedHeight(node.attrs.height);
@@ -29,7 +31,7 @@ export default function RichTextGoogleSheetsEmbedView({ node, selected }) {
   return (
     <NodeViewWrapper
       ref={rootRef}
-      className={`${buildGoogleSheetsEmbedClassName(viewMode, widthMode)}${
+      className={`od-editor-block od-editor-selectable-block ${buildGoogleSheetsEmbedClassName(viewMode, widthMode)}${
         selected ? " is-selected" : ""
       }${!embedSrc ? " od-gsheets-embed--empty" : ""}${
         isFullWidth ? " od-gsheets-embed--has-full-metrics" : ""
@@ -42,6 +44,8 @@ export default function RichTextGoogleSheetsEmbedView({ node, selected }) {
       data-visual-style={legacyStyle}
       data-show-toolbar={showToolbar ? "true" : "false"}
     >
+      <RichTextBlockSelectionHandle editor={editor} getPos={getPos} nodeName="googleSheetsEmbed" label="Seleccionar Google Sheets" />
+      <RichTextBlockDragHandle editor={editor} label="Arrastrar Google Sheets" />
       <div className="od-gsheets-embed__breakout">
         {showToolbar && embedSrc ? (
           <div className="od-gsheets-embed__toolbar" contentEditable={false}>

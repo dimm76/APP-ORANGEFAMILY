@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useEditorState } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
-import { NodeSelection } from "@tiptap/pm/state";
 import { overlayZIndexForStackDepth } from "../overlay/odModalStack.js";
 import OrangePhotoEmbedPickerModal from "./OrangePhotoEmbedPickerModal.jsx";
+import { isRichTextNodeSelection } from "../utils/richTextNodeSelection.js";
 
 export default function RichTextOrangePhotoVideoBubbleMenu({ editor }) {
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -13,7 +13,7 @@ export default function RichTextOrangePhotoVideoBubbleMenu({ editor }) {
   });
   if (!editor || !editor.isEditable) return null;
   return <>
-    <BubbleMenu editor={editor} pluginKey="orangePhotoVideoBubbleMenu" shouldShow={({ state }) => state.selection instanceof NodeSelection && state.selection.node?.type?.name === "orangePhotoVideo"} tippyOptions={{ duration: 100, zIndex: overlayZIndexForStackDepth() }} className="od-rich-text-editor__toolbar-popover">
+    <BubbleMenu editor={editor} pluginKey="orangePhotoVideoBubbleMenu" shouldShow={({ editor: currentEditor, state }) => currentEditor.isEditable && isRichTextNodeSelection(state, "orangePhotoVideo")} tippyOptions={{ duration: 100, zIndex: overlayZIndexForStackDepth() }} className="od-rich-text-editor__toolbar-popover">
       <div className="od-rich-text-editor__toolbar od-orange-photo-bubble-menu">
         <button type="button" className="od-rich-text-editor__button" onMouseDown={(event) => event.preventDefault()} onClick={() => setPickerOpen(true)}>Cambiar vídeo</button>
       </div>

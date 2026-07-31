@@ -2,7 +2,7 @@ import { IonIcon } from "@ionic/react";
 import { OD_ICONS } from "../ui/odIcons.js";
 
 export default function RichTextBlockDragHandle({ editor, label = "Arrastrar bloque" }) {
-  if (!editor?.isEditable) return null;
+  if (!editor) return null;
 
   return (
     <button

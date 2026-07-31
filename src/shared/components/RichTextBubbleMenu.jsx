@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { BubbleMenu } from "@tiptap/react/menus";
-import { NodeSelection } from "@tiptap/pm/state";
+import { TextSelection } from "@tiptap/pm/state";
 import { IonIcon } from "@ionic/react";
 import { OD_ICONS } from "../ui/odIcons.js";
 import { RICH_TEXT_GLYPH } from "./richTextMenuGlyphs.js";
@@ -284,11 +284,10 @@ export default function RichTextBubbleMenu({ editor, inlineOnly = false, onPickE
         }
 
         if (inlineOnly) {
-          if (state.selection instanceof NodeSelection) {
-            return false;
-          }
-
-          return !state.selection.empty;
+          return (
+            state.selection instanceof TextSelection &&
+            !state.selection.empty
+          );
         }
 
         return true;

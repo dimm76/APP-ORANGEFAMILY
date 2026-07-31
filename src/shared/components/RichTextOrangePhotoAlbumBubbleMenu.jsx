@@ -4,6 +4,10 @@ import { BubbleMenu } from "@tiptap/react/menus";
 import { NodeSelection } from "@tiptap/pm/state";
 import { overlayZIndexForStackDepth } from "../overlay/odModalStack.js";
 import OrangePhotoEmbedPickerModal from "./OrangePhotoEmbedPickerModal.jsx";
+import {
+  getRichTextNodeSelectionContext,
+  isRichTextNodeSelection,
+} from "../utils/richTextNodeSelection.js";
 
 const HEIGHTS = new Set(["compact", "normal", "large"]);
 
@@ -18,16 +22,10 @@ export default function RichTextOrangePhotoAlbumBubbleMenu({ editor }) {
   const albumId = String(attrs.albumId || "");
   const height = HEIGHTS.has(attrs.height) ? attrs.height : "normal";
   function openPicker() {
-    const { selection } = editor.state;
+    const context = getRichTextNodeSelectionContext(editor.state, "orangePhotoAlbum");
+    if (!context) return;
 
-    if (
-      !(selection instanceof NodeSelection) ||
-      selection.node?.type?.name !== "orangePhotoAlbum"
-    ) {
-      return;
-    }
-
-    targetPosRef.current = selection.from;
+    targetPosRef.current = context.pos;
     setPickerOpen(true);
   }
 
@@ -71,7 +69,7 @@ export default function RichTextOrangePhotoAlbumBubbleMenu({ editor }) {
     editor.view.focus();
   }
   return <>
-    <BubbleMenu editor={editor} pluginKey="orangePhotoAlbumBubbleMenu" shouldShow={({ state }) => state.selection instanceof NodeSelection && state.selection.node?.type?.name === "orangePhotoAlbum"} tippyOptions={{ duration: 100, zIndex: overlayZIndexForStackDepth() }} className="od-rich-text-editor__toolbar-popover">
+    <BubbleMenu editor={editor} pluginKey="orangePhotoAlbumBubbleMenu" shouldShow={({ editor: currentEditor, state }) => currentEditor.isEditable && isRichTextNodeSelection(state, "orangePhotoAlbum")} tippyOptions={{ duration: 100, zIndex: overlayZIndexForStackDepth() }} className="od-rich-text-editor__toolbar-popover">
       <div className="od-rich-text-editor__toolbar od-orange-photo-bubble-menu">
         <select className="od-filter-input" aria-label="Altura del álbum" value={height} onChange={(event) => editor.chain().focus().updateAttributes("orangePhotoAlbum", { height: event.target.value }).run()}>
           <option value="compact">Compacta</option><option value="normal">Normal</option><option value="large">Grande</option>

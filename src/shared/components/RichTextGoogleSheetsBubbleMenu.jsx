@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { overlayZIndexForStackDepth } from "../overlay/odModalStack.js";
+import { isRichTextNodeSelection } from "../utils/richTextNodeSelection.js";
 import { promptGoogleSheetsUrl } from "./insertGoogleSheetsEmbed.js";
 import {
   clampGoogleSheetsEmbedHeight,
@@ -134,7 +135,9 @@ export default function RichTextGoogleSheetsBubbleMenu({ editor }) {
     <BubbleMenu
       editor={editor}
       pluginKey="odRichGoogleSheetsMenu"
-      shouldShow={({ editor: ed }) => ed.isActive("googleSheetsEmbed")}
+      shouldShow={({ editor: ed, state }) =>
+        ed.isEditable && isRichTextNodeSelection(state, "googleSheetsEmbed")
+      }
       tippyOptions={{ duration: 100, zIndex: overlayZIndexForStackDepth() }}
       className="od-rich-text-editor__toolbar-popover od-rich-gsheets-menu"
     >

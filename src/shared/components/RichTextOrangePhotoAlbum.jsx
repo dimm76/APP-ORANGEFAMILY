@@ -7,6 +7,7 @@ import { listOrangeAlbums, listOrangeAlbumPhotos } from "../api/orangePhotosApi.
 import { OD_ICONS } from "../ui/odIcons.js";
 import AttachmentsImageLightbox from "./AttachmentsImageLightbox.jsx";
 import RichTextBlockDragHandle from "./RichTextBlockDragHandle.jsx";
+import RichTextBlockSelectionHandle from "./RichTextBlockSelectionHandle.jsx";
 
 const HEIGHTS = new Set(["compact", "normal", "large"]);
 
@@ -93,15 +94,9 @@ function OrangePhotoAlbumView({ node, editor, getPos, selected }) {
   const viewerIndex = useMemo(() => items.findIndex((item) => item.id === viewerId), [items, viewerId]);
   const viewer = viewerIndex >= 0 ? items[viewerIndex] : null;
   const unavailable = status === "unavailable" || errorCode === "NOT_FOUND" || errorCode === "FORBIDDEN";
-  function selectNode(event) {
-    if (!editor.isEditable) return;
-    if (event.target instanceof HTMLElement && event.target.closest("[data-drag-handle]")) return;
-    event.preventDefault(); event.stopPropagation();
-    const position = typeof getPos === "function" ? getPos() : null;
-    if (Number.isInteger(position)) editor.commands.setNodeSelection(position);
-  }
-  return <NodeViewWrapper className={`od-orange-photo-album-embed is-${height}${selected ? " is-selected" : ""}`} data-orange-photo-album="" contentEditable={false} onMouseDown={(event) => { if (event.target === event.currentTarget) selectNode(event); }}>
-    <header className="od-orange-photo-album-embed__header" onMouseDown={selectNode}><RichTextBlockDragHandle editor={editor} label="Arrastrar álbum de Orange Photos" /><span className="od-orange-photo-album-embed__identity"><IonIcon icon={OD_ICONS.richImage} aria-hidden="true" /><span><strong>{album?.title || "Álbum de Orange Photos"}</strong>{album ? <small>{album.photo_count || 0} elementos</small> : null}</span></span></header>
+  return <NodeViewWrapper className={`od-editor-block od-editor-selectable-block od-orange-photo-album-embed is-${height}${selected ? " is-selected" : ""}`} data-orange-photo-album="" contentEditable={false}>
+    <RichTextBlockSelectionHandle editor={editor} getPos={getPos} nodeName="orangePhotoAlbum" label="Seleccionar álbum de Orange Photos" />
+    <header className="od-orange-photo-album-embed__header"><RichTextBlockDragHandle editor={editor} label="Arrastrar álbum de Orange Photos" /><span className="od-orange-photo-album-embed__identity"><IonIcon icon={OD_ICONS.richImage} aria-hidden="true" /><span><strong>{album?.title || "Álbum de Orange Photos"}</strong>{album ? <small>{album.photo_count || 0} elementos</small> : null}</span></span></header>
     <div className="od-orange-photo-album-embed__content">{status === "loading" ? <p className="od-status-line">Cargando álbum…</p> : unavailable ? <div><p className="od-status-line od-status-line--error">Este álbum ya no está disponible o no tienes permiso para verlo.</p><button type="button" className="od-btn od-btn-secondary" onClick={() => setRetryKey((value) => value + 1)}>Reintentar</button></div> : status === "error" ? <div><p className="od-status-line od-status-line--error">No se pudo cargar el álbum.</p><button type="button" className="od-btn od-btn-secondary" onClick={() => setRetryKey((value) => value + 1)}>Reintentar</button></div> : !items.length ? <p className="od-status-line">Este álbum no contiene fotos ni vídeos.</p> : <><div className="od-orange-photo-album-embed__grid">{items.map((photo) => <button type="button" className="od-orange-photo-album-embed__item" key={photo.id} aria-label={`Abrir ${photo.title || photo.original_filename || "Sin título"}`} onClick={(event) => { event.stopPropagation(); setViewerId(photo.id); }}><AlbumPreviewImage photo={photo} />{photo.media_type === "video" ? <span className="od-orange-photo-album-embed__video"><IonIcon icon={OD_ICONS.richVideo} /></span> : null}</button>)}</div>{hasMore ? <button type="button" className="od-btn od-btn-secondary od-orange-photo-album-embed__more" disabled={loadingMore} onClick={loadMore}>{loadingMore ? "Cargando…" : "Cargar más"}</button> : null}</>}</div>
     {viewer ? <AttachmentsImageLightbox viewer={{ url: viewer.original_url || viewer.preview_url || viewer.thumbnail_url, poster: viewer.poster_url || viewer.thumbnail_url, mediaType: viewer.media_type, title: viewer.title || viewer.original_filename || "Sin título", positionLabel: `${viewerIndex + 1} de ${items.length}` }} onClose={() => setViewerId(null)} onPrevious={() => setViewerId(items[viewerIndex - 1].id)} onNext={() => setViewerId(items[viewerIndex + 1].id)} hasPrevious={viewerIndex > 0} hasNext={viewerIndex < items.length - 1} /> : null}
   </NodeViewWrapper>;

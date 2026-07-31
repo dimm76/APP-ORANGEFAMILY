@@ -5,6 +5,7 @@ import { TextSelection } from "@tiptap/pm/state";
 import { IonIcon } from "@ionic/react";
 import { OD_ICONS } from "../ui/odIcons.js";
 import RichTextBlockDragHandle from "./RichTextBlockDragHandle.jsx";
+import RichTextBlockSelectionHandle from "./RichTextBlockSelectionHandle.jsx";
 
 function createTabId() {
   return `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -164,7 +165,7 @@ function TabTitleInput({ title, onCommit }) {
   );
 }
 
-function OdTabsNodeView({ editor, node, getPos, updateAttributes }) {
+function OdTabsNodeView({ editor, node, getPos, updateAttributes, selected }) {
   const tabs = [];
 
   node.forEach((child) => {
@@ -327,11 +328,12 @@ function OdTabsNodeView({ editor, node, getPos, updateAttributes }) {
 
   return (
     <NodeViewWrapper
-      className="od-editor-block od-editor-tabs"
+      className={`od-editor-block od-editor-selectable-block od-editor-tabs${selected ? " is-selected" : ""}`}
       data-od-node="tabs"
       data-active-tab-id={activeTabId || ""}
       data-active-tab-index={String(activeTabIndex)}
     >
+      <RichTextBlockSelectionHandle editor={editor} getPos={getPos} nodeName="odTabs" label="Seleccionar bloque de pestañas" />
       <RichTextBlockDragHandle editor={editor} label="Arrastrar bloque de pestañas" />
       <div className="od-editor-tabs__bubble" contentEditable={false}>
         <button

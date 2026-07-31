@@ -2,9 +2,10 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewContent, NodeViewWrapper } from "@tiptap/react";
 import { IonIcon } from "@ionic/react";
 import { OD_ICONS } from "../ui/odIcons.js";
+import RichTextBlockSelectionHandle from "./RichTextBlockSelectionHandle.jsx";
 
 // eslint-disable-next-line react-refresh/only-export-components
-function OdDisclosureNodeView({ node, updateAttributes, editor, getPos }) {
+function OdDisclosureNodeView({ node, updateAttributes, editor, getPos, selected }) {
   const title = node.attrs.title || "Título del desplegable";
   const open = Boolean(node.attrs.open);
   const titleLevel =
@@ -27,11 +28,12 @@ function OdDisclosureNodeView({ node, updateAttributes, editor, getPos }) {
 
   return (
     <NodeViewWrapper
-      className={`od-editor-block od-editor-disclosure${open ? " is-open" : ""}`}
+      className={`od-editor-block od-editor-selectable-block od-editor-disclosure${open ? " is-open" : ""}${selected ? " is-selected" : ""}`}
       data-od-node="disclosure"
       data-open={open ? "true" : "false"}
       data-node-pos={typeof getPos === "function" ? getPos() : undefined}
     >
+      <RichTextBlockSelectionHandle editor={editor} getPos={getPos} nodeName="odDisclosure" label="Seleccionar desplegable" />
       <div className="od-editor-disclosure__summary" contentEditable={false}>
         {editor.isEditable ? (
           <button
@@ -89,6 +91,8 @@ export const OdDisclosure = Node.create({
   isolating: true,
 
   draggable: true,
+
+  selectable: true,
 
   addAttributes() {
     return {
