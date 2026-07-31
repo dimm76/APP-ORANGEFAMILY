@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { useEditorState } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { overlayZIndexForStackDepth } from "../overlay/odModalStack.js";
 import { uploadAttachmentImage } from "../api/attachmentsApi.js";
 import { OD_CORPORATE_COLORS } from "../ui/odCorporateColors.js";
+import { getRichTextNodeSelectionContext, isRichTextNodeSelection } from "../utils/richTextNodeSelection.js";
 import {
   clampOdContainerBorderRadius,
   clampOdContainerBorderWidth,
@@ -132,10 +134,17 @@ export default function RichTextOdContainerBubbleMenu({ editor }) {
   const [openPicker, setOpenPicker] = useState(null);
   const [uploadingBg, setUploadingBg] = useState(false);
   const bgInputRef = useRef(null);
+  const selectedAttrs = useEditorState({
+    editor,
+    selector: ({ editor: currentEditor }) => {
+      if (!currentEditor) return null;
+      return getRichTextNodeSelectionContext(currentEditor.state, "odContainer")?.attrs ?? null;
+    },
+  });
 
   if (!editor) return null;
 
-  const attrs = resolveOdContainerAttrs(editor.getAttributes("odContainer"));
+  const attrs = resolveOdContainerAttrs(selectedAttrs ?? {});
   const widthLabel = WIDTH_OPTIONS.find((option) => option.id === attrs.widthMode)?.label ?? "Normal";
   const backgroundLabel =
     BACKGROUND_OPTIONS.find((option) => option.id === attrs.backgroundType)?.label ?? "Sin fondo";
@@ -197,7 +206,9 @@ export default function RichTextOdContainerBubbleMenu({ editor }) {
     <BubbleMenu
       editor={editor}
       pluginKey="odRichOdContainerMenu"
-      shouldShow={({ editor: ed }) => ed.isActive("odContainer")}
+      shouldShow={({ editor: currentEditor, state }) =>
+        currentEditor.isEditable && isRichTextNodeSelection(state, "odContainer")
+      }
       tippyOptions={{ duration: 100, zIndex: overlayZIndexForStackDepth() }}
       className="od-rich-text-editor__toolbar-popover od-rich-gsheets-menu od-rich-container-menu"
     >

@@ -14,6 +14,8 @@ import RichTextGoogleSheetsBubbleMenu from "./RichTextGoogleSheetsBubbleMenu.jsx
 import RichTextFigmaBubbleMenu from "./RichTextFigmaBubbleMenu.jsx";
 import RichTextOdContainerBubbleMenu from "./RichTextOdContainerBubbleMenu.jsx";
 import RichTextOdColumnsBubbleMenu from "./RichTextOdColumnsBubbleMenu.jsx";
+import RichTextOdColumnBubbleMenu from "./RichTextOdColumnBubbleMenu.jsx";
+import RichTextFloatingDragHandle from "./RichTextFloatingDragHandle.jsx";
 import RichTextBlockInsertMenu from "./RichTextBlockInsertMenu.jsx";
 import RichTextSlashCommandMenu from "./RichTextSlashCommandMenu.jsx";
 import AttachmentImageLibraryModal from "./AttachmentImageLibraryModal.jsx";
@@ -413,6 +415,7 @@ export default function RichTextEditor({
       }),
       Table.configure({
         resizable: false,
+        allowTableNodeSelection: true,
       }),
       TableRow,
       TableHeader,
@@ -534,6 +537,7 @@ export default function RichTextEditor({
 
   const editorChrome = (
     <>
+      <RichTextFloatingDragHandle editor={editor} />
       {enableSlashCommand ? (
         <RichTextSlashCommandMenu editor={editor} handlers={slashHandlers} />
       ) : null}
@@ -543,6 +547,7 @@ export default function RichTextEditor({
       <RichTextFigmaBubbleMenu editor={editor} />
       <RichTextOdContainerBubbleMenu editor={editor} />
       <RichTextOdColumnsBubbleMenu editor={editor} />
+      <RichTextOdColumnBubbleMenu editor={editor} />
       <div className="od-rich-text-editor__content-wrap">
         <EditorContent editor={editor} className="od-rich-text-editor__content" />
       </div>

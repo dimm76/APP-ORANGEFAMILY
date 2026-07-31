@@ -1,25 +1,15 @@
 import { useEditorState } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { overlayZIndexForStackDepth } from "../overlay/odModalStack.js";
-
-function findDisclosurePosition(editor) {
-  const { $from } = editor.state.selection;
-  for (let depth = $from.depth; depth > 0; depth -= 1) {
-    if ($from.node(depth).type.name === "odDisclosure") {
-      return {
-        pos: $from.before(depth),
-        node: $from.node(depth),
-      };
-    }
-  }
-  return null;
-}
+import { getRichTextNodeSelectionContext, isRichTextNodeSelection } from "../utils/richTextNodeSelection.js";
 
 export default function RichTextOdDisclosureBubbleMenu({ editor }) {
   const disclosure = useEditorState({
     editor,
     selector: ({ editor: currentEditor }) => {
-      const context = currentEditor ? findDisclosurePosition(currentEditor) : null;
+      const context = currentEditor
+        ? getRichTextNodeSelectionContext(currentEditor.state, "odDisclosure")
+        : null;
       return context
         ? {
             open: Boolean(context.node.attrs.open),
@@ -35,7 +25,7 @@ export default function RichTextOdDisclosureBubbleMenu({ editor }) {
   if (!editor || !editor.isEditable) return null;
 
   function updateDisclosure(patch) {
-    const context = findDisclosurePosition(editor);
+    const context = getRichTextNodeSelectionContext(editor.state, "odDisclosure");
     if (!context) return;
     editor
       .chain()
@@ -56,7 +46,7 @@ export default function RichTextOdDisclosureBubbleMenu({ editor }) {
       .chain()
       .focus()
       .command(({ tr }) => {
-        const context = findDisclosurePosition(editor);
+        const context = getRichTextNodeSelectionContext(editor.state, "odDisclosure");
         if (!context) return false;
         tr.delete(context.pos, context.pos + context.node.nodeSize);
         return true;
@@ -73,8 +63,8 @@ export default function RichTextOdDisclosureBubbleMenu({ editor }) {
     <BubbleMenu
       editor={editor}
       pluginKey="odDisclosureBubbleMenu"
-      shouldShow={({ editor: currentEditor }) =>
-        currentEditor.isEditable && Boolean(findDisclosurePosition(currentEditor))
+      shouldShow={({ editor: currentEditor, state }) =>
+        currentEditor.isEditable && isRichTextNodeSelection(state, "odDisclosure")
       }
       tippyOptions={{ duration: 100, zIndex: overlayZIndexForStackDepth() }}
       className="od-rich-text-editor__toolbar-popover"

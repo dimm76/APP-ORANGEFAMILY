@@ -3752,8 +3752,8 @@ ion-button.od-rich-text-add-block-btn.is-active {
   color-scheme: light;
 }
 
-.od-rich-text-editor .ProseMirror .od-editor-tabs:hover > .od-editor-tabs__bubble,
-.od-rich-text-editor .ProseMirror .od-editor-tabs:focus-within > .od-editor-tabs__bubble {
+.od-rich-text-editor .ProseMirror .od-editor-tabs.is-selected > .od-editor-tabs__bubble,
+.od-rich-text-editor .ProseMirror .od-editor-tabs.ProseMirror-selectednode > .od-editor-tabs__bubble {
   display: inline-flex;
 }
 
@@ -3974,29 +3974,6 @@ ion-button.od-rich-text-add-block-btn.is-active {
   border-bottom: 1px solid var(--od-color-border-muted, #dce3f5);
 }
 
-.od-editor-block__drag-handle {
-  flex: 0 0 28px;
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--od-color-text-muted, #64748b);
-  cursor: grab;
-}
-
-.od-editor-block__drag-handle:active {
-  cursor: grabbing;
-}
-
-.od-editor-block__drag-handle ion-icon {
-  width: 18px;
-  height: 18px;
-}
-
 .od-editor-block,
 .od-rich-attachment-image-view,
 .od-tiptap-container,
@@ -4004,38 +3981,43 @@ ion-button.od-rich-text-add-block-btn.is-active {
   position: relative;
 }
 
-.od-editor-block > .od-editor-block__drag-handle,
-.od-rich-attachment-image-view > .od-editor-block__drag-handle,
-.od-tiptap-container > .od-editor-block__drag-handle,
-.od-orange-photo-video-embed > .od-editor-block__drag-handle {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  z-index: 1;
-  opacity: 0;
-  border-radius: 6px;
-  background: var(--od-panel-surface, #ffffff);
+/* Handle flotante único de Tiptap */
+.od-rich-text-floating-drag-handle-host { z-index: 45; }
+.od-rich-text-floating-drag-handle {
+  width: 30px;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 7px;
+  background-color: var(--od-color-primary, #fc4200) !important;
+  color: #ffffff !important;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.2);
+  cursor: grab;
+}
+.od-rich-text-floating-drag-handle:hover { background-color: #e83d00 !important; }
+.od-rich-text-floating-drag-handle:active,
+.od-rich-text-floating-drag-handle-host[data-dragging="true"] .od-rich-text-floating-drag-handle { cursor: grabbing; }
+.od-rich-text-floating-drag-handle ion-icon { width: 17px; height: 17px; font-size: 17px; }
+
+/* Único nodo objetivo del hover */
+.od-rich-text-editor:not(.is-wiki-readonly) .ProseMirror .od-rich-text-drag-target:not(.ProseMirror-selectednode) {
+  outline: 1px solid rgba(252, 66, 0, 0.52) !important;
+  outline-offset: 2px;
 }
 
-.od-editor-block:hover > .od-editor-block__drag-handle,
-.od-editor-block.ProseMirror-selectednode > .od-editor-block__drag-handle,
-.od-rich-attachment-image-view:hover > .od-editor-block__drag-handle,
-.od-rich-attachment-image-view.is-selected > .od-editor-block__drag-handle,
-.od-tiptap-container:hover > .od-editor-block__drag-handle,
-.od-tiptap-container.is-selected > .od-editor-block__drag-handle,
-.od-orange-photo-video-embed:hover > .od-editor-block__drag-handle,
-.od-orange-photo-video-embed.is-selected > .od-editor-block__drag-handle {
-  opacity: 1;
+/* Única selección sólida */
+.od-rich-text-editor .ProseMirror .ProseMirror-selectednode {
+  outline: 2px solid var(--od-color-primary, #fc4200) !important;
+  outline-offset: 2px;
 }
 
-.od-editor-disclosure > .od-editor-disclosure__summary .od-editor-block__drag-handle,
-.od-orange-photo-album-embed__header > .od-editor-block__drag-handle {
-  opacity: 1;
-}
-
-.od-wiki-tiptap.is-wiki-readonly .od-editor-block__drag-handle {
-  display: none;
-}
+/* Lectura: ningún estado de edición */
+.od-wiki-tiptap.is-wiki-readonly .ProseMirror .od-rich-text-drag-target,
+.od-wiki-tiptap.is-wiki-readonly .ProseMirror .ProseMirror-selectednode { outline: none !important; }
 
 .od-editor-disclosure__heading {
   flex: 1;
@@ -5983,12 +5965,6 @@ ion-button.od-rich-text-add-block-btn.is-active {
   width: 75%;
 }
 
-.od-rich-text-editor .ProseMirror img.ProseMirror-selectednode,
-.od-rich-text-editor .ProseMirror-selectednode img.od-rich-attachment-image {
-  outline: 2px solid #fc4200;
-  outline-offset: 2px;
-}
-
 .od-rich-image-menu__toolbar {
   gap: 4px;
 }
@@ -6463,13 +6439,6 @@ ion-button.od-rich-text-add-block-btn.is-active {
   overflow: hidden;
 }
 
-.od-rich-text-editor .ProseMirror .od-gsheets-embed.is-selected,
-.od-rich-text-editor .ProseMirror .od-gsheets-embed.ProseMirror-selectednode,
-.od-rich-text-editor .ProseMirror div[data-od-gsheets-embed].ProseMirror-selectednode {
-  outline: 2px solid #fc4200;
-  outline-offset: 2px;
-}
-
 .od-gsheets-embed__toolbar {
   display: flex;
   align-items: center;
@@ -6577,13 +6546,6 @@ ion-button.od-rich-text-add-block-btn.is-active {
 
 .od-rich-text-editor .ProseMirror .od-tiptap-container__content {
   min-height: 1.5rem;
-}
-
-.od-rich-text-editor .ProseMirror .od-tiptap-container.is-selected,
-.od-rich-text-editor .ProseMirror .od-tiptap-container.ProseMirror-selectednode,
-.od-rich-text-editor .ProseMirror div[data-type="od-container"].ProseMirror-selectednode {
-  outline: 2px solid #fc4200;
-  outline-offset: 2px;
 }
 
 .od-rich-container-menu__toolbar {
@@ -6841,13 +6803,6 @@ ion-button.od-rich-text-add-block-btn.is-active {
   max-width: var(--od-figma-full-width);
   margin-left: var(--od-figma-full-margin-left);
   margin-right: var(--od-figma-full-margin-right);
-}
-
-.od-rich-text-editor .ProseMirror .od-figma-embed.is-selected,
-.od-rich-text-editor .ProseMirror .od-figma-embed.ProseMirror-selectednode,
-.od-rich-text-editor .ProseMirror div[data-od-figma-embed].ProseMirror-selectednode {
-  outline: 2px solid rgba(252, 66, 0, 0.22);
-  outline-offset: 3px;
 }
 
 .od-figma-embed__toolbar {

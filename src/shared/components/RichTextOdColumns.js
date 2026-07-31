@@ -15,6 +15,8 @@ export const OdRichColumn = Node.create({
   content: "block+",
   defining: true,
   isolating: true,
+  selectable: true,
+  draggable: false,
 
   parseHTML() {
     return [{ tag: "div.od-rich-column" }];

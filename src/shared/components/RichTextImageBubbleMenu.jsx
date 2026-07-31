@@ -1,5 +1,6 @@
 import { BubbleMenu } from "@tiptap/react/menus";
 import { overlayZIndexForStackDepth } from "../overlay/odModalStack.js";
+import { isRichTextNodeSelection } from "../utils/richTextNodeSelection.js";
 
 /**
  * Controles mínimos cuando hay una imagen embebida seleccionada.
@@ -17,7 +18,9 @@ export default function RichTextImageBubbleMenu({
     <BubbleMenu
       editor={editor}
       pluginKey="odRichImageMenu"
-      shouldShow={({ editor: ed }) => ed.isActive(nodeName)}
+      shouldShow={({ editor: currentEditor, state }) =>
+        currentEditor.isEditable && isRichTextNodeSelection(state, nodeName)
+      }
       tippyOptions={{ duration: 100, zIndex: overlayZIndexForStackDepth() }}
       className="od-rich-text-editor__toolbar-popover od-rich-image-menu"
     >

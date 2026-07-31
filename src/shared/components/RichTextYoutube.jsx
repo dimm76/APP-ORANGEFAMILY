@@ -1,9 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import Youtube, { getEmbedUrlFromYoutubeUrl } from "@tiptap/extension-youtube";
 import { NodeViewWrapper, ReactNodeViewRenderer } from "@tiptap/react";
-import RichTextBlockDragHandle from "./RichTextBlockDragHandle.jsx";
 
-function RichTextYoutubeView({ node, editor, extension }) {
+function RichTextYoutubeView({ node, extension }) {
   const src = getEmbedUrlFromYoutubeUrl({
     url: node.attrs.src,
     ...extension.options,
@@ -12,7 +11,6 @@ function RichTextYoutubeView({ node, editor, extension }) {
 
   return (
     <NodeViewWrapper className="od-editor-block od-editor-youtube" data-youtube-video="">
-      <RichTextBlockDragHandle editor={editor} label="Arrastrar vídeo de YouTube" />
       <iframe
         {...extension.options.HTMLAttributes}
         src={src || undefined}
