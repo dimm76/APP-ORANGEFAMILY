@@ -3,6 +3,34 @@ import { buildOdRichColumnsClassName, resolveColumnLayout } from "../utils/odCol
 import RichTextBlockDragHandle from "./RichTextBlockDragHandle.jsx";
 import RichTextBlockSelectionHandle from "./RichTextBlockSelectionHandle.jsx";
 
+export function RichTextOdColumnView({
+  editor,
+  selected,
+  getPos,
+}) {
+  return (
+    <NodeViewWrapper
+      className={`od-editor-selectable-block od-rich-column od-rich-column-node-view${
+        selected ? " is-selected" : ""
+      }`}
+    >
+      <RichTextBlockSelectionHandle
+        editor={editor}
+        getPos={getPos}
+        nodeName="odRichColumn"
+        label="Seleccionar columna"
+      />
+
+      <RichTextBlockDragHandle
+        editor={editor}
+        label="Arrastrar columna"
+      />
+
+      <NodeViewContent className="od-rich-column__content" />
+    </NodeViewWrapper>
+  );
+}
+
 export default function RichTextOdColumnsView({ node, editor, selected, getPos }) {
   const columns = node.attrs.columns === 3 ? 3 : 2;
   const columnLayout = resolveColumnLayout(columns, node.attrs.columnLayout);

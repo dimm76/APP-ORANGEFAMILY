@@ -3,6 +3,7 @@ import { ReactNodeViewRenderer, NodeViewContent, NodeViewWrapper } from "@tiptap
 import { IonIcon } from "@ionic/react";
 import { OD_ICONS } from "../ui/odIcons.js";
 import RichTextBlockSelectionHandle from "./RichTextBlockSelectionHandle.jsx";
+import RichTextBlockDragHandle from "./RichTextBlockDragHandle.jsx";
 
 // eslint-disable-next-line react-refresh/only-export-components
 function OdDisclosureNodeView({ node, updateAttributes, editor, getPos, selected }) {
@@ -35,21 +36,10 @@ function OdDisclosureNodeView({ node, updateAttributes, editor, getPos, selected
     >
       <RichTextBlockSelectionHandle editor={editor} getPos={getPos} nodeName="odDisclosure" label="Seleccionar desplegable" />
       <div className="od-editor-disclosure__summary" contentEditable={false}>
-        {editor.isEditable ? (
-          <button
-            type="button"
-            className="od-editor-block__drag-handle"
-            aria-label="Arrastrar desplegable"
-            data-drag-handle
-            contentEditable={false}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-          >
-            <IonIcon icon={OD_ICONS.reorder} aria-hidden="true" />
-          </button>
-        ) : null}
+        <RichTextBlockDragHandle
+          editor={editor}
+          label="Arrastrar desplegable"
+        />
 
         <button
           type="button"

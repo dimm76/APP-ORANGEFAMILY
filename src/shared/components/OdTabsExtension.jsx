@@ -582,6 +582,10 @@ export const OdTabPanel = Node.create({
 
   isolating: false,
 
+  selectable: false,
+
+  draggable: false,
+
   addAttributes() {
     return {
       id: {

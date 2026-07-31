@@ -16,15 +16,15 @@ export default function RichTextBlockSelectionHandle({
   nodeName,
   label = "Seleccionar bloque",
 }) {
-  function stopPointerSelection(event) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-
-  function handleClick(event) {
+  function handleMouseDown(event) {
     event.preventDefault();
     event.stopPropagation();
     selectRichTextNode(editor, getPos, nodeName);
+  }
+
+  function stopClick(event) {
+    event.preventDefault();
+    event.stopPropagation();
   }
 
   return (
@@ -34,8 +34,8 @@ export default function RichTextBlockSelectionHandle({
       aria-label={label}
       title={label}
       contentEditable={false}
-      onMouseDown={stopPointerSelection}
-      onClick={handleClick}
+      onMouseDown={handleMouseDown}
+      onClick={stopClick}
     >
       <IonIcon icon={OD_ICONS.expandSections} aria-hidden="true" />
     </button>

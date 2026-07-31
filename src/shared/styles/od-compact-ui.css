@@ -3685,6 +3685,17 @@ ion-button.od-rich-text-add-block-btn.is-active {
   min-width: 0;
 }
 
+.od-rich-column-node-view {
+  position: relative;
+  min-width: 0;
+  min-height: 48px;
+}
+
+.od-rich-column__content {
+  min-width: 0;
+  min-height: 48px;
+}
+
 .od-rich-text-editor .ProseMirror .od-rich-columns {
   padding: 8px;
   border: 1px dashed var(--od-color-border-muted, #cbd5e1);
@@ -4137,6 +4148,17 @@ ion-button.od-rich-text-add-block-btn.is-active {
 .od-wiki-tiptap.is-wiki-readonly
   .od-editor-block__drag-handle {
   display: none !important;
+}
+
+.od-wiki-tiptap.is-wiki-readonly
+  .od-editor-selectable-block,
+.od-wiki-tiptap.is-wiki-readonly
+  .od-editor-selectable-block:hover,
+.od-wiki-tiptap.is-wiki-readonly
+  .od-editor-selectable-block.is-selected,
+.od-wiki-tiptap.is-wiki-readonly
+  .od-editor-selectable-block.ProseMirror-selectednode {
+  outline: none !important;
 }
 
 .od-editor-disclosure__heading {
