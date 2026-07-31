@@ -320,7 +320,17 @@ export default function AttachmentsImageLightbox({
             src={viewer.url}
             alt={title}
             className="od-attachments-lightbox__img"
-            style={size || undefined}
+            style={
+              size
+                ? {
+                    ...size,
+                    maxWidth: "none",
+                    maxHeight: "none",
+                    flex: "0 0 auto",
+                    margin: "auto",
+                  }
+                : undefined
+            }
             onLoad={(event) =>
               setNatural({
                 w: event.currentTarget.naturalWidth,
