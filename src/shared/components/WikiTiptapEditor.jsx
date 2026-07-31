@@ -38,6 +38,8 @@ import RichTextFigmaBubbleMenu from "./RichTextFigmaBubbleMenu.jsx";
 import RichTextOdContainerBubbleMenu from "./RichTextOdContainerBubbleMenu.jsx";
 import RichTextOdDisclosureBubbleMenu from "./RichTextOdDisclosureBubbleMenu.jsx";
 import RichTextOdColumnsBubbleMenu from "./RichTextOdColumnsBubbleMenu.jsx";
+import RichTextOdColumnBubbleMenu from "./RichTextOdColumnBubbleMenu.jsx";
+import RichTextFloatingDragHandle from "./RichTextFloatingDragHandle.jsx";
 import RichTextOrangePhotoAlbumBubbleMenu from "./RichTextOrangePhotoAlbumBubbleMenu.jsx";
 import RichTextOrangePhotoVideoBubbleMenu from "./RichTextOrangePhotoVideoBubbleMenu.jsx";
 import AttachmentImageLibraryModal from "./AttachmentImageLibraryModal.jsx";
@@ -127,6 +129,7 @@ export default function WikiTiptapEditor({
       Underline,
       RichTextTable.configure({
         resizable: false,
+        allowTableNodeSelection: true,
       }),
       TableRow,
       TableHeader,
@@ -333,6 +336,7 @@ export default function WikiTiptapEditor({
       }`}
       onBlurCapture={handleBlurCapture}
     >
+      {!disabled ? <RichTextFloatingDragHandle editor={editor} /> : null}
       {!disabled ? (
         <RichTextBubbleMenu editor={editor} inlineOnly onPickEmoji={handlePickEmoji} />
       ) : null}
@@ -342,6 +346,7 @@ export default function WikiTiptapEditor({
       {!disabled ? <RichTextOdContainerBubbleMenu editor={editor} /> : null}
       {!disabled ? <RichTextOdDisclosureBubbleMenu editor={editor} /> : null}
       {!disabled ? <RichTextOdColumnsBubbleMenu editor={editor} /> : null}
+      {!disabled ? <RichTextOdColumnBubbleMenu editor={editor} /> : null}
       {!disabled ? <RichTextOrangePhotoAlbumBubbleMenu editor={editor} /> : null}
       {!disabled ? <RichTextOrangePhotoVideoBubbleMenu editor={editor} /> : null}
       {!disabled ? (

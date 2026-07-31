@@ -77,17 +77,9 @@ export function readColumnLayoutFromElement(element) {
  */
 export function getOdRichColumnsContext(editor) {
   if (!editor) return null;
-  const { $from } = editor.state.selection;
-  for (let depth = $from.depth; depth > 0; depth -= 1) {
-    const node = $from.node(depth);
-    if (node.type.name === "odRichColumns") {
-      return {
-        attrs: node.attrs,
-        pos: $from.before(depth),
-      };
-    }
-  }
-  return null;
+  const context = getRichTextNodeSelectionContext(editor.state, "odRichColumns");
+  if (!context) return null;
+  return { attrs: context.node.attrs, pos: context.pos, node: context.node };
 }
 
 /**
@@ -110,3 +102,4 @@ export function columnLayoutOptions(columns) {
     title: `Distribución ${COLUMN_LAYOUT_LABELS[id] ?? id}`,
   }));
 }
+import { getRichTextNodeSelectionContext } from "./richTextNodeSelection.js";

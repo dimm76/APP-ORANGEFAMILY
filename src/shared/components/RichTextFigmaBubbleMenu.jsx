@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { overlayZIndexForStackDepth } from "../overlay/odModalStack.js";
+import { isRichTextNodeSelection } from "../utils/richTextNodeSelection.js";
 import { promptFigmaUrl } from "./insertFigmaEmbed.js";
 import {
   clampFigmaEmbedHeight,
@@ -122,7 +123,9 @@ export default function RichTextFigmaBubbleMenu({ editor }) {
     <BubbleMenu
       editor={editor}
       pluginKey="odRichFigmaMenu"
-      shouldShow={({ editor: ed }) => ed.isActive("figmaEmbed")}
+      shouldShow={({ editor: currentEditor, state }) =>
+        currentEditor.isEditable && isRichTextNodeSelection(state, "figmaEmbed")
+      }
       tippyOptions={{ duration: 100, zIndex: overlayZIndexForStackDepth() }}
       className="od-rich-text-editor__toolbar-popover od-rich-figma-menu"
     >

@@ -1,10 +1,9 @@
 import { NodeViewWrapper } from "@tiptap/react";
 import { isAllowedExternalVideoEmbedSrc } from "../utils/videoEmbedUrl.js";
-import RichTextBlockDragHandle from "./RichTextBlockDragHandle.jsx";
 
 const ALLOWED_PROVIDERS = new Set(["google_drive", "vento"]);
 
-export default function RichTextVideoEmbedView({ node, editor }) {
+export default function RichTextVideoEmbedView({ node }) {
   const provider = String(node.attrs.provider ?? "");
   const src = String(node.attrs.src ?? "");
   const valid = ALLOWED_PROVIDERS.has(provider) && isAllowedExternalVideoEmbedSrc(src, provider);
@@ -12,7 +11,6 @@ export default function RichTextVideoEmbedView({ node, editor }) {
 
   return (
     <NodeViewWrapper className="od-editor-block od-video-embed" data-od-video-embed="">
-      <RichTextBlockDragHandle editor={editor} label={`Arrastrar ${title}`} />
       {valid ? (
         <iframe
           src={src}

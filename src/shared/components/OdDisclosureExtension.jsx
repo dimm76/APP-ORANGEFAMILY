@@ -4,7 +4,7 @@ import { IonIcon } from "@ionic/react";
 import { OD_ICONS } from "../ui/odIcons.js";
 
 // eslint-disable-next-line react-refresh/only-export-components
-function OdDisclosureNodeView({ node, updateAttributes, editor, getPos }) {
+function OdDisclosureNodeView({ node, updateAttributes, getPos }) {
   const title = node.attrs.title || "Título del desplegable";
   const open = Boolean(node.attrs.open);
   const titleLevel =
@@ -33,22 +33,6 @@ function OdDisclosureNodeView({ node, updateAttributes, editor, getPos }) {
       data-node-pos={typeof getPos === "function" ? getPos() : undefined}
     >
       <div className="od-editor-disclosure__summary" contentEditable={false}>
-        {editor.isEditable ? (
-          <button
-            type="button"
-            className="od-editor-block__drag-handle"
-            aria-label="Arrastrar desplegable"
-            data-drag-handle
-            contentEditable={false}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-          >
-            <IonIcon icon={OD_ICONS.reorder} aria-hidden="true" />
-          </button>
-        ) : null}
-
         <button
           type="button"
           className="od-editor-disclosure__toggle od-editor-icon-button"
