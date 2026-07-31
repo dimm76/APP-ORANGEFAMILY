@@ -116,7 +116,7 @@ export default function AttachmentsImageLightbox({
     observer.observe(element);
 
     return () => observer.disconnect();
-  }, [infoOpen]);
+  }, [infoOpen, viewer?.url]);
 
   useEffect(() => {
     if (!viewer) {
