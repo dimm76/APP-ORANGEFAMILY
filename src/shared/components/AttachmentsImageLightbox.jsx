@@ -38,6 +38,37 @@ export default function AttachmentsImageLightbox({
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
 
   const stageRef = useRef(null);
+  const imageRef = useRef(null);
+
+  const syncNaturalSize = useCallback((element = imageRef.current) => {
+    if (
+      typeof HTMLImageElement === "undefined" ||
+      !(element instanceof HTMLImageElement)
+    ) {
+      return;
+    }
+
+    const width = element.naturalWidth;
+    const height = element.naturalHeight;
+
+    if (!width || !height) {
+      return;
+    }
+
+    setNatural((current) => {
+      if (
+        current.w === width &&
+        current.h === height
+      ) {
+        return current;
+      }
+
+      return {
+        w: width,
+        h: height,
+      };
+    });
+  }, []);
 
   const center = useCallback(() => {
     if (!stageRef.current) return;
@@ -88,11 +119,33 @@ export default function AttachmentsImageLightbox({
   }, [infoOpen]);
 
   useEffect(() => {
-    if (!viewer) return;
+    if (!viewer) {
+      return undefined;
+    }
 
     setNatural({ w: 0, h: 0 });
     resetView();
-  }, [viewer?.url, resetView]);
+
+    /*
+     * La imagen puede proceder de la caché y estar ya
+     * cargada antes de que onLoad vuelva a notificarse.
+     */
+    const frame = window.requestAnimationFrame(() => {
+      const image = imageRef.current;
+
+      if (image?.complete) {
+        syncNaturalSize(image);
+      }
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [
+    viewer?.url,
+    resetView,
+    syncNaturalSize,
+  ]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -317,6 +370,8 @@ export default function AttachmentsImageLightbox({
           />
         ) : (
           <img
+            key={viewer.url}
+            ref={imageRef}
             src={viewer.url}
             alt={title}
             className="od-attachments-lightbox__img"
@@ -331,12 +386,9 @@ export default function AttachmentsImageLightbox({
                   }
                 : undefined
             }
-            onLoad={(event) =>
-              setNatural({
-                w: event.currentTarget.naturalWidth,
-                h: event.currentTarget.naturalHeight,
-              })
-            }
+            onLoad={(event) => {
+              syncNaturalSize(event.currentTarget);
+            }}
           />
         )}
       </div>
