@@ -1,3 +1,5 @@
+import { getRichTextNodeSelectionContext } from "./richTextNodeSelection.js";
+
 export const COLUMN_LAYOUTS_2 = Object.freeze([
   "50-50",
   "60-40",
@@ -102,4 +104,3 @@ export function columnLayoutOptions(columns) {
     title: `Distribución ${COLUMN_LAYOUT_LABELS[id] ?? id}`,
   }));
 }
-import { getRichTextNodeSelectionContext } from "./richTextNodeSelection.js";

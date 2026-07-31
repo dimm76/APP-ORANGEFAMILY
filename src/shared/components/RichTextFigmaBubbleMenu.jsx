@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { useEditorState } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { overlayZIndexForStackDepth } from "../overlay/odModalStack.js";
-import { isRichTextNodeSelection } from "../utils/richTextNodeSelection.js";
+import { getRichTextNodeSelectionContext, isRichTextNodeSelection } from "../utils/richTextNodeSelection.js";
 import { promptFigmaUrl } from "./insertFigmaEmbed.js";
 import {
   clampFigmaEmbedHeight,
@@ -84,10 +85,17 @@ function FigmaToolbarPicker({
  */
 export default function RichTextFigmaBubbleMenu({ editor }) {
   const [openPicker, setOpenPicker] = useState(null);
+  const selectedAttrs = useEditorState({
+    editor,
+    selector: ({ editor: currentEditor }) => {
+      if (!currentEditor) return null;
+      return getRichTextNodeSelectionContext(currentEditor.state, "figmaEmbed")?.attrs ?? null;
+    },
+  });
 
   if (!editor) return null;
 
-  const attrs = editor.getAttributes("figmaEmbed");
+  const attrs = selectedAttrs ?? {};
   const modes = resolveFigmaModes(attrs);
   const widthLabel =
     WIDTH_OPTIONS.find((option) => option.id === modes.widthMode)?.label ?? "Normal";

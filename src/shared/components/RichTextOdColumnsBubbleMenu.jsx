@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
+import { useEditorState } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { overlayZIndexForStackDepth } from "../overlay/odModalStack.js";
 import {
   columnLayoutOptions,
   getOdRichColumnsContext,
-  isOdRichColumnsActive,
   resolveColumnLayout,
 } from "../utils/odColumnsLayout.js";
+import { isRichTextNodeSelection } from "../utils/richTextNodeSelection.js";
 
 /**
  * @param {{
@@ -88,14 +89,23 @@ function ColumnsLayoutPicker({
  */
 export default function RichTextOdColumnsBubbleMenu({ editor }) {
   const [openPicker, setOpenPicker] = useState(false);
+  const selectedColumns = useEditorState({
+    editor,
+    selector: ({ editor: currentEditor }) => {
+      const context = currentEditor ? getOdRichColumnsContext(currentEditor) : null;
+      if (!context) return null;
+      const columns = Number(context.attrs?.columns) === 3 ? 3 : 2;
+      return {
+        columns,
+        columnLayout: resolveColumnLayout(columns, context.attrs?.columnLayout),
+      };
+    },
+  });
 
   if (!editor) return null;
 
-  const context = getOdRichColumnsContext(editor);
-  if (!context) return null;
-
-  const columns = Number(context.attrs?.columns) === 3 ? 3 : 2;
-  const columnLayout = resolveColumnLayout(columns, context.attrs?.columnLayout);
+  const columns = selectedColumns?.columns ?? 2;
+  const columnLayout = selectedColumns?.columnLayout ?? resolveColumnLayout(columns, null);
   const options = columnLayoutOptions(columns);
   const layoutLabel =
     options.find((option) => option.id === columnLayout)?.label ?? columnLayout;
@@ -121,7 +131,9 @@ export default function RichTextOdColumnsBubbleMenu({ editor }) {
     <BubbleMenu
       editor={editor}
       pluginKey="odRichOdColumnsMenu"
-      shouldShow={({ editor: ed }) => isOdRichColumnsActive(ed)}
+      shouldShow={({ editor: currentEditor, state }) =>
+        currentEditor.isEditable && isRichTextNodeSelection(state, "odRichColumns")
+      }
       tippyOptions={{ duration: 100, zIndex: overlayZIndexForStackDepth() }}
       className="od-rich-text-editor__toolbar-popover od-rich-gsheets-menu"
     >
