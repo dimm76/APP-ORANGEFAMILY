@@ -42,6 +42,7 @@ import RichTextOrangePhotoAlbumBubbleMenu from "./RichTextOrangePhotoAlbumBubble
 import RichTextOrangePhotoVideoBubbleMenu from "./RichTextOrangePhotoVideoBubbleMenu.jsx";
 import AttachmentImageLibraryModal from "./AttachmentImageLibraryModal.jsx";
 import ImageSourcePickerModal from "./ImageSourcePickerModal.jsx";
+import RichTextEmojiPickerModal from "./RichTextEmojiPickerModal.jsx";
 import OrangePhotoEmbedPickerModal from "./OrangePhotoEmbedPickerModal.jsx";
 import { WikiBlockInsertMenu } from "./WikiBlockInsertMenu.jsx";
 import { useRichTextAttachmentEditor } from "../hooks/useRichTextAttachmentEditor.js";
@@ -88,7 +89,9 @@ export default function WikiTiptapEditor({
 }) {
   const rootRef = useRef(null);
   const imageInputRef = useRef(null);
+  const emojiInsertPosRef = useRef(null);
   const externalSourceSignatureRef = useRef("");
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [imageSourceOpen, setImageSourceOpen] = useState(false);
   const [imageLibraryOpen, setImageLibraryOpen] = useState(false);
   const [orangePhotoPickerMode, setOrangePhotoPickerMode] = useState(null);
@@ -210,6 +213,32 @@ export default function WikiTiptapEditor({
   function handlePickOrangePhotoAlbum() { setOrangePhotoPickerMode("album"); }
   function handlePickOrangePhotoVideo() { setOrangePhotoPickerMode("video"); }
 
+  function handlePickEmoji() {
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    emojiInsertPosRef.current = from === to ? from : to;
+    setEmojiPickerOpen(true);
+  }
+
+  function handleCloseEmojiPicker() {
+    emojiInsertPosRef.current = null;
+    setEmojiPickerOpen(false);
+  }
+
+  function handleConfirmEmoji(emoji) {
+    const value = String(emoji ?? "");
+    const storedPosition = emojiInsertPosRef.current;
+    if (!editor || !value || !Number.isInteger(storedPosition)) {
+      handleCloseEmojiPicker();
+      return;
+    }
+
+    const maxPosition = editor.state.doc.content.size;
+    const safePosition = Math.max(1, Math.min(storedPosition, maxPosition));
+    editor.chain().focus().insertContentAt(safePosition, value, { updateSelection: true }).run();
+    handleCloseEmojiPicker();
+  }
+
   function handleConfirmOrangePhoto(resource) {
     if (orangePhotoPickerMode === "album") editor.chain().focus().setOrangePhotoAlbum({ albumId: resource.id, height: "normal" }).run();
     if (orangePhotoPickerMode === "video") editor.chain().focus().setOrangePhotoVideo({ photoId: resource.id, aspectRatio: "16/9" }).run();
@@ -227,6 +256,13 @@ export default function WikiTiptapEditor({
     if (!editor) return;
     editor.setEditable(!disabled);
   }, [editor, disabled]);
+
+  useEffect(() => {
+    emojiInsertPosRef.current = null;
+    // El selector debe cerrarse de forma síncrona al cambiar de página o modo.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEmojiPickerOpen(false);
+  }, [pageKey, disabled]);
 
   useEffect(() => {
     if (!editor) return undefined;
@@ -297,7 +333,9 @@ export default function WikiTiptapEditor({
       }`}
       onBlurCapture={handleBlurCapture}
     >
-      {!disabled ? <RichTextBubbleMenu editor={editor} inlineOnly /> : null}
+      {!disabled ? (
+        <RichTextBubbleMenu editor={editor} inlineOnly onPickEmoji={handlePickEmoji} />
+      ) : null}
       {!disabled ? <RichTextImageBubbleMenu editor={editor} /> : null}
       {!disabled ? <RichTextGoogleSheetsBubbleMenu editor={editor} /> : null}
       {!disabled ? <RichTextFigmaBubbleMenu editor={editor} /> : null}
@@ -310,6 +348,7 @@ export default function WikiTiptapEditor({
         <RichTextSlashCommandMenu
           editor={editor}
           handlers={{
+            onPickEmoji: handlePickEmoji,
             onPickImage: handlePickImage,
             onPickYoutube: handlePickYoutube,
             onPickGoogleDriveVideo: handlePickGoogleDriveVideo,
@@ -326,6 +365,7 @@ export default function WikiTiptapEditor({
         <WikiBlockInsertMenu
           editor={editor}
           insertId={pageKey}
+          onPickEmoji={handlePickEmoji}
           onPickImage={handlePickImage}
           onPickYoutube={handlePickYoutube}
           onPickGoogleDriveVideo={handlePickGoogleDriveVideo}
@@ -350,6 +390,11 @@ export default function WikiTiptapEditor({
         onClose={() => setImageSourceOpen(false)}
         onPickUpload={handlePickImageUpload}
         onPickLibrary={handlePickImageLibrary}
+      />
+      <RichTextEmojiPickerModal
+        open={emojiPickerOpen}
+        onClose={handleCloseEmojiPicker}
+        onSelect={handleConfirmEmoji}
       />
       <AttachmentImageLibraryModal
         open={imageLibraryOpen}

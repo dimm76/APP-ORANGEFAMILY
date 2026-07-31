@@ -5999,6 +5999,78 @@ ion-button.od-rich-text-add-block-btn.is-active {
   gap: 8px;
 }
 
+.od-rich-emoji-modal {
+  width: min(520px, calc(100vw - 24px));
+  max-width: min(520px, calc(100vw - 24px));
+  max-height: min(80vh, 640px);
+}
+
+.od-rich-emoji-modal .od-modal-body {
+  overflow-y: auto;
+}
+
+.od-rich-emoji-groups {
+  display: grid;
+  gap: 14px;
+}
+
+.od-rich-emoji-group {
+  display: grid;
+  gap: 6px;
+}
+
+.od-rich-emoji-group__title {
+  margin: 0;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.od-rich-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.od-rich-emoji-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 1;
+  margin: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.od-rich-emoji-button:hover {
+  border-color: var(--od-color-border-muted, #dce3f5);
+  background: #f8fafc;
+}
+
+.od-rich-emoji-button:focus-visible {
+  outline: none;
+  border-color: #cbd5e1;
+  box-shadow: 0 0 0 2px rgba(226, 232, 240, 0.75);
+}
+
+@media (max-width: 520px) {
+  .od-rich-emoji-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
 .od-image-source-card {
   width: 100%;
   display: flex;

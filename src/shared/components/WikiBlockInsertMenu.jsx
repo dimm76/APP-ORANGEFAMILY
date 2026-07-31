@@ -10,6 +10,7 @@ const WIKI_BLOCK_PANEL_HOST_ID = "od-wiki-block-panel-host";
 function WikiBlockInsertMenu({
   editor,
   insertId,
+  onPickEmoji,
   onPickImage,
   onPickYoutube,
   onPickGoogleDriveVideo,
@@ -50,6 +51,10 @@ function WikiBlockInsertMenu({
 
   const handlers = useMemo(
     () => ({
+      onPickEmoji: () => {
+        setOpen(false);
+        onPickEmoji?.();
+      },
       onPickImage: () => {
         setOpen(false);
         onPickImage?.();
@@ -78,6 +83,7 @@ function WikiBlockInsertMenu({
       onPickOrangePhotoVideo: () => { setOpen(false); onPickOrangePhotoVideo?.(); },
     }),
     [
+      onPickEmoji,
       onPickImage,
       onPickYoutube,
       onPickGoogleDriveVideo,

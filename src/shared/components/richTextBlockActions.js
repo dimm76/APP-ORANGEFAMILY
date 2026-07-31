@@ -37,7 +37,7 @@ function getEditorBlockCaps(editor) {
 /**
  * Grupos de acciones de bloque reutilizables (menú Wiki, futuro comando "/").
  * @param {import("@tiptap/core").Editor | null} editor
- * @param {{ onPickImage?: () => void, onPickOrangePhotoAlbum?: () => void, onPickOrangePhotoVideo?: () => void, onPickYoutube?: () => void, onPickGoogleDriveVideo?: () => void, onPickVentoVideo?: () => void, onPickGoogleSheets?: () => void, onPickFigma?: () => void }} [handlers]
+ * @param {{ onPickEmoji?: () => void, onPickImage?: () => void, onPickOrangePhotoAlbum?: () => void, onPickOrangePhotoVideo?: () => void, onPickYoutube?: () => void, onPickGoogleDriveVideo?: () => void, onPickVentoVideo?: () => void, onPickGoogleSheets?: () => void, onPickFigma?: () => void }} [handlers]
  * @returns {{ title: string, items: Array<{ id: string, icon: string, label: string, title: string, disabled?: boolean, onClick: () => void }> }[]}
  */
 export function getRichTextBlockMenuGroups(editor, handlers = {}) {
@@ -90,7 +90,17 @@ export function getRichTextBlockMenuGroups(editor, handlers = {}) {
           title: "Convertir bloque actual en título 4",
           onClick: run((chain) => chain.setHeading({ level: 4 })),
         },
-      ],
+        typeof handlers.onPickEmoji === "function"
+          ? {
+              id: "emoji",
+              glyph: "😊",
+              label: "Emoji",
+              title: "Insertar un emoji en la posición actual",
+              slashAliases: ["emoji", "emoticono", "emoticon", "cara", "smiley"],
+              onClick: handlers.onPickEmoji,
+            }
+          : null,
+      ].filter(Boolean),
     },
     {
       title: "Listas",
@@ -337,7 +347,7 @@ export function wrapBlockMenuGroupsForSlash(editor, groups) {
 
 /**
  * @param {import("@tiptap/core").Editor | null} editor
- * @param {{ onPickImage?: () => void, onPickOrangePhotoAlbum?: () => void, onPickOrangePhotoVideo?: () => void, onPickYoutube?: () => void, onPickGoogleDriveVideo?: () => void, onPickVentoVideo?: () => void, onPickGoogleSheets?: () => void, onPickFigma?: () => void }} [handlers]
+ * @param {{ onPickEmoji?: () => void, onPickImage?: () => void, onPickOrangePhotoAlbum?: () => void, onPickOrangePhotoVideo?: () => void, onPickYoutube?: () => void, onPickGoogleDriveVideo?: () => void, onPickVentoVideo?: () => void, onPickGoogleSheets?: () => void, onPickFigma?: () => void }} [handlers]
  * @param {string} [query]
  */
 export function getFilteredRichTextBlockMenuGroups(editor, handlers = {}, query = "") {

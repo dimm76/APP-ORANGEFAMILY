@@ -250,9 +250,10 @@ function getBlockActiveState(editor) {
  * @param {{
  *   editor: import("@tiptap/core").Editor | null,
  *   inlineOnly?: boolean,
+ *   onPickEmoji?: () => void,
  * }} props
  */
-export default function RichTextBubbleMenu({ editor, inlineOnly = false }) {
+export default function RichTextBubbleMenu({ editor, inlineOnly = false, onPickEmoji }) {
   if (!editor) return null;
 
   const block = getBlockActiveState(editor);
@@ -398,6 +399,14 @@ export default function RichTextBubbleMenu({ editor, inlineOnly = false }) {
             title={canLink ? "Crear, editar o quitar enlace" : "No disponible"}
             onClick={handleSetLink}
           />
+          {typeof onPickEmoji === "function" ? (
+            <MenuRow
+              glyph="😊"
+              label="Emoji"
+              title="Insertar emoji al final de la selección"
+              onClick={onPickEmoji}
+            />
+          ) : null}
         </MenuSection>
 
         <MenuSection title="Color de texto">
