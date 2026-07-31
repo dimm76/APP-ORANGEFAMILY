@@ -15,6 +15,7 @@ const ZIP_LIMIT_MESSAGE = "Puedes descargar un máximo de 500 elementos a la vez
 export default function OrangePhotosBulkActions({
   photos,
   albums,
+  categories = [],
   members,
   onClose,
   onAlbum,
@@ -258,6 +259,7 @@ export default function OrangePhotosBulkActions({
 
       {modal === "album-create" && onCreateAlbum ? (
         <OrangeAlbumCreateModal
+          categories={categories}
           members={members}
           submitLabel="Crear y añadir"
           onClose={() => setModal("album")}

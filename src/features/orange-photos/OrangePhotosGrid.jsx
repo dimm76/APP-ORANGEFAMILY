@@ -239,7 +239,13 @@ function OrangePhotosGrid({
     );
   }
 
-  if (!groups.length) return <p className="od-status-line">No hay fotos para estos filtros.</p>;
+  if (!groups.length) {
+    return (
+      <div className="od-orange-photos__content" ref={contentRef}>
+        <p className="od-status-line">No hay fotos para estos filtros.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="od-orange-photos__content" ref={contentRef}>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 export default function OrangeAlbumCreateModal({
+  categories = [],
   members = [],
   onClose,
   onCreate,
@@ -10,6 +11,7 @@ export default function OrangeAlbumCreateModal({
   const [title, setTitle] = useState("");
   const [visibility, setVisibility] = useState("private");
   const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState([]);
   const [canContribute, setCanContribute] = useState(false);
   const [associateDate, setAssociateDate] = useState(false);
   const [dateMode, setDateMode] = useState("single");
@@ -27,6 +29,14 @@ export default function OrangeAlbumCreateModal({
 
   const toggleMember = id => {
     setSelectedUserIds(current =>
+      current.includes(id)
+        ? current.filter(value => value !== id)
+        : [...current, id],
+    );
+  };
+
+  const toggleCategory = id => {
+    setSelectedCategoryIds(current =>
       current.includes(id)
         ? current.filter(value => value !== id)
         : [...current, id],
@@ -53,6 +63,7 @@ export default function OrangeAlbumCreateModal({
         visibility,
         user_ids: visibility === "selected" ? selectedUserIds : [],
         can_contribute: visibility === "private" ? false : canContribute,
+        category_ids: selectedCategoryIds,
         date_mode: associateDate ? dateMode : null,
         date_start: associateDate ? dateStart : null,
         date_end: associateDate
@@ -169,6 +180,27 @@ export default function OrangeAlbumCreateModal({
               </label>
             </fieldset>
           </div>
+
+          <fieldset className="od-orange-album-form__section od-orange-album-form__fieldset">
+            <legend>Categorías</legend>
+            {categories.length ? (
+              categories.map(category => (
+                <label
+                  key={category.id}
+                  className="od-orange-album-form__check"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedCategoryIds.includes(category.id)}
+                    onChange={() => toggleCategory(category.id)}
+                  />
+                  <span>{category.name}</span>
+                </label>
+              ))
+            ) : (
+              <p>Todavía no has creado categorías.</p>
+            )}
+          </fieldset>
 
           <fieldset className="od-orange-album-form__section od-orange-album-form__fieldset">
             <legend>Fecha</legend>
