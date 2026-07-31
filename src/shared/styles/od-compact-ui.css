@@ -5955,6 +5955,12 @@ ion-button.od-rich-text-add-block-btn.is-active {
   margin: 0;
 }
 
+.od-wiki-tiptap.is-wiki-readonly
+  .ProseMirror
+  img.od-rich-attachment-image {
+  cursor: zoom-in;
+}
+
 .od-rich-text-editor .ProseMirror img.od-rich-attachment-image[data-display-width="50"],
 .od-rich-text-editor .ProseMirror img[data-attachment-id][data-display-width="50"] {
   width: 50%;
