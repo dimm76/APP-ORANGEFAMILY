@@ -125,6 +125,11 @@ function handleOrangePhotosRoutes(app) {
   app.post("/api/orange-photo-albums/:id/photos", safe(req => service.addPhoto(req, req.params.id, req.body || {}), "No se pudo añadir la foto."));
   app.delete("/api/orange-photo-albums/:id/photos/:photoId", safe(req => service.addPhoto(req, req.params.id, { photo_id: req.params.photoId }, true), "No se pudo quitar la foto."));
   app.post("/api/orange-photo-albums/:id/share", safe(req => service.shareAlbum(req, req.params.id, req.body || {}), "No se pudo compartir el álbum."));
+  app.get("/api/orange-photo-album-categories", safe(req => service.albumCategories(req), "No se pudieron cargar las categorías de álbum."));
+  app.post("/api/orange-photo-album-categories", safe(req => service.createAlbumCategory(req, req.body || {}), "No se pudo crear la categoría.", 201));
+  app.patch("/api/orange-photo-album-categories/:id", safe(req => service.updateAlbumCategory(req, req.params.id, req.body || {}), "No se pudo actualizar la categoría."));
+  app.delete("/api/orange-photo-album-categories/:id", safe(req => service.deleteAlbumCategory(req, req.params.id), "No se pudo eliminar la categoría."));
+  app.put("/api/orange-photo-albums/:id/categories", safe(req => service.setAlbumCategories(req, req.params.id, req.body || {}), "No se pudieron guardar las categorías del álbum."));
   app.get("/api/orange-photo-tags", safe(req => service.tags(req), "No se pudieron cargar las etiquetas."));
   app.post("/api/orange-photo-tags", safe(req => service.createTag(req, req.body || {}), "No se pudo crear la etiqueta.", 201));
 }

@@ -40,6 +40,11 @@ export const createOrangeAlbum=body=>request('/api/orange-photo-albums',{method:
 export const updateOrangeAlbum=(id,body)=>request(`/api/orange-photo-albums/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify(body)});
 export const shareOrangeAlbum=(id,body)=>request(`/api/orange-photo-albums/${encodeURIComponent(id)}/share`,{method:'POST',body:JSON.stringify(body)});
 export const deleteOrangeAlbum=id=>updateOrangeAlbum(id,{is_archived:true});
+export const listOrangeAlbumCategories=(options={})=>request("/api/orange-photo-album-categories",{signal:options.signal});
+export const createOrangeAlbumCategory=body=>request("/api/orange-photo-album-categories",{method:"POST",body:JSON.stringify(body)});
+export const updateOrangeAlbumCategory=(id,body)=>request(`/api/orange-photo-album-categories/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify(body)});
+export const deleteOrangeAlbumCategory=id=>request(`/api/orange-photo-album-categories/${encodeURIComponent(id)}`,{method:"DELETE"});
+export const setOrangeAlbumCategories=(id,categoryIds)=>request(`/api/orange-photo-albums/${encodeURIComponent(id)}/categories`,{method:"PUT",body:JSON.stringify({category_ids:categoryIds})});
 export const addPhotoToAlbum=(id,photo_id)=>request(`/api/orange-photo-albums/${encodeURIComponent(id)}/photos`,{method:'POST',body:JSON.stringify({photo_id})});
 export const removePhotoFromAlbum=(id,photoId)=>request(`/api/orange-photo-albums/${encodeURIComponent(id)}/photos/${encodeURIComponent(photoId)}`,{method:'DELETE'});
 export const listOrangePhotoMembers=()=>request('/api/orange-photo-members');

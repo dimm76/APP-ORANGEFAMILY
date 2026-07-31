@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { IonIcon } from "@ionic/react";
-import { albumsOutline, cloudUploadOutline } from "ionicons/icons";
+import { albumsOutline, cloudUploadOutline, folderOutline } from "ionicons/icons";
 import { overlayZIndexForStackDepth } from "../../shared/overlay/odModalStack.js";
 
 export function OrangePhotosAnchoredPortal({ anchorRef, width = 280, onClose, label, children }) {
@@ -12,7 +12,7 @@ export function OrangePhotosAnchoredPortal({ anchorRef, width = 280, onClose, la
   return createPortal(<><button type="button" className="od-orangephotos-popover-shield" aria-label={label} onClick={onClose} />{children(style)}</>, document.body);
 }
 
-export default function OrangePhotosCreateMenu({ open, anchorRef, onClose, onCreateAlbum, onImport }) {
+export default function OrangePhotosCreateMenu({ open, anchorRef, onClose, onCreateAlbum, onCreateCategory, onImport }) {
   if (!open) return null;
-  return <OrangePhotosAnchoredPortal anchorRef={anchorRef} onClose={onClose} label="Cerrar menú">{style => <div className="od-action-menu od-orangephotos-create-menu" style={style} role="menu"><p>Crear</p><button className="od-action-menu-item" type="button" role="menuitem" onClick={onCreateAlbum}><IonIcon icon={albumsOutline} />Crear álbum</button><hr /><p>Añadir fotos</p><button className="od-action-menu-item" type="button" role="menuitem" onClick={onImport}><IonIcon icon={cloudUploadOutline} />Importar fotos y vídeos</button></div>}</OrangePhotosAnchoredPortal>;
+  return <OrangePhotosAnchoredPortal anchorRef={anchorRef} onClose={onClose} label="Cerrar menú">{style => <div className="od-action-menu od-orangephotos-create-menu" style={style} role="menu"><p>Crear</p><button className="od-action-menu-item" type="button" role="menuitem" onClick={onCreateAlbum}><IonIcon icon={albumsOutline} />Crear álbum</button><button className="od-action-menu-item" type="button" role="menuitem" onClick={() => { onClose(); onCreateCategory(); }}><IonIcon icon={folderOutline} />Crear categoría</button><hr /><p>Añadir fotos</p><button className="od-action-menu-item" type="button" role="menuitem" onClick={onImport}><IonIcon icon={cloudUploadOutline} />Importar fotos y vídeos</button></div>}</OrangePhotosAnchoredPortal>;
 }

@@ -241,6 +241,10 @@ Durante el modo de selección, `Shift` más clic selecciona el intervalo lineal 
 
 Los álbumes pueden crearse tanto desde el botón global `+` como desde la cabecera de la vista de álbumes. El propietario puede cambiar su nombre, compartirlos con toda la familia o con miembros concretos, y elegir manualmente como portada una imagen que pertenezca al propio álbum.
 
+Cada usuario puede clasificar con cero, una o varias categorías personales tanto sus álbumes como los álbumes recibidos. Las categorías no se comparten: cada persona mantiene una clasificación independiente del mismo álbum. La selección simultánea de categorías aplica lógica OR y se combina con la búsqueda y los filtros estructurales.
+
+Los álbumes admiten una fecha global única o un intervalo. La vista permite ordenarlos en frontend por fecha del álbum, fecha de creación o título; al ordenar por fecha del álbum, los álbumes sin fecha aparecen siempre al final. Esta clasificación no oculta todavía las fotos del flujo principal.
+
 Al añadir la primera imagen a un álbum que todavía no tiene portada, Node la asigna automáticamente sin reemplazar posteriormente una portada existente. Archivar un álbum lo retira del listado, pero conserva intactas sus fotos en la biblioteca y no elimina manualmente sus relaciones desde el frontend.
 
 Compartir un álbum concede acceso efectivo y reversible a todas las fotos y vídeos que contiene, sin cambiar `orange_photos.visibility` ni crear filas en `orange_photo_shares`. Para el destinatario, esos elementos aparecen tanto en **Todas las fotos** como en **Compartidas conmigo**; al dejar de compartir el álbum o retirar un elemento, desaparece ese acceso salvo que exista otra compartición directa o mediante otro álbum. Las tarjetas propias compartidas por álbum usan el icono naranja y las recibidas el azul.

@@ -337,13 +337,46 @@
 .od-orange-albums-view__create { flex:0 0 auto; }
 .od-orange-albums-view { display:flex; flex:1 1 0; flex-direction:column; width:100%; min-height:0; overflow:hidden; }
 .od-orange-albums-view__scroller { flex:1 1 0; min-height:0; overflow-x:hidden; overflow-y:auto; padding-bottom:24px; scrollbar-gutter:stable; overscroll-behavior:contain; }
-.od-orange-albums-view__filters { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:14px; }.od-orange-albums-view__grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:20px; align-items:start; }.od-orange-album-card { position:relative; overflow:visible; display:flex; flex-direction:column; align-items:stretch; width:100%; max-width:360px; border:1px solid #dce3f5; border-radius:8px; background:#fff; color:#1e293b; text-align:left; cursor:pointer; }.od-orange-album-card__cover { position:relative; }.od-orange-album-card__cover,.od-orange-album-card img,.od-orange-album-card__placeholder { width:100%; height:150px; }.od-orange-album-card img,.od-orange-album-card__placeholder { object-fit:cover; display:grid; place-items:center; border-radius:7px 7px 0 0; background:#e2e8f0; color:#64748b; }.od-orange-album-card__footer { display:flex; align-items:center; gap:8px; min-height:54px; padding:8px 8px 8px 10px; }.od-orange-album-card__text { min-width:0; flex:1; display:grid; gap:4px; }.od-orange-album-card__text strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.od-orange-album-card__text small { display:flex; align-items:center; gap:4px; color:#64748b; }
+.od-orange-albums-view__filters { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:14px; }.od-orange-albums-view__grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:20px; align-items:start; }.od-orange-album-card { position:relative; overflow:visible; display:flex; flex-direction:column; align-items:stretch; width:100%; max-width:360px; border:1px solid #dce3f5; border-radius:8px; background:#fff; color:#1e293b; text-align:left; cursor:pointer; }.od-orange-album-card__cover { position:relative; }.od-orange-album-card__cover,.od-orange-album-card img,.od-orange-album-card__placeholder { width:100%; height:150px; }.od-orange-album-card img,.od-orange-album-card__placeholder { object-fit:cover; display:grid; place-items:center; border-radius:7px 7px 0 0; background:#e2e8f0; color:#64748b; }.od-orange-album-card__footer { display:flex; align-items:center; gap:8px; min-height:54px; padding:8px 8px 8px 10px; }.od-orange-album-card__text { min-width:0; flex:1; display:grid; gap:4px; }.od-orange-album-card__text strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.od-orange-album-card__text small { display:flex; align-items:center; gap:4px; color:#64748b; }
 .od-orange-album-card__share { position:absolute; top:10px; right:10px; z-index:2; display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; }.od-orange-album-card__share ion-icon { width:18px; height:18px; }
 .od-orange-album-card__menu-wrap { position:relative; z-index:2; flex:0 0 auto; margin-left:auto; }
 .od-orange-album-card__menu-button { display:grid; place-items:center; width:32px; height:32px; padding:0; border:1px solid #dce3f5; border-radius:8px; background:#fff; color:#37374b; cursor:pointer; }
 .od-orange-album-card__menu { position:absolute; top:36px; right:0; z-index:3; min-width:210px; padding:6px; border:1px solid #dce3f5; border-radius:8px; background:#fff; box-shadow:0 4px 12px rgba(17,18,41,.12); }
 .od-orange-album-card__menu .od-action-menu-item { width:100%; text-align:left; }
 .od-orange-album-card__menu-danger { color:#a63a3a; }
+.od-orange-albums-view>header { flex-wrap:wrap; }
+.od-orange-albums-view__sort { width:220px; flex:0 1 220px; }
+.od-orange-albums-view__category-more { flex:0 0 auto; }
+.od-orange-album-card__categories { position:absolute; left:0; right:0; bottom:0; display:flex; flex-wrap:wrap; gap:4px; max-height:58px; overflow:hidden; padding:22px 8px 7px; background:linear-gradient(transparent,rgba(15,23,42,.82)); opacity:0; pointer-events:none; transition:opacity .15s ease; }
+.od-orange-album-card:hover .od-orange-album-card__categories,.od-orange-album-card:focus-within .od-orange-album-card__categories { opacity:1; }
+.od-orange-album-card__category { max-width:120px; overflow:hidden; padding:2px 6px; border-radius:999px; background:rgba(15,23,42,.72); color:#fff; font-size:11.5px; line-height:1.2; text-overflow:ellipsis; white-space:nowrap; }
+.od-orange-album-card__meta { display:flex; align-items:baseline; justify-content:space-between; gap:8px; min-width:0; }
+.od-orange-album-card__date { margin-left:auto; overflow:hidden; color:#64748b; text-overflow:ellipsis; white-space:nowrap; }
+.od-orange-album-card__date--compact { font-size:11px; }
+.od-orange-album-form,
+.od-orange-album-options-modal { display:flex; flex-direction:column; gap:18px; }
+.od-orange-album-form__section,
+.od-orange-album-options-modal__section { display:flex; flex-direction:column; gap:12px; }
+.od-orange-album-form__fieldset,
+.od-orange-album-options-modal__fieldset { min-width:0; margin:0; padding:14px 16px 16px; border:1px solid var(--od-border-color,#d9e1ef); border-radius:12px; }
+.od-orange-album-form__fieldset legend,
+.od-orange-album-options-modal__fieldset legend { padding:0 4px; color:inherit; }
+.od-orange-album-form__check,
+.od-orange-album-options-modal__check,
+.od-orange-album-form__inline-options label,
+.od-orange-album-options-modal__inline-options label { display:inline-flex; align-items:center; gap:8px; }
+.od-orange-album-form__inline-options,
+.od-orange-album-options-modal__inline-options { display:flex; flex-wrap:wrap; align-items:center; gap:16px; }
+.od-orange-album-form .od-form-field,
+.od-orange-album-options-modal .od-form-field { margin:0; }
+.od-orange-album-form .od-modal-actions,
+.od-orange-album-options-modal .od-modal-actions { margin-top:2px; }
+.od-orange-album-form input[type="checkbox"],
+.od-orange-album-form input[type="radio"],
+.od-orange-album-options-modal input[type="checkbox"],
+.od-orange-album-options-modal input[type="radio"] { accent-color:#fc4200; }
+@media (hover:none) { .od-orange-album-card__categories { display:none; } }
+@media (max-width:640px) { .od-orange-albums-view__sort { order:2; width:100%; flex-basis:100%; } .od-orange-albums-view__create { order:3; } .od-orange-albums-view>header>div { flex:1 1 auto; } }
 .od-orange-album-share__permission-help { margin:0; color:#64748b; font-size:12px; }
 .od-orange-album-share-modal__body { display:grid; gap:20px; }
 .od-orange-album-share-modal__section { display:grid; gap:10px; }
