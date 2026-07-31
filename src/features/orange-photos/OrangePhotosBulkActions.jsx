@@ -7,9 +7,9 @@ import OrangeAlbumCreateModal from "./OrangeAlbumCreateModal.jsx";
 import OrangePhotoShareModal from "./OrangePhotoShareModal.jsx";
 import OrangePhotosBulkEditModal from "./OrangePhotosBulkEditModal.jsx";
 
-const MAX_BULK_SELECTION = 100;
+const MAX_BULK_SELECTION = 500;
 const MAX_ZIP_SELECTION = 500;
-const BULK_LIMIT_MESSAGE = "Puedes realizar acciones sobre un máximo de 100 elementos a la vez.";
+const BULK_LIMIT_MESSAGE = "Puedes realizar acciones sobre un máximo de 500 elementos a la vez.";
 const ZIP_LIMIT_MESSAGE = "Puedes descargar un máximo de 500 elementos a la vez.";
 
 export default function OrangePhotosBulkActions({
