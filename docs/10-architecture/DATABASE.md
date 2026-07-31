@@ -80,3 +80,17 @@ Las migraciones deberán:
 La base de datos de OrangeFamily todavía no ha sido creada.
 
 La carpeta `docs/30-database/migration/` deberá permanecer sin migraciones heredadas hasta que exista un modelo propio aprobado.
+
+## Migraciones y producción
+
+Toda migración destinada a producción debe seguir el procedimiento y el
+checklist definidos en:
+
+- `../50-operations/PRODUCTION_DEPLOYMENT.md`
+- `../50-operations/DEPLOYMENT_CHECKLIST.md`
+
+Los objetos creados por `postgres` no conceden automáticamente permisos
+al rol de ejecución `orangefamily_app_user`. Toda tabla, secuencia, vista
+o función nueva debe incluir una revisión explícita de privilegios y
+probarse con el rol real de la aplicación antes de considerar terminado
+el despliegue.
