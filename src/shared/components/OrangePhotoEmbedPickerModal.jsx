@@ -11,7 +11,9 @@ function resourceTitle(resource, mode) {
 export default function OrangePhotoEmbedPickerModal({ open, mode, selectedId, onClose, onConfirm }) {
   const [items, setItems] = useState([]);
   const [selection, setSelection] = useState(selectedId || null);
+  const [openingSelectedId, setOpeningSelectedId] = useState(selectedId || null);
   const [query, setQuery] = useState("");
+  const [serverQuery, setServerQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
@@ -19,12 +21,40 @@ export default function OrangePhotoEmbedPickerModal({ open, mode, selectedId, on
   const [hasMore, setHasMore] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const pageControllerRef = useRef(null);
+  const openModeRef = useRef(null);
+  const openingSelectedIdRef = useRef(selectedId || null);
+
+  useEffect(() => {
+    if (!open) {
+      openModeRef.current = null;
+      setQuery("");
+      setServerQuery("");
+      setLoadingMore(false);
+      pageControllerRef.current?.abort();
+      pageControllerRef.current = null;
+      return;
+    }
+    if (!mode || openModeRef.current === mode) return;
+    openModeRef.current = mode;
+    openingSelectedIdRef.current = selectedId || null;
+    setOpeningSelectedId(openingSelectedIdRef.current);
+    setSelection(openingSelectedIdRef.current);
+    setQuery("");
+    setServerQuery("");
+  }, [open, mode, selectedId]);
+
+  useEffect(() => {
+    if (!open || mode !== "video") return undefined;
+    const timer = window.setTimeout(() => setServerQuery(query.trim()), 350);
+    return () => window.clearTimeout(timer);
+  }, [open, mode, query]);
 
   useEffect(() => {
     if (!open || !mode) return undefined;
+    pageControllerRef.current?.abort();
+    pageControllerRef.current = null;
     const controller = new AbortController();
-    setSelection(selectedId || null);
-    setQuery("");
+    setLoadingMore(false);
     setItems([]);
     setPage(1);
     setHasMore(false);
@@ -32,9 +62,10 @@ export default function OrangePhotoEmbedPickerModal({ open, mode, selectedId, on
     setLoading(true);
     const request = mode === "album"
       ? listOrangeAlbums({ signal: controller.signal })
-      : listOrangePhotoVideos({ page: 1, signal: controller.signal });
+      : listOrangePhotoVideos({ page: 1, search: serverQuery, signal: controller.signal });
     request.then((data) => {
       const next = (data.items || []).filter((item) => mode !== "video" || item.media_type === "video");
+      if (controller.signal.aborted) return;
       setItems(next);
       setHasMore(mode === "video" && data.has_more === true);
     }).catch((requestError) => {
@@ -42,8 +73,8 @@ export default function OrangePhotoEmbedPickerModal({ open, mode, selectedId, on
     }).finally(() => {
       if (!controller.signal.aborted) setLoading(false);
     });
-    return () => { controller.abort(); pageControllerRef.current?.abort(); };
-  }, [open, mode, selectedId, retryKey]);
+    return () => { controller.abort(); };
+  }, [open, mode, serverQuery, retryKey]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -53,12 +84,14 @@ export default function OrangePhotoEmbedPickerModal({ open, mode, selectedId, on
   }, [open, onClose]);
 
   const filtered = useMemo(() => {
+    if (mode === "video") return items;
     const needle = query.trim().toLocaleLowerCase("es");
     if (!needle) return items;
     return items.filter((item) => resourceTitle(item, mode).toLocaleLowerCase("es").includes(needle));
   }, [items, mode, query]);
 
   async function loadMore() {
+    if (mode !== "video" || loadingMore || !hasMore) return;
     const nextPage = page + 1;
     pageControllerRef.current?.abort();
     const controller = new AbortController();
@@ -66,10 +99,11 @@ export default function OrangePhotoEmbedPickerModal({ open, mode, selectedId, on
     setLoadingMore(true);
     setError("");
     try {
-      const data = await listOrangePhotoVideos({ page: nextPage, signal: controller.signal });
+      const data = await listOrangePhotoVideos({ page: nextPage, search: serverQuery, signal: controller.signal });
+      if (controller.signal.aborted || pageControllerRef.current !== controller) return;
       setItems((current) => {
-        const byId = new Map(current.map((item) => [item.id, item]));
-        for (const item of data.items || []) if (item.media_type === "video") byId.set(item.id, item);
+        const byId = new Map(current.map((item) => [String(item.id), item]));
+        for (const item of data.items || []) if (item.media_type === "video") byId.set(String(item.id), item);
         return [...byId.values()];
       });
       setPage(nextPage);
@@ -77,7 +111,10 @@ export default function OrangePhotoEmbedPickerModal({ open, mode, selectedId, on
     } catch (requestError) {
       if (requestError.name !== "AbortError") setError(requestError.message || "No se pudieron cargar más vídeos.");
     } finally {
-      if (!controller.signal.aborted) setLoadingMore(false);
+      if (pageControllerRef.current === controller) {
+        pageControllerRef.current = null;
+        setLoadingMore(false);
+      }
     }
   }
 
@@ -100,7 +137,7 @@ export default function OrangePhotoEmbedPickerModal({ open, mode, selectedId, on
           })}</div>}
           {mode === "video" && hasMore ? <button type="button" className="od-btn od-btn-secondary od-orange-photo-embed-picker__more" disabled={loadingMore} onClick={loadMore}>{loadingMore ? "Cargando…" : "Cargar más"}</button> : null}
           {error && items.length ? <p className="od-status-line od-status-line--error">{error}</p> : null}
-          <div className="od-modal-actions"><button type="button" className="od-btn od-btn-secondary" onClick={onClose}>Cancelar</button><button type="button" className="od-btn od-btn-primary" disabled={!selected} onClick={() => { onConfirm?.(selected); onClose?.(); }}>{selectedId ? "Aplicar" : isAlbum ? "Insertar álbum" : "Insertar vídeo"}</button></div>
+          <div className="od-modal-actions"><button type="button" className="od-btn od-btn-secondary" onClick={onClose}>Cancelar</button><button type="button" className="od-btn od-btn-primary" disabled={!selected} onClick={() => { onConfirm?.(selected); onClose?.(); }}>{openingSelectedId ? "Aplicar" : isAlbum ? "Insertar álbum" : "Insertar vídeo"}</button></div>
         </div>
       </section>
     </div>, document.body
