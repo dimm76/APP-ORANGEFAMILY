@@ -8,15 +8,54 @@ const TARGET_CLASS = "od-rich-text-drag-target";
 const POSITION_CONFIG = { placement: "left-start", strategy: "absolute" };
 const NESTED_CONFIG = {
   defaultRules: true,
-  edgeDetection: { edges: ["left", "top"], threshold: 12, strength: 500 },
-  rules: [{
-    id: "orangeFamilyNestedBlockTargets",
-    evaluate: ({ node, depth }) => {
-      if (node.type.name === "odTabPanel") return 1000;
-      if (depth > 1 && node.isTextblock) return 1000;
-      return 0;
+
+  /*
+   * Modelo jerárquico predecible:
+   *
+   * - centro del nodo: gana el nivel más profundo;
+   * - borde superior: gana progresivamente el padre;
+   * - no usar borde izquierdo porque columnas, hijos y
+   *   contenedores suelen compartir o solapar ese eje.
+   *
+   * strength 200 mantiene seleccionables profundidades
+   * habituales. Con 500, profundidad 2 quedaba excluida.
+   */
+  edgeDetection: {
+    edges: ["top"],
+    threshold: 6,
+    strength: 200,
+  },
+
+  rules: [
+    {
+      id: "orangeFamilyNestedBlockTargets",
+
+      evaluate: ({ node, depth }) => {
+        const nodeName = node.type.name;
+
+        /*
+         * Nodo técnico interno.
+         * La unidad funcional seleccionable es odTabs.
+         */
+        if (nodeName === "odTabPanel") {
+          return 1000;
+        }
+
+        /*
+         * El texto interior no debe competir con la
+         * columna, desplegable, pestaña o contenedor.
+         *
+         * Los párrafos de primer nivel permanecen
+         * seleccionables.
+         */
+        if (depth > 1 && node.isTextblock) {
+          return 1000;
+        }
+
+        return 0;
+      },
     },
-  }],
+  ],
 };
 
 export default function RichTextFloatingDragHandle({ editor }) {
@@ -30,26 +69,48 @@ export default function RichTextFloatingDragHandle({ editor }) {
     if (host instanceof HTMLElement) host.draggable = draggable;
   }, []);
 
-  const clearTargetDom = useCallback(() => {
+  const clearTargetDom = useCallback((currentEditor = editor) => {
     targetDomRef.current?.classList?.remove(TARGET_CLASS);
     targetDomRef.current = null;
-  }, []);
 
-  const clearTarget = useCallback(() => {
-    clearTargetDom();
+    const editorDom = currentEditor?.view?.dom;
+
+    if (!(editorDom instanceof HTMLElement)) {
+      return;
+    }
+
+    editorDom
+      .querySelectorAll(`.${TARGET_CLASS}`)
+      .forEach((element) => {
+        element.classList.remove(TARGET_CLASS);
+      });
+  }, [editor]);
+
+  const clearTarget = useCallback((currentEditor = editor) => {
+    clearTargetDom(currentEditor);
     targetPosRef.current = null;
     targetNodeNameRef.current = "";
     setHostDraggable(true);
-  }, [clearTargetDom, setHostDraggable]);
+  }, [clearTargetDom, editor, setHostDraggable]);
 
   const handleNodeChange = useCallback(({ node, editor: currentEditor, pos }) => {
-    clearTarget();
+    clearTarget(currentEditor);
     if (!node || !Number.isInteger(pos) || !currentEditor) return;
     const dom = currentEditor.view.nodeDOM(pos);
     targetPosRef.current = pos;
     targetNodeNameRef.current = node.type.name;
+    const currentSelection = currentEditor.state.selection;
+    const hasDifferentNodeSelection =
+      currentSelection instanceof NodeSelection && currentSelection.from !== pos;
     setHostDraggable(node.type.name !== "odRichColumn");
-    if (dom instanceof HTMLElement) {
+    /*
+     * Mientras exista otro NodeSelection, el handle puede
+     * desplazarse al nuevo objetivo, pero no se dibuja un
+     * segundo outline de hover.
+     *
+     * El nuevo nodo quedará seleccionado al pulsar el handle.
+     */
+    if (!hasDifferentNodeSelection && dom instanceof HTMLElement) {
       dom.classList.add(TARGET_CLASS);
       targetDomRef.current = dom;
     }
@@ -77,13 +138,18 @@ export default function RichTextFloatingDragHandle({ editor }) {
     event.preventDefault();
     event.stopPropagation();
     selectCurrentTarget();
+    clearTargetDom(editor);
     if (targetNodeNameRef.current === "odRichColumn") {
       const host = event.currentTarget.parentElement;
       if (host instanceof HTMLElement) host.draggable = false;
     }
-  }, [selectCurrentTarget]);
+  }, [clearTargetDom, editor, selectCurrentTarget]);
 
-  useEffect(() => () => clearTarget(), [clearTarget]);
+  useEffect(() => {
+    return () => {
+      clearTarget(editor);
+    };
+  }, [clearTarget, editor]);
 
   if (!editor) return null;
   return (
