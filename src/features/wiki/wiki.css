@@ -540,6 +540,34 @@
   word-break: break-word;
 }
 
+.od-wiki-workspace__sidebar-doc-title-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0 0 2px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: #111229;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  cursor: text;
+}
+
+.od-wiki-workspace__sidebar-doc-title-input:hover {
+  border-bottom-color: #dce3f5;
+}
+
+.od-wiki-workspace__sidebar-doc-title-input:focus {
+  outline: none;
+  border-bottom-color: var(--od-color-primary, #fc4200);
+}
+
 .od-wiki-sidebar-popover.od-action-popover-content ion-list {
   padding: 6px 0;
   margin: 0;

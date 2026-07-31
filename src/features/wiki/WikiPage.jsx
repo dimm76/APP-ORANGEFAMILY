@@ -364,6 +364,9 @@ function WikiSidebarExpandTab({ onClick, ariaLabel }) {
 
 function WikiDocumentSidebarContent({
   documentTitle,
+  documentTitleEditable,
+  onDocumentTitleChange,
+  onDocumentTitleBlur,
   detail,
   detailError,
   loadingOutline,
@@ -378,6 +381,7 @@ function WikiDocumentSidebarContent({
   onCreatePageUnderRoot,
   onCreateSubpageFor,
   onRenamePage,
+  onDuplicatePage,
   onArchivePage,
   onCollapseSidebar,
   dragEnabled = false,
@@ -442,9 +446,27 @@ function WikiDocumentSidebarContent({
       <div className="od-wiki-workspace__sidebar-scroll">
         <div className="od-wiki-workspace__sidebar-doc">
           <div className="od-wiki-workspace__sidebar-doc-row">
-            <p className="od-wiki-workspace__sidebar-doc-label" title={documentTitle}>
-              {documentTitle}
-            </p>
+            {!publicMode && !readOnly && documentTitleEditable ? (
+              <input
+                type="text"
+                className="od-wiki-workspace__sidebar-doc-title-input"
+                aria-label="Título del documento"
+                value={documentTitle}
+                maxLength={200}
+                onChange={(event) => onDocumentTitleChange?.(event.target.value)}
+                onBlur={() => onDocumentTitleBlur?.()}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    event.currentTarget.blur();
+                  }
+                }}
+              />
+            ) : (
+              <p className="od-wiki-workspace__sidebar-doc-label" title={documentTitle}>
+                {documentTitle}
+              </p>
+            )}
             {!publicMode && detail && !detailError ? renderDocActionsMenu(actionsMenuId) : null}
           </div>
         </div>
@@ -493,6 +515,7 @@ function WikiDocumentSidebarContent({
                   menusDisabled={treeMenusDisabled}
                   onCreateSubpageFor={onCreateSubpageFor}
                   onRenamePage={onRenamePage}
+                  onDuplicatePage={onDuplicatePage}
                   onArchivePage={onArchivePage}
                   dragEnabled={canDragTree}
                   dragState={dragState}
@@ -531,6 +554,7 @@ function WikiTree({
   menusDisabled,
   onCreateSubpageFor,
   onRenamePage,
+  onDuplicatePage,
   onArchivePage,
   dragEnabled = false,
   dragState,
@@ -619,6 +643,12 @@ function WikiTree({
                       onClick: () => void onRenamePage(n.id, pageTitle),
                     },
                     {
+                      key: "duplicate",
+                      icon: OD_ICONS.duplicate,
+                      label: "Duplicar página",
+                      onClick: () => void onDuplicatePage(n.id),
+                    },
+                    {
                       key: "archive",
                       icon: OD_ICONS.delete,
                       label: "Archivar",
@@ -639,6 +669,7 @@ function WikiTree({
                 menusDisabled={menusDisabled}
                 onCreateSubpageFor={onCreateSubpageFor}
                 onRenamePage={onRenamePage}
+                onDuplicatePage={onDuplicatePage}
                 onArchivePage={onArchivePage}
                 dragEnabled={dragEnabled}
                 dragState={dragState}
@@ -917,7 +948,28 @@ function WikiLibrary() {
   async function handleDeleteDocument(row) {
     const id = String(row?.id ?? "").trim();
     if (!id) return;
-    if (!window.confirm("¿Borrar este documento? Se archivará y dejará de estar visible.")) return;
+
+    let childCount;
+    try {
+      const outlineResult = await fetchWikiOutline({
+        include_archived: false,
+        roots_only: false,
+      });
+      const items = Array.isArray(outlineResult?.items) ? outlineResult.items : [];
+      const subtreeIds = collectSubtreeIds(items, id);
+      childCount = Math.max(0, subtreeIds.size - 1);
+    } catch {
+      setSaveHint("No se pudo comprobar si el documento contiene páginas internas.");
+      return;
+    }
+
+    const confirmationMessage = childCount
+      ? `Este documento contiene ${
+          childCount === 1 ? "1 página interna" : `${childCount} páginas internas`
+        }. Al borrarlo se archivarán también todas ellas y dejarán de estar visibles. ¿Quieres continuar?`
+      : "¿Borrar este documento? Se archivará y dejará de estar visible.";
+
+    if (!window.confirm(confirmationMessage)) return;
     closeRowMenu();
     try {
       await deleteWikiPage(id);
@@ -1451,6 +1503,8 @@ function WikiLibrary() {
 
 function WikiDocumentWorkspace({ pageId }) {
   const [documentRoot, setDocumentRoot] = useState(null);
+  const [documentTitleDraft, setDocumentTitleDraft] = useState("");
+  const [dirtyDocumentTitle, setDirtyDocumentTitle] = useState(false);
   const [outlineFlat, setOutlineFlat] = useState([]);
   const [detail, setDetail] = useState(null);
   const [titleDraft, setTitleDraft] = useState("");
@@ -1484,6 +1538,8 @@ function WikiDocumentWorkspace({ pageId }) {
       const page = await fetchWikiPageById(activePageId);
       const root = await resolveDocumentRoot(page);
       setDocumentRoot(root);
+      setDocumentTitleDraft(String(root?.title ?? ""));
+      setDirtyDocumentTitle(false);
 
       const outlineRes = await fetchWikiOutline({
         roots_only: false,
@@ -1522,6 +1578,8 @@ function WikiDocumentWorkspace({ pageId }) {
           : "No se pudo cargar el documento.";
       setDetail(null);
       setDocumentRoot(null);
+      setDocumentTitleDraft("");
+      setDirtyDocumentTitle(false);
       setOutlineFlat([]);
       setDetailError(msg);
       setTitleDraft("");
@@ -1588,11 +1646,56 @@ function WikiDocumentWorkspace({ pageId }) {
       setDirtyTitle(false);
       setSaveHint("Título guardado.");
       setDetail((d) => (d ? { ...d, title: next } : d));
-      void loadWorkspace(String(detail.id));
+      setOutlineFlat((items) =>
+        items.map((item) =>
+          String(item?.id) === String(detail.id) ? { ...item, title: next } : item
+        )
+      );
+      if (String(detail.id) === String(documentRoot?.id)) {
+        setDocumentRoot((root) => (root ? { ...root, title: next } : root));
+        setDocumentTitleDraft(next);
+        setDirtyDocumentTitle(false);
+      }
       setTimeout(() => setSaveHint(""), 2000);
     } catch (err) {
       const msg =
         typeof err?.message === "string" ? err.message.trim() : "No se pudo guardar el título.";
+      setSaveHint(msg);
+    }
+  }
+
+  async function saveDocumentTitleIfNeeded() {
+    if (!documentRoot?.id || !dirtyDocumentTitle) return;
+    const next = String(documentTitleDraft ?? "").trim().slice(0, 200);
+    if (!next) {
+      setSaveHint("El título no puede estar vacío.");
+      return;
+    }
+    if (next === String(documentRoot.title ?? "").trim()) {
+      setDirtyDocumentTitle(false);
+      return;
+    }
+    try {
+      await patchWikiPage(documentRoot.id, { title: next });
+      setDocumentRoot((root) => (root ? { ...root, title: next } : root));
+      setOutlineFlat((items) =>
+        items.map((item) =>
+          String(item?.id) === String(documentRoot.id) ? { ...item, title: next } : item
+        )
+      );
+      if (String(detail?.id) === String(documentRoot.id)) {
+        setDetail((current) => (current ? { ...current, title: next } : current));
+        setTitleDraft(next);
+        setDirtyTitle(false);
+      }
+      setDirtyDocumentTitle(false);
+      setSaveHint("Título del documento guardado.");
+      setTimeout(() => setSaveHint(""), 2000);
+    } catch (err) {
+      const msg =
+        typeof err?.message === "string" && err.message.trim()
+          ? err.message.trim()
+          : "No se pudo guardar el título del documento.";
       setSaveHint(msg);
     }
   }
@@ -1640,6 +1743,33 @@ function WikiDocumentWorkspace({ pageId }) {
   async function handleCreateSubpage() {
     if (!detail?.id) return;
     await handleCreateSubpageFor(detail.id);
+  }
+
+  async function handleDuplicatePage(targetPageId) {
+    const id = String(targetPageId ?? "").trim();
+    if (!id) return;
+
+    setSaveHint("");
+
+    try {
+      const result = await duplicateWikiPage(id);
+      const duplicated = result?.item || result;
+      const duplicatedId = String(duplicated?.id ?? "").trim();
+
+      if (!duplicatedId) {
+        throw new Error("No se pudo obtener la página duplicada.");
+      }
+
+      setSaveHint("Página duplicada.");
+      spaNavigate(`/app/wiki/${encodeURIComponent(duplicatedId)}`);
+    } catch (err) {
+      const message =
+        typeof err?.message === "string" && err.message.trim()
+          ? err.message.trim()
+          : "No se pudo duplicar la página.";
+
+      setSaveHint(message);
+    }
   }
 
   async function handleRenamePage(targetPageId, currentTitle) {
@@ -1869,7 +1999,6 @@ function WikiDocumentWorkspace({ pageId }) {
     spaNavigate(`/app/wiki/${encodeURIComponent(id)}`);
   }
 
-  const documentTitle = String(documentRoot?.title ?? "").trim() || "Documento";
   const canEdit = Boolean(detail?.id && !detail.is_archived);
   const isEditMode = canEdit && detailViewMode === "edit";
   const editModeHost = typeof document !== "undefined"
@@ -1930,7 +2059,13 @@ function WikiDocumentWorkspace({ pageId }) {
   const showSidebarExpandRail = isMobile ? !mobileDrawerOpen : !desktopSidebarOpen;
 
   const sidebarContentProps = {
-    documentTitle,
+    documentTitle: documentTitleDraft,
+    documentTitleEditable: Boolean(documentRoot?.id && !documentRoot.is_archived),
+    onDocumentTitleChange: (value) => {
+      setDocumentTitleDraft(value);
+      setDirtyDocumentTitle(true);
+    },
+    onDocumentTitleBlur: () => void saveDocumentTitleIfNeeded(),
     detail,
     detailError,
     loadingOutline,
@@ -1945,6 +2080,7 @@ function WikiDocumentWorkspace({ pageId }) {
     onCreatePageUnderRoot: handleCreatePageUnderRoot,
     onCreateSubpageFor: handleCreateSubpageFor,
     onRenamePage: handleRenamePage,
+    onDuplicatePage: handleDuplicatePage,
     onArchivePage: handleArchivePage,
     dragEnabled: true,
     dragState: treeDragState,
@@ -2055,7 +2191,7 @@ function WikiDocumentWorkspace({ pageId }) {
                   setDirtyTitle(true);
                 }}
                 onBlur={() => void saveTitleIfNeeded()}
-                disabled={Boolean(detail.is_archived) || detailViewMode === "read"}
+                disabled={Boolean(detail.is_archived)}
               />
 
               <div className="od-wiki-workspace__editor">

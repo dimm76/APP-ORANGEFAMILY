@@ -138,7 +138,58 @@ async function moveWikiPageInDb(req,id,body={}) {
   }catch(e){await client.query("ROLLBACK");return resultError(400,e.message||"No se pudo mover la página.");}finally{client.release();}
 }
 async function duplicateWikiPageInDb(req,id){const page=await fetchWikiByIdFromDb(req,id);if(!page.ok)return page;const p=page.payload;return createWikiPageInDb(req,{...p,title:`Copia de ${p.title}`,slug:null,status:"draft",visibility:"internal",public_enabled:false});}
-async function deleteWikiPageInDb(req,id){const auth=resolveAuthenticatedFamily(req);if(!auth.ok)return auth;if(!isUuid(id))return resultError(400,"Identificador no válido.");const existing=await pool.query("SELECT id FROM public.wiki_pages WHERE id=$1 AND family_id=$2",[id,auth.familyId]);if(!existing.rowCount)return resultError(404,"Documento wiki no encontrado.");const children=await pool.query("SELECT 1 FROM public.wiki_pages WHERE parent_id=$1 AND family_id=$2 AND is_archived=false LIMIT 1",[id,auth.familyId]);if(children.rowCount)return resultError(400,"No se puede borrar un documento con páginas hijas activas.");await pool.query(`UPDATE public.wiki_pages SET is_archived=true,status='archived',visibility='internal',public_enabled=false,public_revoked_at=now(),updated_by=$3 WHERE id=$1 AND family_id=$2`,[id,auth.familyId,auth.userId]);return{ok:true,payload:{archived:true}};}
+async function deleteWikiPageInDb(req, id) {
+  const auth = resolveAuthenticatedFamily(req);
+  if (!auth.ok) return auth;
+
+  if (!isUuid(id)) {
+    return resultError(400, "Identificador no válido.");
+  }
+
+  const archived = await pool.query(
+    `
+      WITH RECURSIVE subtree AS (
+        SELECT id
+        FROM public.wiki_pages
+        WHERE id = $1::uuid
+          AND family_id = $2::uuid
+
+        UNION ALL
+
+        SELECT child.id
+        FROM public.wiki_pages child
+        INNER JOIN subtree parent_page
+          ON child.parent_id = parent_page.id
+        WHERE child.family_id = $2::uuid
+      )
+      UPDATE public.wiki_pages page
+      SET
+        is_archived = true,
+        status = 'archived',
+        visibility = 'internal',
+        public_enabled = false,
+        public_revoked_at = now(),
+        updated_by = $3::uuid
+      FROM subtree
+      WHERE page.id = subtree.id
+        AND page.family_id = $2::uuid
+      RETURNING page.id
+    `,
+    [id, auth.familyId, auth.userId]
+  );
+
+  if (!archived.rowCount) {
+    return resultError(404, "Documento wiki no encontrado.");
+  }
+
+  return {
+    ok: true,
+    payload: {
+      archived: true,
+      archived_count: archived.rowCount,
+    },
+  };
+}
 async function publishWikiPublicLinkInDb(req,id,body={}){const auth=resolveAuthenticatedFamily(req);if(!auth.ok)return auth;if(!isUuid(id))return resultError(400,"Identificador no válido.");const expires=body.expires_at?new Date(body.expires_at):null;if(expires&&(!Number.isFinite(expires.getTime())||expires<=new Date()))return resultError(400,"Caducidad no válida.");const token=randomBytes(32).toString("hex");const r=await pool.query(`UPDATE public.wiki_pages SET public_enabled=true,public_token=$3,public_published_at=now(),public_expires_at=$4,public_revoked_at=NULL,visibility='public_link',status='publish',published_at=COALESCE(published_at,now()),updated_by=$5 WHERE id=$1 AND family_id=$2 AND is_archived=false RETURNING *`,[id,auth.familyId,token,expires,auth.userId]);return r.rows[0]?{ok:true,payload:mapPage(r.rows[0],true)}:resultError(404,"Documento no encontrado.");}
 async function revokeWikiPublicLinkInDb(req,id){const auth=resolveAuthenticatedFamily(req);if(!auth.ok)return auth;const r=await pool.query("UPDATE public.wiki_pages SET public_enabled=false,public_revoked_at=now(),updated_by=$3 WHERE id=$1 AND family_id=$2 RETURNING *",[id,auth.familyId,auth.userId]);return r.rows[0]?{ok:true,payload:mapPage(r.rows[0],true)}:resultError(404,"Documento no encontrado.");}
 async function fetchPublicWikiByTokenFromDb(token){const safe=clean(token,128);if(!safe)return resultError(404,"Documento no encontrado.");const root=(await pool.query(`SELECT id,parent_id,title,slug,content_json,content_html,excerpt,status,visibility,document_type,menu_order,public_published_at,public_expires_at,updated_at FROM public.wiki_pages WHERE public_token=$1 AND public_enabled=true AND visibility='public_link' AND status='publish' AND is_archived=false AND public_revoked_at IS NULL AND (public_expires_at IS NULL OR public_expires_at>now())`,[safe])).rows[0];if(!root)return resultError(404,"Documento público no encontrado.");const rows=await pool.query(`WITH RECURSIVE tree AS (SELECT id,parent_id,title,slug,content_json,content_html,excerpt,status,visibility,document_type,menu_order,public_published_at,public_expires_at,updated_at FROM public.wiki_pages WHERE id=$1 UNION ALL SELECT w.id,w.parent_id,w.title,w.slug,w.content_json,w.content_html,w.excerpt,w.status,w.visibility,w.document_type,w.menu_order,w.public_published_at,w.public_expires_at,w.updated_at FROM public.wiki_pages w JOIN tree t ON w.parent_id=t.id WHERE w.family_id=(SELECT family_id FROM public.wiki_pages WHERE id=$1) AND w.status='publish' AND w.is_archived=false) SELECT * FROM tree ORDER BY menu_order,lower(title)`,[root.id]);const attachment_urls=await getPublicAttachmentUrls(rows.rows.map(r=>r.id));return{ok:true,payload:{item:root,outline:rows.rows,attachment_urls}};}
