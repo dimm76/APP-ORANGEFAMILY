@@ -33,7 +33,7 @@ const NAV_ITEMS = [
     label: "Ajustes",
     href: "/app/settings/family",
     icon: settingsOutline,
-    ownerOnly: true,
+    settingsItem: true,
   },
 ];
 
@@ -66,18 +66,19 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
   }
 
   const isOwner = user?.families?.some((family) => family.role === "owner");
+  const settingsHref = isOwner ? "/app/settings/family" : "/app/settings/downloads";
   const visibleItems = NAV_ITEMS.filter(
     (item) =>
       (!item.ownerOnly || isOwner) &&
       (!item.moduleKey || hasModuleAccess(item.moduleKey))
-  );
+  ).map((item) => item.settingsItem ? { ...item, href: settingsHref } : item);
 
   if (hasModuleAccess("orange_photos") && pathname.startsWith("/app/orangephotos")) {
     return <OrangePhotosSidebar pathname={pathname} onNavigate={onNavigate} />;
   }
 
-  if (isOwner && pathname.startsWith("/app/settings/")) {
-    return <SettingsSidebar pathname={pathname} onNavigate={onNavigate} />;
+  if (pathname.startsWith("/app/settings/")) {
+    return <SettingsSidebar pathname={pathname} onNavigate={onNavigate} isOwner={isOwner} />;
   }
 
   return (
@@ -87,7 +88,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
           {visibleItems.map((item) => (
             <IonItem
               key={item.href}
-              className={`od-main-item ${pathname === item.href || (item.href === "/app/wiki" && pathname.startsWith("/app/wiki/")) || (item.href === "/app/settings/family" && pathname.startsWith("/app/settings/")) ? "od-item-active" : ""}`}
+              className={`od-main-item ${pathname === item.href || (item.href === "/app/wiki" && pathname.startsWith("/app/wiki/")) || (item.settingsItem && pathname.startsWith("/app/settings/")) ? "od-item-active" : ""}`}
               button
               detail={false}
               lines="none"

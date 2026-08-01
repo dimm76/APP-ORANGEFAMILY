@@ -45,6 +45,21 @@ class OrangeFamilyAuthApi(apiBaseUrl: String) {
         request("api/auth/logout", "POST", sessionToken, "{}")
     }
 
+    fun latestAndroidRelease(sessionToken: String): AppReleaseResult {
+        val response = request("api/app-releases/android/latest", "GET", sessionToken = sessionToken)
+        if (response.status == HttpURLConnection.HTTP_UNAUTHORIZED) return AppReleaseResult.Unauthorized
+        if (response.status !in 200..299) return AppReleaseResult.Failure(response.publicMessage())
+        val json = response.json ?: return AppReleaseResult.Failure(GENERIC_ERROR)
+        if (!json.has("release")) return AppReleaseResult.Failure(GENERIC_ERROR)
+        val item = json.optJSONObject("release") ?: return AppReleaseResult.Success(null)
+        val versionCode = item.optInt("version_code", 0)
+        val versionName = item.optString("version_name").trim()
+        val fileName = item.optString("file_name").trim()
+        val downloadUrl = item.optString("download_url").trim()
+        if (versionCode < 1 || versionName.isBlank() || fileName.isBlank() || downloadUrl.isBlank()) return AppReleaseResult.Failure(GENERIC_ERROR)
+        return AppReleaseResult.Success(AppRelease(versionCode, versionName, fileName, downloadUrl, item.optString("release_notes").trim().takeIf(String::isNotBlank), item.optString("published_at").trim().takeIf(String::isNotBlank)))
+    }
+
     private fun request(
         path: String,
         method: String,
@@ -108,6 +123,13 @@ class OrangeFamilyAuthApi(apiBaseUrl: String) {
         data class Success(val user: AuthUser) : CurrentUserResult
         data class Failure(val message: String) : CurrentUserResult
         data object Unauthorized : CurrentUserResult
+    }
+
+    data class AppRelease(val versionCode: Int, val versionName: String, val fileName: String, val downloadUrl: String, val releaseNotes: String?, val publishedAt: String?)
+    sealed interface AppReleaseResult {
+        data class Success(val release: AppRelease?) : AppReleaseResult
+        data class Failure(val message: String) : AppReleaseResult
+        data object Unauthorized : AppReleaseResult
     }
 
     private companion object {

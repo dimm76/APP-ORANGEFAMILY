@@ -1,5 +1,8 @@
 package com.orangefamily.photossync.ui
 
+import android.content.Intent
+import android.net.Uri
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,7 +32,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import com.orangefamily.photossync.R
+import com.orangefamily.photossync.BuildConfig
 import com.orangefamily.photossync.auth.AuthUser
+import com.orangefamily.photossync.auth.OrangeFamilyAuthApi
+import com.orangefamily.photossync.auth.SecureSessionStore
 import com.orangefamily.photossync.backup.CameraBackupController.CameraBackupState
 import com.orangefamily.photossync.data.LocalMediaItem
 import com.orangefamily.photossync.data.CameraBackupRepository
@@ -91,6 +97,8 @@ fun StatusScreen(
             }
         }
 
+        AppVersionCard(user.id)
+
         CameraBackupCard(
             state = cameraBackupState,
             onRequestMediaPermission = onRequestMediaPermission,
@@ -105,6 +113,48 @@ fun StatusScreen(
             Text(
                 stringResource(if (loggingOut) R.string.logout_loading else R.string.logout_action),
             )
+        }
+    }
+}
+
+private sealed interface AppReleaseState {
+    data object Loading : AppReleaseState
+    data class Ready(val release: OrangeFamilyAuthApi.AppRelease?) : AppReleaseState
+    data object Error : AppReleaseState
+}
+
+@Composable
+private fun AppVersionCard(userId: String) {
+    val context = LocalContext.current
+    val state by produceState<AppReleaseState>(AppReleaseState.Loading, userId) {
+        value = withContext(Dispatchers.IO) {
+            val token = SecureSessionStore(context).load(BuildConfig.API_BASE_URL)
+            if (token == null) AppReleaseState.Error else when (val result = runCatching {
+                OrangeFamilyAuthApi(BuildConfig.API_BASE_URL).latestAndroidRelease(token)
+            }.getOrNull()) {
+                is OrangeFamilyAuthApi.AppReleaseResult.Success -> AppReleaseState.Ready(result.release)
+                else -> AppReleaseState.Error
+            }
+        }
+    }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.app_version_title), style = MaterialTheme.typography.titleLarge)
+            StatusValue(stringResource(R.string.installed_version_label), BuildConfig.VERSION_NAME + " · " + BuildConfig.VERSION_CODE)
+            when (val current = state) {
+                AppReleaseState.Loading -> Text(stringResource(R.string.checking_app_version))
+                AppReleaseState.Error -> Text(stringResource(R.string.app_version_check_failed), color = MaterialTheme.colorScheme.error)
+                is AppReleaseState.Ready -> {
+                    val release = current.release
+                    if (release == null) Text(stringResource(R.string.no_app_release))
+                    else if (release.versionCode > BuildConfig.VERSION_CODE) {
+                        StatusValue(stringResource(R.string.available_version_label), release.versionName + " · " + release.versionCode)
+                        Text(stringResource(R.string.app_update_available), color = MaterialTheme.colorScheme.primary)
+                        Button(onClick = {context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(release.downloadUrl),),)},modifier = Modifier.fillMaxWidth(),) {Text(stringResource(R.string.download_app_update),)}
+                    } else if (release.versionCode == BuildConfig.VERSION_CODE) Text(stringResource(R.string.app_is_updated), color = MaterialTheme.colorScheme.primary)
+                    else Text(stringResource(R.string.app_is_newer_than_published))
+                }
+            }
         }
     }
 }

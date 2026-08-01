@@ -126,4 +126,15 @@
         <item quantity="one">%d seleccionada</item>
         <item quantity="other">%d seleccionadas</item>
     </plurals>
+    <string name="app_version_title">Versión de la aplicación</string>
+    <string name="installed_version_label">Instalada</string>
+    <string name="available_version_label">Disponible</string>
+    <string name="available_file_label">Archivo</string>
+    <string name="checking_app_version">Comprobando actualizaciones…</string>
+    <string name="app_version_check_failed">No se pudo comprobar la última versión.</string>
+    <string name="no_app_release">Todavía no hay una versión publicada.</string>
+    <string name="app_update_available">Hay una actualización disponible.</string>
+    <string name="download_app_update">Descargar actualización</string>
+    <string name="app_is_updated">La aplicación está actualizada.</string>
+    <string name="app_is_newer_than_published">Esta instalación es posterior a la versión publicada.</string>
 </resources>

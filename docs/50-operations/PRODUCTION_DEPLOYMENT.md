@@ -1140,3 +1140,13 @@ Cuando una credencial se exponga accidentalmente:
 6. validar el acceso a PostgreSQL;
 7. comprobar que la credencial anterior ya no funciona;
 8. revisar que no se haya incorporado a Git.
+## Publicación del agente Android
+
+OrangeFamily mantiene los metadatos de la publicación Android vigente en
+application_releases. Las migraciones continúan siendo manuales: antes de
+desplegar el código debe aplicarse la migración 20260801180000_application_releases.sql.
+
+La primera versión que incorpora la comprobación automática es versionCode 5
+y versionName 1.2.0. El administrador debe generar el APK release firmado,
+alojarlo en una URL HTTPS estable, desplegar frontend y backend y registrar la
+publicación desde Ajustes > Descargas.

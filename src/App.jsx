@@ -6,6 +6,8 @@ import WikiPage, { WikiPublicPage } from "./features/wiki/WikiPage.jsx";
 import OrangePhotosPage from "./features/orange-photos/OrangePhotosPage.jsx";
 import FamilyMembersPage from "./features/settings/FamilyMembersPage.jsx";
 import StoragePage from "./features/settings/StoragePage.jsx";
+import DownloadsPage from "./features/settings/DownloadsPage.jsx";
+import { useAuth } from "./app/authContext.js";
 import AuthActionPage from "./app/AuthActionPage.jsx";
 import "./App.css";
 
@@ -61,8 +63,14 @@ function ModulePlaceholder({ title, description }) {
   );
 }
 
+function SettingsAccessDenied() {
+  return <div className="od-page"><div className="od-page-inner"><h1 className="od-page-title">Acceso restringido</h1><p className="od-status-line od-status-line--error">Solo el administrador puede acceder a este apartado de Ajustes.</p></div></div>;
+}
+
 function AppContent() {
   const [pathname, setPathname] = useState(currentPathname);
+  const { user } = useAuth();
+  const isOwner = user?.families?.some((family) => family.role === "owner");
 
   useEffect(() => {
     const syncPathname = () => setPathname(currentPathname());
@@ -78,7 +86,7 @@ function AppContent() {
 
   return (
     <AppLayout>
-      {pathname === "/app/settings/attachments" ? (
+      {pathname === "/app/settings/downloads" ? <DownloadsPage /> : pathname.startsWith("/app/settings/") && !isOwner ? <SettingsAccessDenied /> : pathname === "/app/settings/attachments" ? (
         <AttachmentsLibraryPage />
       ) : pathname === "/app/settings/family" ? (
         <FamilyMembersPage />

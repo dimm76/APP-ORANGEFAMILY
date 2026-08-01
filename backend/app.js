@@ -16,6 +16,7 @@ const { handleWikiRoutes } = require("./src/wikiHttp");
 const { handleOrangePhotosRoutes } = require("./src/orangePhotosHttp");
 const { handleFamilyMembersRoutes } = require("./src/familyMembersHttp");
 const { handleStorageUsageRoutes } = require("./src/storageUsageHttp");
+const { handleAppReleaseRoutes } = require("./src/appReleasesHttp");
 const { requireFamilyModule } = require("./src/moduleAccess");
 
 const app = express();
@@ -58,6 +59,7 @@ handleWikiRoutes(app);
 handleOrangePhotosRoutes(app);
 handleFamilyMembersRoutes(app);
 handleStorageUsageRoutes(app);
+handleAppReleaseRoutes(app);
 
 app.get("/api/health", async (_req, res) => {
   try {
