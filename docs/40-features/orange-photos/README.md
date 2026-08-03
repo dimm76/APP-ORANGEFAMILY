@@ -1,5 +1,15 @@
 # OrangePhotos
 
+## Estado final de invitados externos — Fase 1
+
+Los invitados externos son `auth_users` normales sin `family_membership`. El acceso se concede exclusivamente mediante grants por álbum. Las invitaciones se gestionan desde Compartir álbum, usan tokens hasheados, caducan a los siete días, requieren coincidencia exacta de email y pueden revocarse.
+
+La Fase 1 incluye landing de invitado, grid, viewer, descarga autenticada y paginación. No incluye subida de fotos ni comentarios.
+
+Migración pendiente: `docs/30-database/migration/20260803140000_orange_photo_album_external_guests.sql`.
+
+No ejecutar la migración hasta la revisión final y el merge coordinado.
+
 ## Invitados externos — Fase 1
 
 El acceso público continúa siendo de lectura y descarga. Los miembros familiares se autorizan mediante `family_memberships`; los invitados externos son cuentas de autenticación normales sin membresía familiar y reciben un grant explícito por álbum. No existe `role='guest'` en `family_memberships`.

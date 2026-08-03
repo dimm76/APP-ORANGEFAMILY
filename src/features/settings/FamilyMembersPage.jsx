@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { IonBadge } from "@ionic/react";
 import {
   createFamilyMember,
+  listExternalGuests,
   listFamilyMembers,
   resendInvitation,
   sendMemberPasswordReset,
@@ -45,35 +46,22 @@ export default function FamilyMembersPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [modalError, setModalError] = useState("");
+  const [externalGuests, setExternalGuests] = useState([]);
+  const [externalGuestsLoading, setExternalGuestsLoading] = useState(true);
+  const [externalGuestsError, setExternalGuestsError] = useState("");
 
   async function load() {
     setLoading(true);
+    setExternalGuestsLoading(true);
     setError("");
-    try {
-      setItems((await listFamilyMembers()).items || []);
-    } catch (loadError) {
-      setError(loadError.message);
-    } finally {
-      setLoading(false);
-    }
+    setExternalGuestsError("");
+    const [familyResult, guestsResult] = await Promise.allSettled([listFamilyMembers(), listExternalGuests()]);
+    if (familyResult.status === "fulfilled") setItems(familyResult.value.items || []); else setError(familyResult.reason.message);
+    if (guestsResult.status === "fulfilled") setExternalGuests(guestsResult.value.items || []); else setExternalGuestsError(guestsResult.reason.message);
+    setLoading(false); setExternalGuestsLoading(false);
   }
 
-  useEffect(() => {
-    let cancelled = false;
-    listFamilyMembers()
-      .then((result) => {
-        if (!cancelled) setItems(result.items || []);
-      })
-      .catch((loadError) => {
-        if (!cancelled) setError(loadError.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, []);
 
   function openCreate() {
     setEditing("new");
@@ -409,6 +397,14 @@ export default function FamilyMembersPage() {
             </table>
           </div>
         )}
+
+        <section className="of-family-external-guests">
+          <div className="of-family-external-guests__header"><div><h2>Invitados externos</h2><p>Personas con acceso únicamente a álbumes concretos de OrangePhotos.</p></div><span className="of-family-external-guests__count">{externalGuests.length}</span></div>
+          {externalGuestsError ? <p className="od-status-line od-status-line--error" role="alert">{externalGuestsError}</p> : null}
+          {externalGuestsLoading ? <p className="od-status-line">Cargando invitados externos…</p> : null}
+          {!externalGuestsLoading&&!externalGuestsError&&!externalGuests.length ? <p className="od-status-line">No hay invitados externos activos.</p> : null}
+          {!externalGuestsLoading&&externalGuests.length ? <div className="od-table-wrap"><table className="od-table od-table--fill"><thead><tr><th>Persona</th><th>Email</th><th>Estado</th><th>Álbumes</th><th>Permisos</th></tr></thead><tbody>{externalGuests.map((guest)=><tr key={guest.user_id}><td>{guest.display_name||guest.email}</td><td>{guest.email}</td><td>{guest.auth_status==="active"?"Activo":guest.auth_status}</td><td><div className="of-family-external-guests__albums">{(guest.albums||[]).map(album=><span className="of-family-external-guests__album" key={album.grant_id}>{album.album_title}</span>)}</div></td><td><div className="of-family-external-guests__permissions">{(guest.albums||[]).map(album=><div className="of-family-external-guests__permission" key={album.grant_id}><strong>{album.album_title}</strong><span>Puede ver{album.can_contribute?" · Puede añadir":""}{album.can_comment?" · Podrá comentar":""}</span></div>)}</div></td></tr>)}</tbody></table></div> : null}
+        </section>
 
         {editing === "new" ? (
           <div className="od-modal-backdrop" role="presentation">

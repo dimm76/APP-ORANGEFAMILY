@@ -2,6 +2,7 @@ const service=require('./orangePhotosGuestService');
 function send(res,r){return res.status(r.ok?200:(r.status||400)).json(r.ok?{ok:true,...r.payload}:{ok:false,code:r.code,message:r.reason});}
 function safe(fn){return async(req,res)=>{try{return send(res,await fn(req));}catch(e){console.error('Orange guest',{message:e.message});return res.status(500).json({ok:false,code:'INTERNAL_ERROR',message:'No se pudo completar la operación.'});}};}
 function handleOrangePhotosGuestRoutes(app){
+ app.get('/api/settings/external-guests',safe(req=>service.listFamilyExternalGuests(req)));
  app.post('/api/orange-photo-albums/:albumId/guest-invitations',safe(req=>service.createInvitation(req,req.params.albumId,req.body||{})));
  app.get('/api/orange-photo-albums/:albumId/guest-access',safe(req=>service.listAccess(req,req.params.albumId)));
  app.delete('/api/orange-photo-albums/:albumId/guest-invitations/:invitationId',safe(req=>service.revokeInvitation(req,req.params.albumId,req.params.invitationId)));

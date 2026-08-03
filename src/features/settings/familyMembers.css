@@ -37,6 +37,11 @@
 .of-family-modules__grid .of-family-form__check { margin-top:0; }
 .of-family-module-badges { display:flex; flex-wrap:wrap; gap:4px; }
 .of-family-actions { display:flex; flex-wrap:wrap; gap:6px; }
+.of-family-external-guests { margin-top:32px; }
+.of-family-external-guests__header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:16px; }
+.of-family-external-guests__header h2 { margin:0; }.of-family-external-guests__header p { margin:4px 0 0; }.of-family-external-guests__count { min-width:32px; padding:4px 10px; border-radius:999px; text-align:center; font-weight:700; background:#f1f5f9; }
+.of-family-external-guests__albums,.of-family-external-guests__permissions { display:flex; flex-wrap:wrap; gap:6px; }.of-family-external-guests__album { display:inline-flex; padding:3px 8px; border:1px solid #dce3f5; border-radius:999px; white-space:nowrap; }.of-family-external-guests__permissions { flex-direction:column; }.of-family-external-guests__permission { display:flex; flex-direction:column; gap:2px; }
+@media (max-width:640px){.of-family-external-guests__header{flex-direction:column}.of-family-external-guests__album{white-space:normal}}
 @media (max-width: 700px) {
   .of-family-form__grid {
     grid-template-columns: 1fr;
