@@ -261,6 +261,7 @@
 .od-orangephotos-popover-shield { position:fixed; inset:0; z-index:10049; padding:0; border:0; background:transparent; }
 .od-orangephotos-create-menu,.od-orangephotos-filters-popover { max-height:calc(100vh - 24px); overflow:auto; background:#fff; border:1px solid #dce3f5; border-radius:8px; box-shadow:0 8px 24px rgba(15,23,42,.12); color:#334155; }.od-orangephotos-create-menu { padding:6px; }.od-orangephotos-create-menu p { margin:5px 8px; color:#64748b; font-size:11px; font-weight:700; text-transform:uppercase; }.od-orangephotos-create-menu hr { margin:5px 0; border:0; border-top:1px solid #e8edf7; }.od-orangephotos-create-menu .od-action-menu-item { display:flex; align-items:center; gap:8px; width:100%; }.od-orangephotos-create-menu ion-icon { width:17px; height:17px; }
 .od-orangephotos-filters-popover { padding:12px; }.od-orangephotos-filter-fields { display:flex; flex-direction:column; gap:14px; }.od-orangephotos-filter-fields .od-form-field { display:flex; flex-direction:column; gap:6px; }.od-orangephotos-filter-fields .od-filter-multiselect { width:100%; }.od-orangephotos-mode { display:inline-flex; align-self:flex-start; padding:2px; border:1px solid #dce3f5; border-radius:8px; background:#f8fafc; }.od-orangephotos-mode button { min-height:26px; padding:0 8px; border:0; border-radius:6px; background:transparent; color:#64748b; font:600 11px inherit; cursor:pointer; }.od-orangephotos-mode button.is-active { background:#fff; color:#fc4200; box-shadow:0 1px 2px rgba(15,23,42,.08); }.od-orangephotos-filters-popover footer { display:flex; justify-content:space-between; gap:8px; margin-top:14px; padding-top:10px; border-top:1px solid #e8edf7; }
+.od-orangephotos-filter-mode { display:flex; align-items:center; gap:5px; min-width:0; }.od-orangephotos-filter-mode__label { margin-right:auto; color:#64748b; font-size:10px; font-weight:700; text-transform:uppercase; }.od-orangephotos-filter-mode button { min-height:24px; padding:0 8px; border:1px solid #dce3f5; border-radius:999px; background:#fff; color:#64748b; font:600 11px inherit; cursor:pointer; }.od-orangephotos-filter-mode button.is-active { border-color:#fc4200; background:#fff8f5; color:#fc4200; }
 .od-orangephotos-upload-progress { position:fixed; right:16px; bottom:16px; z-index:120250; width:min(430px,calc(100vw - 32px)); max-height:min(70vh,600px); display:flex; flex-direction:column; overflow:hidden; border:1px solid #dce3f5; border-radius:12px; background:#fff; box-shadow:0 20px 40px rgba(15,23,42,.16); color:#334155; }.od-orangephotos-upload-progress header { padding:13px 14px; border-bottom:1px solid #e8edf7; }.od-orangephotos-upload-progress h2 { margin:0; color:#0f172a; font-size:15px; }.od-orangephotos-upload-progress__list { overflow:auto; padding:6px 14px; }.od-orangephotos-upload-row { padding:8px 0; border-bottom:1px solid #f1f5f9; }.od-orangephotos-upload-row>div { display:grid; grid-template-columns:20px minmax(0,1fr); gap:2px 6px; }.od-orangephotos-upload-row strong { overflow:hidden; font-size:12px; text-overflow:ellipsis; white-space:nowrap; }.od-orangephotos-upload-row small { grid-column:2; color:#64748b; }.od-orangephotos-upload-row progress { width:100%; height:5px; margin-top:5px; accent-color:#fc4200; }.od-orangephotos-upload-progress footer { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:11px 14px; border-top:1px solid #e8edf7; font-size:12px; }.od-orangephotos-upload-progress footer div { display:flex; gap:6px; }
 .od-orangephotos-upload-row__cancel { grid-column:2; justify-self:start; margin-top:4px; }
 .od-orangephotos-upload-progress__list { overflow-y:auto; max-height:min(60vh,560px); overscroll-behavior:contain; }
@@ -1256,3 +1257,39 @@
 .od-orange-photo-card__share--received {
   color: #1d4ed8;
 }
+ .od-orangephotos-public { min-height: 100vh; background: var(--od-color-bg, #f4f5f7); color: var(--od-color-text, #37374b); }
+.od-orangephotos-public__header { padding: 14px 20px; border-bottom: 1px solid var(--od-color-border, #e4e4e8); background: var(--od-color-surface, #fff); font-weight: 700; }
+.od-orangephotos-public__main { width: min(100% - 32px, 940px); margin: 0 auto; padding: 24px 0; }
+.od-orangephotos-public__media { display: block; max-width: 100%; max-height: 70vh; margin: 20px auto; object-fit: contain; }
+.od-orangephotos-public__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.od-orangephotos-public__grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; }
+.od-orangephotos-public-link { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--od-color-border, #e4e4e8); }
+.od-orangephotos-public-link__url { width: 100%; min-width: 0; }
+.od-orangephotos-public-link__actions,.od-orangephotos-public__selection { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.od-orangephotos-public__identity { margin-bottom: 18px; }
+.od-orangephotos-public__selection { position: sticky; top: 0; z-index: 2; padding: 10px; background: var(--od-color-surface, #fff); border: 1px solid var(--od-color-border, #e4e4e8); border-radius: 8px; }
+.od-orangephotos-public__load-more { display: flex; justify-content: center; padding: 18px 0; }
+.od-orange-photos__content--public .od-orange-photo-card__share { display: none; }
+@media (max-width: 420px) { .od-orangephotos-public__main { width: min(100% - 20px, 940px); padding-top: 14px; } .od-orangephotos-public-link__actions > * { flex: 1 1 auto; } }
+.od-orangephotos-share-link-row { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--od-color-border, #e4e4e8); }
+.od-orangephotos-share-link-url { min-width: 0; margin-bottom: 10px; overflow: hidden; color: var(--od-color-text-muted); font-size: 0.82rem; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.od-orangephotos-share-link-trigger,.od-orangephotos-share-link-active { display: flex; align-items: center; gap: 7px; }
+.od-orangephotos-share-link-trigger { min-height: 32px; padding: 0 10px; border: 1px solid var(--od-color-border-soft, #dce3f5); border-radius: 8px; background: #fff; color: #334155; font: inherit; font-weight: 600; cursor: pointer; }
+.od-orangephotos-share-link-active { flex-wrap: wrap; }
+.od-orangephotos-share-link-active > ion-icon,.od-orangephotos-share-link-trigger > ion-icon { flex: 0 0 auto; font-size: 18px; color: var(--od-color-primary, #fc4200); }
+.od-orangephotos-share-link-feedback { margin: 8px 0 0; color: var(--od-color-success, #15803d); font-size: 12px; }
+.od-orangephotos-share-link-confirm { max-width: 390px; }
+.od-orangephotos-share-link-confirm .od-modal-title { display: flex; align-items: center; gap: 8px; }
+.od-orangephotos-create-link-modal__actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: nowrap; gap: 12px; margin-top: 20px; }
+.od-orangephotos-create-link-modal__actions > .od-btn { width: auto; min-width: 0; margin: 0; flex: 0 0 auto; }
+.od-orangephotos-create-link-modal__actions > .od-btn-primary { min-width: 138px; }
+.od-orangephotos-public-photo { width: 100%; max-width: 1100px; margin: 0 auto; }
+.od-orangephotos-public-photo__header { display: grid; gap: 4px; margin-bottom: 12px; }
+.od-orangephotos-public-photo__header p { margin: 3px 0 0; }
+.od-orangephotos-public-photo__media { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 240px; border-radius: 10px; background: #111229; overflow: hidden; }
+.od-orangephotos-public-photo__image,.od-orangephotos-public-photo__video { display: block; max-width: 100%; max-height: calc(100vh - 230px); object-fit: contain; }
+.od-orangephotos-public-photo__image { cursor: zoom-in; }
+.od-orangephotos-public-photo__actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.od-orangephotos-public-photo__actions .od-button-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; }
+.od-orangephotos-public-photo__info { margin-top: 12px; border: 1px solid var(--od-color-border-soft, #dce3f5); border-radius: 8px; background: #fff; }
+@media (max-width: 420px) { .od-orangephotos-share-link-active { align-items: stretch; } .od-orangephotos-public-photo__media { min-height: 180px; } .od-orangephotos-public-photo__actions { justify-content: center; } }

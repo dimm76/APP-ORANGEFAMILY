@@ -47,6 +47,7 @@ export default function OrangePhotoDetailsPanel({
   members = [],
   onSave,
   feedback,
+  readOnly = false,
 }) {
   const [form, setForm] = useState({});
 
@@ -90,6 +91,8 @@ export default function OrangePhotoDetailsPanel({
   ]
     .filter(Boolean)
     .join(" ");
+
+  if(readOnly){const date=photo.captured_at?new Date(photo.captured_at).toLocaleString("es-ES"):"â€”",duration=photo.duration_seconds?`${Math.round(Number(photo.duration_seconds))} s`:"â€”";return <div className="od-orange-photo-details"><DetailSection icon={documentOutline} title="Descripción"><p>{photo.description||"â€”"}</p></DetailSection><DetailSection icon={personOutline} title="Propiedad"><p><strong>Propietario:</strong> {photo.owner_display_name||"â€”"}</p></DetailSection><DetailSection icon={calendarOutline} title="Fecha y hora"><p>{date}</p></DetailSection><DetailSection icon={cameraOutline} title="Cámara y captura"><p>{camera||"â€”"}</p><p><strong>Lente:</strong> {photo.lens_model||"â€”"}</p></DetailSection><DetailSection icon={documentOutline} title="Archivo"><p><strong>{photo.title||"â€”"}</strong></p><p>{photo.original_filename||"â€”"}</p><small>{photo.width&&photo.height?`${photo.width} × ${photo.height}`:"â€”"}{photo.media_type==="video"?` · ${duration}`:""}</small></DetailSection><DetailSection icon={locationOutline} title="Ubicación"><p>{photo.location_name||"â€”"}</p></DetailSection></div>;}
 
   return (
     <div className="od-orange-photo-details">

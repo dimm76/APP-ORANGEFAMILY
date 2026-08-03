@@ -16,6 +16,7 @@ import { OD_ICONS } from "../../shared/ui/odIcons.js";
 import OrangePhotoDetailsPanel from "./OrangePhotoDetailsPanel.jsx";
 import OrangePhotoShareModal from "./OrangePhotoShareModal.jsx";
 import OrangePhotoEventsModal from "./OrangePhotoEventsModal.jsx";
+const DEFAULT_CAPABILITIES = Object.freeze({select:true,favorite:true,share:true,download:true,editDetails:true,history:true,generatePoster:true,trash:true,restore:true,purge:true});
 
 export default function OrangePhotoViewer({
   photo,
@@ -36,7 +37,12 @@ export default function OrangePhotoViewer({
   hasPrevious,
   hasNext,
   positionLabel,
+  capabilities,
+  downloadUrl,
+  onPublicLinkChange,
 }) {
+  const allowed={...DEFAULT_CAPABILITIES,...(capabilities||{})};
+  const effectiveDownloadUrl=downloadUrl||orangePhotoDownloadUrl(photo.id);
   const [infoOpen, setInfoOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -66,7 +72,7 @@ export default function OrangePhotoViewer({
     setFeedback("Guardando…");
 
     try {
-      await onSave(body);
+      await onSave?.(body);
       notify("Cambios guardados");
     } catch (error) {
       setFeedback(error.message);
@@ -144,9 +150,10 @@ export default function OrangePhotoViewer({
             members={members}
             onSave={save}
             feedback={feedback}
+            readOnly={!allowed.editDetails}
           />
         )}
-        renderInfoHeaderActions={photo.is_owner ? () => (
+        renderInfoHeaderActions={photo.is_owner&&allowed.history ? () => (
           <button
             ref={eventsButtonRef}
             type="button"
@@ -162,7 +169,7 @@ export default function OrangePhotoViewer({
           <>
             {!trashMode ? (
               <>
-                <button
+                {allowed.select?<button
                   className={`od-attachments-lightbox__btn od-attachments-lightbox__btn--primary-action${selected ? " is-selected" : ""}`}
                   type="button"
                   aria-label={selected ? "Quitar de la selección" : "Añadir a la selección"}
@@ -170,9 +177,9 @@ export default function OrangePhotoViewer({
                   onClick={onToggleSelected}
                 >
                   <IonIcon icon={checkboxOutline} />
-                </button>
+                </button>:null}
 
-                <button
+                {allowed.favorite?<button
                   className={`od-attachments-lightbox__btn od-attachments-lightbox__btn--primary-action${photo.is_favorite ? " is-active" : ""}`}
                   type="button"
                   aria-label={photo.is_favorite ? "Quitar de favoritas" : "Añadir a favoritas"}
@@ -180,9 +187,9 @@ export default function OrangePhotoViewer({
                   onClick={onToggleFavorite}
                 >
                   <IonIcon icon={photo.is_favorite ? heart : heartOutline} />
-                </button>
+                </button>:null}
 
-                <button
+                {allowed.share?<button
                   ref={shareButtonRef}
                   className={`od-attachments-lightbox__btn od-attachments-lightbox__btn--primary-action${photo.visibility !== "private" ? " is-active" : ""}`}
                   type="button"
@@ -191,7 +198,7 @@ export default function OrangePhotoViewer({
                   onClick={() => setShareOpen(true)}
                 >
                   <IonIcon icon={shareSocialOutline} />
-                </button>
+                </button>:null}
               </>
             ) : null}
 
@@ -220,10 +227,10 @@ export default function OrangePhotoViewer({
                   <div className="od-attachments-lightbox__more-menu" role="menu">
                     {photo.media_type==="video"&&photo.is_owner?<button className="od-attachments-lightbox__more-item" type="button" role="menuitem" disabled={posterBusy} onClick={handleGeneratePoster}><IonIcon icon={imageOutline}/><span>{posterBusy?"Generando miniatura…":hasPoster?"Recrear miniatura":"Generar miniatura"}</span></button>:null}
                     {posterError?<small className="od-status-line od-status-line--error">{posterError}</small>:null}
-                    {!trashMode ? (
+                    {!trashMode&&allowed.download ? (
                       <a
                         className="od-attachments-lightbox__more-item"
-                        href={orangePhotoDownloadUrl(photo.id)}
+                        href={effectiveDownloadUrl}
                         role="menuitem"
                         onClick={closeMore}
                       >
@@ -232,7 +239,7 @@ export default function OrangePhotoViewer({
                       </a>
                     ) : null}
 
-                    {trashMode && photo.is_owner ? (
+                    {trashMode && photo.is_owner&&(allowed.restore||allowed.purge) ? (
                       <>
                         <button
                           className="od-attachments-lightbox__more-item"
@@ -254,7 +261,7 @@ export default function OrangePhotoViewer({
                           <span>Eliminar definitivamente</span>
                         </button>
                       </>
-                    ) : photo.is_owner ? (
+                    ) : photo.is_owner&&allowed.trash ? (
                       <button
                         className="od-attachments-lightbox__more-item od-attachments-lightbox__more-item--danger"
                         type="button"
@@ -273,21 +280,22 @@ export default function OrangePhotoViewer({
         )}
       />
 
-      {!trashMode && shareOpen ? (
+      {!trashMode && shareOpen&&allowed.share ? (
         <OrangePhotoShareModal
           photo={photo}
           members={members}
           returnFocusRef={shareButtonRef}
           onClose={() => setShareOpen(false)}
           onSave={async (body) => {
-            await onShareSave(body);
+            await onShareSave?.(body);
             setShareOpen(false);
             notify("Compartición actualizada");
           }}
+          onPublicLinkChange={onPublicLinkChange}
         />
       ) : null}
 
-      {eventsOpen && photo.is_owner ? (
+      {eventsOpen && photo.is_owner&&allowed.history ? (
         <OrangePhotoEventsModal
           photo={photo}
           returnFocusRef={eventsButtonRef}
