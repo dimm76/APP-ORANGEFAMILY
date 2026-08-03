@@ -6,7 +6,7 @@ import {
 } from "react";
 import { IonApp, IonContent, IonPage, IonSpinner } from "@ionic/react";
 import { fetchAuthMe, postAuthLogin, postAuthLogout } from "../shared/api/authApi.js";
-import { AuthContext, hasFamilyModuleAccess } from "./authContext.js";
+import { AuthContext, hasFamilyModuleAccess, isExternalGuestOnly } from "./authContext.js";
 import LoginPage from "./LoginPage.jsx";
 import "./app-login.css";
 
@@ -78,7 +78,7 @@ export default function AuthGate({ children }) {
 
   return (
     <AuthContext.Provider value={value}>
-      {!user ? <LoginPage /> : children}
+      {!user ? <LoginPage /> : (!user.families?.length && !user.external_access?.has_album_grants ? <IonApp><IonPage><IonContent className="ion-padding"><p className="od-status-line od-status-line--error">Tu cuenta no tiene acceso activo a OrangeFamily.</p></IonContent></IonPage></IonApp> : isExternalGuestOnly(user) && !window.location.pathname.startsWith("/guest") ? <IonApp><IonPage><IonContent className="ion-padding"><p className="od-status-line od-status-line--error">Este acceso solo permite álbumes compartidos contigo.</p></IonContent></IonPage></IonApp> : children)}
     </AuthContext.Provider>
   );
 }
