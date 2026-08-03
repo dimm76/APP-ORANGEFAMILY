@@ -167,6 +167,8 @@ function OrangePhotosGrid({
   onOpen,
   onActivePeriodChange,
   albumMode = false,
+  publicMode = false,
+  selectable = true,
 }) {
   const contentRef = useRef(null);
   const measuredWidthRef = useRef(0);
@@ -248,7 +250,7 @@ function OrangePhotosGrid({
   }
 
   return (
-    <div className="od-orange-photos__content" ref={contentRef}>
+    <div className={`od-orange-photos__content${publicMode?" od-orange-photos__content--public":""}`} ref={contentRef}>
       {layout.map((period) => (
         <section
           className="od-orange-photos__period"
@@ -259,7 +261,7 @@ function OrangePhotosGrid({
           <h2>{period.label}</h2>
           {period.days.map((day) => (
             <section className="od-orange-photos__day" key={day.key}>
-              <header className="od-orange-photos__day-header"><DaySelectionToggle dayKey={day.key} photoIds={day.photos.map(photo => photo.id)} selected={selected} selectionMode={selectionMode} onSelectMany={onSelectMany} /><h3>{day.label}</h3></header>
+              <header className="od-orange-photos__day-header">{selectable?<DaySelectionToggle dayKey={day.key} photoIds={day.photos.map(photo => photo.id)} selected={selected} selectionMode={selectionMode} onSelectMany={onSelectMany}/>:null}<h3>{day.label}</h3></header>
               {day.rows.map((row) => (
                 <div
                   className="od-orange-photos__justified-row"
@@ -275,9 +277,9 @@ function OrangePhotosGrid({
                     >
                       <OrangePhotoCard
                         photo={photo}
-                        selectionMode={selectionMode}
+                        selectionMode={selectable&&selectionMode}
                         selected={selected.has(photo.id)}
-                        onSelect={onSelect}
+                        onSelect={selectable?onSelect:()=>{}}
                         onOpen={onOpen}
                         eager={globalIndex < 8}
                       />

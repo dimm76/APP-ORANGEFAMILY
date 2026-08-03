@@ -43,8 +43,8 @@ export const listOrangeAlbumPhotoIds=id=>request(`/api/orange-photo-albums/${enc
 export const createOrangeAlbum=body=>request('/api/orange-photo-albums',{method:'POST',body:JSON.stringify(body)});
 export const updateOrangeAlbum=(id,body)=>request(`/api/orange-photo-albums/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify(body)});
 export const shareOrangeAlbum=(id,body)=>request(`/api/orange-photo-albums/${encodeURIComponent(id)}/share`,{method:'POST',body:JSON.stringify(body)});
-export const createOrangeAlbumPublicLink=(id,regenerate=false)=>request(`/api/orange-photo-albums/${encodeURIComponent(id)}/public-link`,{method:'POST',body:JSON.stringify({regenerate})});
-export const revokeOrangeAlbumPublicLink=id=>request(`/api/orange-photo-albums/${encodeURIComponent(id)}/public-link`,{method:'DELETE'});
+export const createOrangeAlbumPublicLink=(id,regenerate=false)=>request(`/api/orange-photo-albums/${encodeURIComponent(id)}/public-link`,{method:'POST',body:JSON.stringify({regenerate})}).then(response=>{window.dispatchEvent(new CustomEvent("orangephotos:album-public-link",{detail:{id,publicLink:response.public_link}}));return response;});
+export const revokeOrangeAlbumPublicLink=id=>request(`/api/orange-photo-albums/${encodeURIComponent(id)}/public-link`,{method:'DELETE'}).then(response=>{window.dispatchEvent(new CustomEvent("orangephotos:album-public-link",{detail:{id,publicLink:response.public_link}}));return response;});
 export const getPublicOrangePhoto=(token,options={})=>request(`/api/public/orangephotos/photo/${encodeURIComponent(token)}`,{signal:options.signal});
 export const getPublicOrangeAlbum=(token,options={})=>request(`/api/public/orangephotos/album/${encodeURIComponent(token)}`,{signal:options.signal});
 export const getPublicOrangeAlbumPhotos=(token,filters={},options={})=>request(`/api/public/orangephotos/album/${encodeURIComponent(token)}/photos?${photoQuery(filters)}`,{signal:options.signal});

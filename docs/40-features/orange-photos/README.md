@@ -23,6 +23,16 @@ Fotos: `GET/POST /api/orange-photos`, `GET/PATCH /api/orange-photos/:id`, `POST 
 
 Etiquetas: `GET/POST /api/orange-photo-tags`. Miembros seleccionables: `GET /api/orange-photo-members`.
 
+## Filtros y enlaces públicos
+
+La biblioteca admite `access_sources=owned,direct,album`, `owner_user_ids` y `share_states=private,family,selected,public_link`. Node valida los propietarios contra usuarios y membresías activas de la familia. La clasificación es exclusiva: `owned` tiene prioridad; para elementos ajenos, `direct` incluye visibilidad familiar o selección directa y tiene prioridad sobre `album`, reservado al acceso obtenido únicamente mediante un álbum compartido.
+
+El enlace público es independiente de `visibility`. Solo el propietario puede crearlo, copiarlo, regenerarlo o revocarlo mediante `POST/DELETE /api/orange-photos/:id/public-link` y `POST/DELETE /api/orange-photo-albums/:id/public-link`. Regenerar invalida inmediatamente el token anterior y revocar responde públicamente como recurso inexistente.
+
+Las APIs públicas parten de `/api/public/orangephotos/photo/:token` y `/api/public/orangephotos/album/:token`, con URL temporal, descarga individual, listado de álbum y ZIP. El listado limita `per_page` a 100 y el ZIP a 500 elementos. Node valida token activo, papelera y pertenencia al álbum, sin exponer familia, propietario interno, correo, claves de almacenamiento, checksum, EXIF completo ni permisos.
+
+Las páginas `/public/orangephotos/photo/:token` y `/public/orangephotos/album/:token` muestran la misma vista reducida con o sin sesión. Reutilizan grid, visor y panel de lectura; no ofrecen edición, subida pública ni colaboración anónima. Requieren aplicar manualmente `20260803100000_orange_photos_public_links.sql`.
+
 ## Frontend
 
 `OrangePhotosPage` coordina filtros, galería cronológica, selección, álbumes, paginación, subida, visor, detalles y compartición. Los componentes están en `src/features/orange-photos/` y consumen únicamente la API Node.

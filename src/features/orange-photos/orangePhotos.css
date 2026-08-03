@@ -1262,3 +1262,11 @@
 .od-orangephotos-public__media { display: block; max-width: 100%; max-height: 70vh; margin: 20px auto; object-fit: contain; }
 .od-orangephotos-public__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .od-orangephotos-public__grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; }
+.od-orangephotos-public-link { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--od-color-border, #e4e4e8); }
+.od-orangephotos-public-link__url { width: 100%; min-width: 0; }
+.od-orangephotos-public-link__actions,.od-orangephotos-public__selection { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.od-orangephotos-public__identity { margin-bottom: 18px; }
+.od-orangephotos-public__selection { position: sticky; top: 0; z-index: 2; padding: 10px; background: var(--od-color-surface, #fff); border: 1px solid var(--od-color-border, #e4e4e8); border-radius: 8px; }
+.od-orangephotos-public__load-more { display: flex; justify-content: center; padding: 18px 0; }
+.od-orange-photos__content--public .od-orange-photo-card__share { display: none; }
+@media (max-width: 420px) { .od-orangephotos-public__main { width: min(100% - 20px, 940px); padding-top: 14px; } .od-orangephotos-public-link__actions > * { flex: 1 1 auto; } }
