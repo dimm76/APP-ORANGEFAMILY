@@ -1270,3 +1270,21 @@
 .od-orangephotos-public__load-more { display: flex; justify-content: center; padding: 18px 0; }
 .od-orange-photos__content--public .od-orange-photo-card__share { display: none; }
 @media (max-width: 420px) { .od-orangephotos-public__main { width: min(100% - 20px, 940px); padding-top: 14px; } .od-orangephotos-public-link__actions > * { flex: 1 1 auto; } }
+.od-orangephotos-share-link-row { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--od-color-border, #e4e4e8); }
+.od-orangephotos-share-link-trigger,.od-orangephotos-share-link-active { display: flex; align-items: center; gap: 7px; }
+.od-orangephotos-share-link-trigger { min-height: 32px; padding: 0 10px; border: 1px solid var(--od-color-border-soft, #dce3f5); border-radius: 8px; background: #fff; color: #334155; font: inherit; font-weight: 600; cursor: pointer; }
+.od-orangephotos-share-link-active { flex-wrap: wrap; }
+.od-orangephotos-share-link-active > ion-icon,.od-orangephotos-share-link-trigger > ion-icon { flex: 0 0 auto; font-size: 18px; color: var(--od-color-primary, #fc4200); }
+.od-orangephotos-share-link-feedback { margin: 8px 0 0; color: var(--od-color-success, #15803d); font-size: 12px; }
+.od-orangephotos-share-link-confirm { max-width: 390px; }
+.od-orangephotos-share-link-confirm .od-modal-title { display: flex; align-items: center; gap: 8px; }
+.od-orangephotos-public-photo { width: 100%; max-width: 1100px; margin: 0 auto; }
+.od-orangephotos-public-photo__header { display: grid; gap: 4px; margin-bottom: 12px; }
+.od-orangephotos-public-photo__header p { margin: 3px 0 0; }
+.od-orangephotos-public-photo__media { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 240px; border-radius: 10px; background: #111229; overflow: hidden; }
+.od-orangephotos-public-photo__image,.od-orangephotos-public-photo__video { display: block; max-width: 100%; max-height: calc(100vh - 230px); object-fit: contain; }
+.od-orangephotos-public-photo__image { cursor: zoom-in; }
+.od-orangephotos-public-photo__actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.od-orangephotos-public-photo__actions .od-button-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; }
+.od-orangephotos-public-photo__info { margin-top: 12px; border: 1px solid var(--od-color-border-soft, #dce3f5); border-radius: 8px; background: #fff; }
+@media (max-width: 420px) { .od-orangephotos-share-link-active { align-items: stretch; } .od-orangephotos-public-photo__media { min-height: 180px; } .od-orangephotos-public-photo__actions { justify-content: center; } }
