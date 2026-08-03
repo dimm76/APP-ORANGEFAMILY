@@ -4,6 +4,8 @@ export const createOrangeAlbumGuestInvitation=(albumId,payload)=>request(`/api/o
 export const listOrangeAlbumGuestAccess=albumId=>request(`/api/orange-photo-albums/${id(albumId)}/guest-access`);
 export const revokeOrangeAlbumGuestInvitation=(albumId,invitationId)=>request(`/api/orange-photo-albums/${id(albumId)}/guest-invitations/${id(invitationId)}`,{method:"DELETE"});
 export const revokeOrangeAlbumGuestGrant=(albumId,grantId)=>request(`/api/orange-photo-albums/${id(albumId)}/guest-grants/${id(grantId)}`,{method:"DELETE"});
+export const listOrangeAlbumRecipients=albumId=>request(`/api/orange-photo-albums/${id(albumId)}/recipients`);
+export const syncOrangeAlbumRecipients=(albumId,payload)=>request(`/api/orange-photo-albums/${id(albumId)}/recipients`,{method:"PUT",body:JSON.stringify(payload)});
 export const getOrangeGuestInvitation=token=>request(`/api/public/orange-photo-guest-invitations/${id(token)}`);
 export const acceptOrangeGuestInvitation=token=>request(`/api/orange-photo-guest-invitations/${id(token)}/accept`,body({}));
 export const listOrangeGuestAlbums=()=>request("/api/guest/orange-photo-albums");
