@@ -25,7 +25,9 @@ Etiquetas: `GET/POST /api/orange-photo-tags`. Miembros seleccionables: `GET /api
 
 ## Filtros y enlaces públicos
 
-La biblioteca admite `access_sources=owned,direct,album`, `owner_user_ids` y `share_states=private,family,selected,public_link`. Node valida los propietarios contra usuarios y membresías activas de la familia. La clasificación es exclusiva: `owned` tiene prioridad; para elementos ajenos, `direct` incluye visibilidad familiar o selección directa y tiene prioridad sobre `album`, reservado al acceso obtenido únicamente mediante un álbum compartido.
+La biblioteca admite `access_sources=owned,direct,album`, `owner_user_ids` y `share_states=private,family,selected,public_link`. Los filtros múltiples usan `access_sources_mode` y `owner_user_ids_mode`, con semántica `include` o `exclude`; una lista vacía no restringe en ninguno de los modos. Node valida los propietarios contra usuarios y membresías activas de la familia. La clasificación es exclusiva: `owned` tiene prioridad; para elementos ajenos, `direct` incluye visibilidad familiar o selección directa y tiene prioridad sobre `album`, reservado al acceso obtenido únicamente mediante un álbum compartido.
+
+Los modos y selecciones visuales se persisten por usuario y navegador. «Fotos de» no muestra al usuario actual y se reserva para distinguir propietarios del contenido recibido; los elementos propios se controlan mediante «Origen → Mis elementos».
 
 El enlace público es independiente de `visibility`. Solo el propietario puede crearlo, copiarlo, regenerarlo o revocarlo mediante `POST/DELETE /api/orange-photos/:id/public-link` y `POST/DELETE /api/orange-photo-albums/:id/public-link`. Regenerar invalida inmediatamente el token anterior y revocar responde públicamente como recurso inexistente.
 
