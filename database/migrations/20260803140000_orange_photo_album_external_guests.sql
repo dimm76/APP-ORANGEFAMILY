@@ -1,3 +1,5 @@
+BEGIN;
+
 CREATE TABLE public.orange_photo_album_guest_invitations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), album_id uuid NOT NULL REFERENCES public.orange_photo_albums(id) ON DELETE CASCADE,
   invited_email text NOT NULL, invited_by_user_id uuid NOT NULL REFERENCES public.auth_users(id) ON DELETE RESTRICT,
@@ -20,3 +22,10 @@ CREATE INDEX idx_orange_photo_guest_grants_user_status ON public.orange_photo_al
 CREATE INDEX idx_orange_photo_guest_grants_album_status ON public.orange_photo_album_guest_grants(album_id,status);
 CREATE TRIGGER trg_orange_photo_guest_invitations_updated_at BEFORE UPDATE ON public.orange_photo_album_guest_invitations FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 CREATE TRIGGER trg_orange_photo_guest_grants_updated_at BEFORE UPDATE ON public.orange_photo_album_guest_grants FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+REVOKE ALL ON public.orange_photo_album_guest_invitations FROM PUBLIC;
+REVOKE ALL ON public.orange_photo_album_guest_grants FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE ON public.orange_photo_album_guest_invitations TO orangefamily_app_user;
+GRANT SELECT, INSERT, UPDATE ON public.orange_photo_album_guest_grants TO orangefamily_app_user;
+
+COMMIT;

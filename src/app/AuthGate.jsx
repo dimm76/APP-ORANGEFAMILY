@@ -78,7 +78,7 @@ export default function AuthGate({ children }) {
 
   return (
     <AuthContext.Provider value={value}>
-      {!user ? <LoginPage /> : (!user.families?.length && !user.external_access?.has_album_grants ? <IonApp><IonPage><IonContent className="ion-padding"><p className="od-status-line od-status-line--error">Tu cuenta no tiene acceso activo a OrangeFamily.</p></IonContent></IonPage></IonApp> : isExternalGuestOnly(user) && !window.location.pathname.startsWith("/guest") ? <IonApp><IonPage><IonContent className="ion-padding"><p className="od-status-line od-status-line--error">Este acceso solo permite álbumes compartidos contigo.</p></IonContent></IonPage></IonApp> : children)}
+      {!user ? <LoginPage /> : (!user.families?.length && !user.external_access?.has_album_grants && !window.location.pathname.startsWith("/guest-invitations/" ) ? <IonApp><IonPage><IonContent className="ion-padding"><p className="od-status-line od-status-line--error">Tu cuenta no tiene acceso activo a OrangeFamily.</p></IonContent></IonPage></IonApp> : isExternalGuestOnly(user) && !window.location.pathname.startsWith("/guest") && !window.location.pathname.startsWith("/guest-invitations/") ? <IonApp><IonPage><IonContent className="ion-padding"><p className="od-status-line od-status-line--error">Este acceso solo permite álbumes compartidos contigo.</p></IonContent></IonPage></IonApp> : children)}
     </AuthContext.Provider>
   );
 }

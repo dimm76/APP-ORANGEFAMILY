@@ -10,6 +10,9 @@ import StoragePage from "./features/settings/StoragePage.jsx";
 import DownloadsPage from "./features/settings/DownloadsPage.jsx";
 import { useAuth } from "./app/authContext.js";
 import AuthActionPage from "./app/AuthActionPage.jsx";
+import OrangeGuestInvitationPage from "./features/orange-photos/OrangeGuestInvitationPage.jsx";
+import OrangeGuestLandingPage from "./features/orange-photos/OrangeGuestLandingPage.jsx";
+import OrangeGuestAlbumPage from "./features/orange-photos/OrangeGuestAlbumPage.jsx";
 import "./App.css";
 
 const OD_NAV_EVENT = "od-spa-navigate";
@@ -104,6 +107,14 @@ function AppContent() {
   );
 }
 
+function AuthenticatedRouter() {
+  const pathname = currentPathname();
+  if (pathname.startsWith("/guest-invitations/")) return <OrangeGuestInvitationPage token={decodeURIComponent(pathname.slice("/guest-invitations/".length))} />;
+  if (pathname === "/guest") return <OrangeGuestLandingPage />;
+  if (pathname.startsWith("/guest/orangephotos/albums/")) return <OrangeGuestAlbumPage albumId={decodeURIComponent(pathname.slice("/guest/orangephotos/albums/".length))} />;
+  return <AppContent />;
+}
+
 function App() {
   const pathname = currentPathname();
   if (pathname.startsWith("/public/wiki/")) {
@@ -116,7 +127,7 @@ function App() {
   if (pathname === "/reset-password") return <AuthActionPage mode="reset" />;
   return (
     <AuthGate>
-      <AppContent />
+      <AuthenticatedRouter />
     </AuthGate>
   );
 }

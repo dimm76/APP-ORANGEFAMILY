@@ -4,12 +4,13 @@ function safe(fn){return async(req,res)=>{try{return send(res,await fn(req));}ca
 function handleOrangePhotosGuestRoutes(app){
  app.post('/api/orange-photo-albums/:albumId/guest-invitations',safe(req=>service.createInvitation(req,req.params.albumId,req.body||{})));
  app.get('/api/orange-photo-albums/:albumId/guest-access',safe(req=>service.listAccess(req,req.params.albumId)));
- app.delete('/api/orange-photo-albums/:albumId/guest-invitations/:invitationId',safe(async req=>{const o=await service.listAccess(req,req.params.albumId);if(!o.ok)return o;return service.revokeInvitation(req,req.params.albumId,req.params.invitationId);}));
+ app.delete('/api/orange-photo-albums/:albumId/guest-invitations/:invitationId',safe(req=>service.revokeInvitation(req,req.params.albumId,req.params.invitationId)));
  app.delete('/api/orange-photo-albums/:albumId/guest-grants/:grantId',safe(async req=>service.revokeGrant(req,req.params.albumId,req.params.grantId)));
  app.get('/api/public/orange-photo-guest-invitations/:token',safe(req=>service.publicInvitation(req.params.token)));
  app.post('/api/orange-photo-guest-invitations/:token/accept',safe(req=>service.accept(req,req.params.token)));
  app.get('/api/guest/orange-photo-albums',safe(req=>service.guestAlbums(req)));
  app.get('/api/guest/orange-photo-albums/:albumId',safe(req=>service.guestAlbum(req,req.params.albumId)));
  app.get('/api/guest/orange-photo-albums/:albumId/photos',safe(req=>service.guestPhotos(req,req.params.albumId,req.query||{})));
+ app.get('/api/guest/orange-photo-albums/:albumId/photos/:photoId/download',safe(req=>service.guestPhotoDownload(req,req.params.albumId,req.params.photoId)));
 }
 module.exports={handleOrangePhotosGuestRoutes};
