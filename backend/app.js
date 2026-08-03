@@ -14,6 +14,7 @@ const {
 const { handleAttachmentsRoutes } = require("./src/attachmentsHttp");
 const { handleWikiRoutes } = require("./src/wikiHttp");
 const { handleOrangePhotosRoutes } = require("./src/orangePhotosHttp");
+const { handleOrangePhotoAlbumAccessRoutes } = require("./src/orangePhotoAlbumAccessHttp");
 const { handleOrangePhotosGuestRoutes } = require("./src/orangePhotosGuestHttp");
 const { handleFamilyMembersRoutes } = require("./src/familyMembersHttp");
 const { handleStorageUsageRoutes } = require("./src/storageUsageHttp");
@@ -59,6 +60,7 @@ app.use("/api/orange-photo-members", requireFamilyModule("orange_photos"));
 
 handleAttachmentsRoutes(app);
 handleWikiRoutes(app);
+handleOrangePhotoAlbumAccessRoutes(app);
 handleOrangePhotosRoutes(app);
 handleFamilyMembersRoutes(app);
 handleStorageUsageRoutes(app);
