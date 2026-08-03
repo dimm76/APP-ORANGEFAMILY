@@ -106,12 +106,13 @@ function AppContent() {
     </AppLayout>
   );
 }
+function safeDecodePathSegment(value) { try { return decodeURIComponent(value); } catch { return ""; } }
 
 function AuthenticatedRouter() {
   const pathname = currentPathname();
-  if (pathname.startsWith("/guest-invitations/")) return <OrangeGuestInvitationPage token={decodeURIComponent(pathname.slice("/guest-invitations/".length))} />;
+  if (pathname.startsWith("/guest-invitations/")) return <OrangeGuestInvitationPage token={safeDecodePathSegment(pathname.slice("/guest-invitations/".length))} />;
   if (pathname === "/guest") return <OrangeGuestLandingPage />;
-  if (pathname.startsWith("/guest/orangephotos/albums/")) return <OrangeGuestAlbumPage albumId={decodeURIComponent(pathname.slice("/guest/orangephotos/albums/".length))} />;
+  if (pathname.startsWith("/guest/orangephotos/albums/")) return <OrangeGuestAlbumPage albumId={safeDecodePathSegment(pathname.slice("/guest/orangephotos/albums/".length))} />;
   return <AppContent />;
 }
 
