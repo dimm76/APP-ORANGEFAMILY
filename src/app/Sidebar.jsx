@@ -46,7 +46,7 @@ function spaNavigate(href) {
   window.dispatchEvent(new Event(OD_NAV_EVENT));
 }
 
-export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
+export default function Sidebar({ collapsed, onToggleCollapse, onNavigate, orangePhotosGuestMode = false }) {
   const { user, hasModuleAccess, logout } = useAuth();
   const [pathname, setPathname] = useState(currentPathname);
 
@@ -63,6 +63,10 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
   function navigate(href) {
     spaNavigate(href);
     onNavigate?.();
+  }
+
+  if (orangePhotosGuestMode) {
+    return <OrangePhotosSidebar pathname={pathname} onNavigate={onNavigate} guestMode />;
   }
 
   const isOwner = user?.families?.some((family) => family.role === "owner");

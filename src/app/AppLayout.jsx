@@ -7,9 +7,9 @@ import "./app-layout.css";
 
 const OD_NAV_EVENT = "od-spa-navigate";
 
-function navigateToDashboard(event) {
+function navigateTo(event, pathname) {
   event.preventDefault();
-  window.history.pushState({}, "", "/");
+  window.history.pushState({}, "", pathname);
   window.dispatchEvent(new Event(OD_NAV_EVENT));
 }
 
@@ -33,7 +33,7 @@ function isSettingsWorkspacePath(pathname) {
   return normalizePathname(pathname).startsWith("/app/settings/");
 }
 
-export default function AppLayout({ children }) {
+export default function AppLayout({ children, orangePhotosGuestMode = false }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [routeTick, setRouteTick] = useState(0);
@@ -41,7 +41,8 @@ export default function AppLayout({ children }) {
   const pathname =
     typeof window !== "undefined" ? window.location.pathname : "/";
   const wikiWorkspaceMode = isWikiDocumentWorkspacePath(pathname);
-  const orangePhotosWorkspaceMode = isOrangePhotosWorkspacePath(pathname);
+  const regularOrangePhotosWorkspaceMode = isOrangePhotosWorkspacePath(pathname);
+  const orangePhotosWorkspaceMode = regularOrangePhotosWorkspaceMode || orangePhotosGuestMode;
   const settingsWorkspaceMode = isSettingsWorkspacePath(pathname);
   const forceExpandedSidebar =
     orangePhotosWorkspaceMode || settingsWorkspaceMode;
@@ -77,8 +78,8 @@ export default function AppLayout({ children }) {
 
           <a
             className="od-app-header-brand-link"
-            href="/"
-            onClick={navigateToDashboard}
+            href={orangePhotosGuestMode ? "/guest" : "/"}
+            onClick={event => navigateTo(event, orangePhotosGuestMode ? "/guest" : "/")}
           >
             <img
               className="od-app-header-brand"
@@ -90,11 +91,11 @@ export default function AppLayout({ children }) {
           </a>
 
           <div className="od-app-header-search" aria-label={orangePhotosWorkspaceMode ? "Búsqueda de fotografías" : "Búsqueda global"}>
-            {orangePhotosWorkspaceMode ? <span id="od-orangephotos-search-host" /> : <GlobalSearch />}
+            {orangePhotosGuestMode ? null : orangePhotosWorkspaceMode ? <span id="od-orangephotos-search-host" /> : <GlobalSearch />}
           </div>
 
           <div className="od-app-header-actions">
-            {orangePhotosWorkspaceMode ? <span id="od-orangephotos-actions-host" /> : null}
+            {orangePhotosGuestMode ? null : orangePhotosWorkspaceMode ? <span id="od-orangephotos-actions-host" /> : null}
             {wikiWorkspaceMode ? (
               <>
                 <span id="od-wiki-edit-mode-host" className="od-wiki-edit-mode-host" />
@@ -117,6 +118,7 @@ export default function AppLayout({ children }) {
               collapsed={forceExpandedSidebar ? false : collapsed}
               onToggleCollapse={() => setCollapsed((current) => !current)}
               onNavigate={() => setMobileNavOpen(false)}
+              orangePhotosGuestMode={orangePhotosGuestMode}
             />
           </aside>
 
@@ -130,7 +132,7 @@ export default function AppLayout({ children }) {
           ) : null}
 
           <main className="od-main">
-            <IonContent className="od-main-ion-content" scrollY={!orangePhotosWorkspaceMode}>{children}</IonContent>
+            <IonContent className="od-main-ion-content" scrollY={orangePhotosGuestMode ? true : !orangePhotosWorkspaceMode}>{children}</IonContent>
           </main>
         </div>
       </div>

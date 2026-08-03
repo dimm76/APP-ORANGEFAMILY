@@ -4,6 +4,7 @@ function safe(fn){return async(req,res)=>{try{return send(res,await fn(req));}ca
 function handleOrangePhotosGuestRoutes(app){
  app.get('/api/settings/external-guests',safe(req=>service.listFamilyExternalGuests(req)));
  app.post('/api/orange-photo-albums/:albumId/guest-invitations',safe(req=>service.createInvitation(req,req.params.albumId,req.body||{})));
+ app.post('/api/orange-photo-albums/:albumId/guest-invitations/:invitationId/resend',safe(req=>service.resendInvitation(req,req.params.albumId,req.params.invitationId)));
  app.get('/api/orange-photo-albums/:albumId/guest-access',safe(req=>service.listAccess(req,req.params.albumId)));
  app.delete('/api/orange-photo-albums/:albumId/guest-invitations/:invitationId',safe(req=>service.revokeInvitation(req,req.params.albumId,req.params.invitationId)));
  app.delete('/api/orange-photo-albums/:albumId/guest-grants/:grantId',safe(async req=>service.revokeGrant(req,req.params.albumId,req.params.grantId)));
