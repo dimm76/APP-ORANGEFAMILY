@@ -4,6 +4,7 @@ import AppLayout from "./app/AppLayout.jsx";
 import AttachmentsLibraryPage from "./app/AttachmentsLibraryPage.jsx";
 import WikiPage, { WikiPublicPage } from "./features/wiki/WikiPage.jsx";
 import OrangePhotosPage from "./features/orange-photos/OrangePhotosPage.jsx";
+import { OrangePhotoPublicPage, OrangeAlbumPublicPage } from "./features/orange-photos/OrangePhotosPublicPage.jsx";
 import FamilyMembersPage from "./features/settings/FamilyMembersPage.jsx";
 import StoragePage from "./features/settings/StoragePage.jsx";
 import DownloadsPage from "./features/settings/DownloadsPage.jsx";
@@ -109,6 +110,8 @@ function App() {
     const token = decodeURIComponent(pathname.slice("/public/wiki/".length)).trim();
     return <WikiPublicPage token={token} />;
   }
+  if (pathname.startsWith("/public/orangephotos/photo/")) return <OrangePhotoPublicPage token={decodeURIComponent(pathname.slice("/public/orangephotos/photo/".length)).trim()} />;
+  if (pathname.startsWith("/public/orangephotos/album/")) return <OrangeAlbumPublicPage token={decodeURIComponent(pathname.slice("/public/orangephotos/album/".length)).trim()} />;
   if (pathname === "/activate") return <AuthActionPage mode="activate" />;
   if (pathname === "/reset-password") return <AuthActionPage mode="reset" />;
   return (

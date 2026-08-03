@@ -40,7 +40,7 @@ function OrangePhotosSearchModal({ open, value, onChange, onClose }) {
   if (!open) return null;
   return <div className="od-modal-backdrop od-orangephotos-search-modal__backdrop" onMouseDown={onClose}><section className="od-modal od-orangephotos-search-modal" role="dialog" aria-modal="true" aria-labelledby="od-orangephotos-search-title" onMouseDown={event => event.stopPropagation()}><header className="od-modal-header"><h2 className="od-modal-title" id="od-orangephotos-search-title">Buscar</h2><button type="button" className="od-modal-close" aria-label="Cerrar búsqueda" onClick={onClose}><IonIcon icon={closeOutline} /></button></header><div className="od-modal-body od-orangephotos-search-modal__body"><input autoFocus className="od-filter-search-input od-orangephotos-search-modal__input" placeholder="Buscar en tus fotos y álbumes" value={value} onChange={onChange} /></div></section></div>;
 }
-const emptyVisualFilters = Object.freeze({ media_type: "all", library_scope: "all", share_scope: "all", favorite: false, trashed: false });
+const emptyVisualFilters = Object.freeze({ media_type: "all", access_sources: ["owned", "direct", "album"], owner_user_ids: [], share_states: ["private", "family", "selected", "public_link"], favorite: false, trashed: false });
 const initial = { search: "", ...emptyVisualFilters, album_id: "", page: 1, per_page: 30 };
 const monthFmt = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric" }), shortFmt = new Intl.DateTimeFormat("es-ES", { month: "short" }), dayFmt = new Intl.DateTimeFormat("es-ES", { weekday: "short", day: "numeric", month: "short" });
 const capitalizeFirst = value => value ? value.charAt(0).toUpperCase() + value.slice(1) : value;

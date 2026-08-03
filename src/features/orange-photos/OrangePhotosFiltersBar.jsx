@@ -1,18 +1,6 @@
 import ODFilterSelect from "../../shared/components/ODFilterSelect.jsx";
 
-const LIBRARY_OPTIONS = [{ value: "all", label: "Todas" }, { value: "owned", label: "Propias" }, { value: "shared_with_me", label: "Compartidas conmigo" }, { value: "shared_by_me", label: "Compartidas por mí" }];
-const SHARE_OPTIONS = [{ value: "all", label: "Todos" }, { value: "family", label: "Toda la familia" }, { value: "selected", label: "Personas concretas" }];
-
-function MediaToggle({ value, onChange }) {
-  const options = [{ value: "all", label: "Todos" }, { value: "image", label: "Fotos" }, { value: "video", label: "Vídeos" }];
-  return <div className="od-orangephotos-mode" role="group" aria-label="Tipo de contenido">{options.map(option => <button key={option.value} type="button" className={value === option.value ? "is-active" : ""} onClick={() => onChange(option.value)}>{option.label}</button>)}</div>;
-}
-
-export default function OrangePhotosFiltersBar({ filters, onChange }) {
-  const set = (key, value) => onChange({ ...filters, [key]: value });
-  return <div className="od-orangephotos-filter-fields">
-    <div className="od-form-field"><span className="od-form-label">Tipo de contenido</span><MediaToggle value={filters.media_type} onChange={value => set("media_type", value)} /></div>
-    <div className="od-form-field"><span className="od-form-label">Mostrar</span><ODFilterSelect mode="single" panelPortal options={LIBRARY_OPTIONS} value={filters.library_scope} onChange={value => set("library_scope", value)} /></div>
-    {filters.library_scope === "shared_by_me" ? <div className="od-form-field"><span className="od-form-label">Compartidas con</span><ODFilterSelect mode="single" panelPortal options={SHARE_OPTIONS} value={filters.share_scope} onChange={value => set("share_scope", value)} /></div> : null}
-  </div>;
-}
+const SOURCE_OPTIONS = [{ value: "owned", label: "Mis elementos" }, { value: "direct", label: "Compartidos directamente conmigo" }, { value: "album", label: "Procedentes de álbumes compartidos" }];
+const STATE_OPTIONS = [{ value: "private", label: "Privados" }, { value: "family", label: "Toda la familia" }, { value: "selected", label: "Personas concretas" }, { value: "public_link", label: "Con enlace público" }];
+function MediaToggle({ value, onChange }) { const options = [{ value: "all", label: "Todos" }, { value: "image", label: "Fotos" }, { value: "video", label: "Vídeos" }]; return <div className="od-orangephotos-mode" role="group" aria-label="Tipo de contenido">{options.map(option => <button key={option.value} type="button" className={value === option.value ? "is-active" : ""} onClick={() => onChange(option.value)}>{option.label}</button>)}</div>; }
+export default function OrangePhotosFiltersBar({ filters, onChange, members = [] }) { const set = (key, value) => onChange({ ...filters, [key]: value }); return <div className="od-orangephotos-filter-fields"><div className="od-form-field"><span className="od-form-label">Tipo de contenido</span><MediaToggle value={filters.media_type} onChange={value => set("media_type", value)} /></div><div className="od-form-field"><span className="od-form-label">Origen</span><ODFilterSelect mode="multiple" panelPortal options={SOURCE_OPTIONS} value={filters.access_sources} onChange={value => set("access_sources", value)} /></div><div className="od-form-field"><span className="od-form-label">Propietarios</span><ODFilterSelect mode="multiple" panelPortal options={members.map(member => ({ value: member.id, label: member.display_name }))} value={filters.owner_user_ids} onChange={value => set("owner_user_ids", value)} /></div><div className="od-form-field"><span className="od-form-label">Estado de compartición</span><ODFilterSelect mode="multiple" panelPortal options={STATE_OPTIONS} value={filters.share_states} onChange={value => set("share_states", value)} /></div></div>; }
