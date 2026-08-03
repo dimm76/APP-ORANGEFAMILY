@@ -1271,6 +1271,7 @@
 .od-orange-photos__content--public .od-orange-photo-card__share { display: none; }
 @media (max-width: 420px) { .od-orangephotos-public__main { width: min(100% - 20px, 940px); padding-top: 14px; } .od-orangephotos-public-link__actions > * { flex: 1 1 auto; } }
 .od-orangephotos-share-link-row { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--od-color-border, #e4e4e8); }
+.od-orangephotos-share-link-url { min-width: 0; margin-bottom: 10px; overflow: hidden; color: var(--od-color-text-muted); font-size: 0.82rem; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .od-orangephotos-share-link-trigger,.od-orangephotos-share-link-active { display: flex; align-items: center; gap: 7px; }
 .od-orangephotos-share-link-trigger { min-height: 32px; padding: 0 10px; border: 1px solid var(--od-color-border-soft, #dce3f5); border-radius: 8px; background: #fff; color: #334155; font: inherit; font-weight: 600; cursor: pointer; }
 .od-orangephotos-share-link-active { flex-wrap: wrap; }
