@@ -14,6 +14,7 @@ const dbMock = { query: async (...args) => { calls.push(args); return { rows: []
 require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: dbMock };
 require.cache[wasabiPath] = { id: wasabiPath, filename: wasabiPath, loaded: true, exports: { getSignedOrangePhotoUrl: async record => `https://signed.test/${record.object_key || "file"}` } };
 const guests = require("../src/orangePhotosGuestService.js");
+const orangePhotosService = require("../src/orangePhotosService.js");
 if (originalDb) require.cache[dbPath] = originalDb; else delete require.cache[dbPath];
 if (originalWasabi) require.cache[wasabiPath] = originalWasabi; else delete require.cache[wasabiPath];
 
@@ -30,7 +31,7 @@ const guestReq={user:{id:userId,families:[{id:familyId,role:"guest",module_acces
 const memberReq={user:{id:userId,families:[{id:familyId,role:"member",module_access:{orange_photos:true}}]}};
 const guestWithoutOrangePhotosReq={user:{id:userId,families:[{id:familyId,role:"guest",module_access:{orange_photos:false}}]}};
 function normalizeSql(sql){return String(sql).replace(/\s+/g," ").trim().toLowerCase();}
-function isGuestFamilyAclQuery(sql){const text=normalizeSql(sql);return text.includes("orange_photo_album_access")&&/subject_type\s*=\s*'family'/i.test(text)&&/status\s*=\s*'active'/i.test(text)&&/revoked_at\s+is\s+null/i.test(text);}
+function isGuestFamilyAclQuery(sql){const text=normalizeSql(sql);return text.includes("orange_photo_album_access")&&/status\s*=\s*'active'/i.test(text)&&/revoked_at\s+is\s+null/i.test(text);}
 function transactionClient({grant=true,failOn=null}={}) { const clientCalls=[]; let count=0; const client={query:async(sql,params)=>{clientCalls.push({sql,params});count+=1;if(failOn&&count===failOn)throw new Error("SQL failure");if(sql==="BEGIN"||sql==="COMMIT"||sql==="ROLLBACK")return{rows:[]};if(/guest_invitations/.test(sql)&&/SELECT i/.test(sql))return{rows:[{id:invitationId,album_id:albumId,title:"Album",is_archived:false,status:"pending",revoked_at:null,expires_at:new Date(Date.now()+60000),invited_email:"guest@example.com",invited_by_user_id:ownerId,can_view:true,can_contribute:false,can_comment:false}]};if(/orange_photo_albums/.test(sql)&&/SELECT/.test(sql))return{rows:[{id:albumId,title:"Album",family_id:familyId}]};if(/auth_users/.test(sql))return{rows:[{email:"guest@example.com",status:"active"}]};if(/guest_grants/.test(sql)&&/SELECT/.test(sql))return{rows:grant?[{id:grantId,status:"revoked"}]:[]};if(/guest_grants/.test(sql)&&/UPDATE/.test(sql))return{rows:grant?[{id:grantId,user_id:userId}]:[]};return{rows:[]};},release(){client.released=true;}};currentClient=client;return{client,clientCalls};}
 function acceptRequest(){return {user:{id:userId}};}
 
@@ -65,3 +66,69 @@ test("endpoint ZIP devuelve JSON antes de cabeceras si la selecciÃ³n es invÃ�
 test("endpoint ZIP configura headers y aÃ±ade una entrada por elemento", async () => { const service = require("../src/orangePhotosGuestService.js"); const http = require("../src/orangePhotosGuestHttp.js"); const routes = []; http.handleOrangePhotosGuestRoutes({ get: () => {}, delete: () => {}, post: (path, handler) => routes.push({ path, handler }) }); const route = routes.find(item => item.path.endsWith("/download")); const originalItems = service.guestDownloadItems; const originalObject = service.downloadGuestObject; let downloads = 0; service.guestDownloadItems = async () => ({ ok: true, payload: { items: [{ original_filename: "x.jpg" }, { original_filename: "x.jpg" }] } }); service.downloadGuestObject = async () => { downloads += 1; return { Body: Buffer.from("x") }; }; const headers = {}; const response = { destroyed: false, headersSent: false, setHeader(name, value) { headers[name] = value; }, status() { return this; }, json() {}, on() {}, once() {}, emit() {}, pipe() {}, destroy() { this.destroyed = true; } }; await route.handler({ params: { albumId }, body: {} }, response); assert.equal(headers["Content-Type"], "application/zip"); assert.match(headers["Content-Disposition"], /orangefamily-album-.*\.zip/); assert.equal(downloads, 2); service.guestDownloadItems = originalItems; service.downloadGuestObject = originalObject; });
 test("listGuestOwnedPhotos exige guest autenticado y orange_photos",async()=>{assert.equal((await guests.listGuestOwnedPhotos({})).status,401);assert.equal((await guests.listGuestOwnedPhotos({user:{id:userId,families:[{role:"member",module_access:{orange_photos:true}}]}})).status,403);assert.equal((await guests.listGuestOwnedPhotos({user:{id:userId,families:[{role:"guest",module_access:{orange_photos:false}}]}})).status,403);});
 test("listGuestOwnedPhotos consulta ACL family activa, limita paginaciÃ³n y marca propiedad",async()=>{const observed=[];dbMock.query=async(sql,params)=>{observed.push({sql,params});if(/WITH accessible/.test(sql))return{rows:[{id:downloadPhotoIds[0],accessible_album_id:albumId,total_count:1,created_at:new Date(),owner_user_id:userId}]};if(/orange_photo_files/.test(sql))return{rows:[{variant:"thumbnail",bucket:"b",object_key:"thumb"}]};return{rows:[]};};const result=await guests.listGuestOwnedPhotos({user:{id:userId,families:[{role:"guest",module_access:{orange_photos:true}}]}},{page:2,per_page:999,owner_user_id:"attacker",family_id:"attacker"});assert.equal(result.ok,true);assert.equal(result.payload.per_page,100);assert.equal(result.payload.items[0].is_owned_by_current_user,true);assert.equal(result.payload.items[0].accessible_album_id,albumId);const query=observed.find(call=>/WITH accessible/.test(call.sql));assert.match(query.sql,/subject_type='family'/);assert.match(query.sql,/acl.status='active'/);assert.match(query.sql,/acl.revoked_at IS NULL/);assert.match(query.sql,/album.is_archived=false/);assert.match(query.sql,/photo.owner_user_id=\$1::uuid/);assert.match(query.sql,/photo.is_trashed=false/);assert.deepEqual(query.params,[userId,100,100]);});
+
+function configureGuestAddPhoto({ photo = true, contributions = true, acl = true } = {}) {
+  const observed = [];
+  dbMock.query = async (sql, params) => {
+    observed.push({ sql, params });
+    if (/FROM public\.orange_photos photo/.test(sql)) return { rows: photo ? [{ id: downloadPhotoIds[0], family_id: familyId, owner_user_id: userId, is_trashed: false, media_type: "image" }] : [] };
+    if (isGuestFamilyAclQuery(sql)) return { rows: acl ? [{ id: albumId, family_id: familyId, allow_contributions: contributions, allow_comments: false }] : [] };
+    if (/FROM public\.orange_photos p/.test(sql)) return { rows: photo ? [{ id: downloadPhotoIds[0], family_id: familyId, owner_user_id: userId, is_trashed: false, media_type: "image" }] : [] };
+    if (/INSERT INTO public\.orange_photo_album_items/.test(sql)) return { rows: [{ photo_id: downloadPhotoIds[0] }], rowCount: 1 };
+    return { rows: [] };
+  };
+  currentClient = { query: dbMock.query, release() {} };
+  return observed;
+}
+
+const guestAddRequest = { user: { id: userId, families: [{ id: familyId, role: "guest", status: "active", module_access: { orange_photos: true } }] } };
+const hasObservedQuery = (queries, fragment) => queries.some(entry => String(entry.sql).includes(fragment));
+
+test("guest can add an owned photo to an album with contributions enabled", async () => {
+  const queries = configureGuestAddPhoto();
+  const result = await orangePhotosService.addPhoto(guestAddRequest, albumId, { photo_id: downloadPhotoIds[0] });
+  assert.equal(result.ok, true);
+  assert.equal(hasObservedQuery(queries, "INSERT INTO public.orange_photo_album_items"), true);
+  const ownership = queries.find(entry => /FROM public\.orange_photos photo/.test(entry.sql));
+  assert.match(ownership.sql, /photo\.id\s*=\s*\$1::uuid/);
+  assert.match(ownership.sql, /photo\.family_id\s*=\s*\$2::uuid/);
+  assert.match(ownership.sql, /photo\.owner_user_id\s*=\s*\$3::uuid/);
+  assert.match(ownership.sql, /photo\.is_trashed\s*=\s*false/);
+  assert.deepEqual(ownership.params, [downloadPhotoIds[0], familyId, userId]);
+});
+
+test("guest cannot add a photo owned by another user", async () => {
+  const queries = configureGuestAddPhoto({ photo: false });
+  const result = await orangePhotosService.addPhoto(guestAddRequest, albumId, { photo_id: downloadPhotoIds[0], owner_user_id: ownerId });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 404);
+  assert.equal(result.code, "PHOTO_NOT_FOUND");
+  assert.equal(hasObservedQuery(queries, "orange_photo_album_access"), false);
+  assert.equal(hasObservedQuery(queries, "INSERT INTO public.orange_photo_album_items"), false);
+});
+
+test("guest cannot add an owned trashed photo to an album", async () => {
+  const queries = configureGuestAddPhoto({ photo: false });
+  const result = await orangePhotosService.addPhoto(guestAddRequest, albumId, { photo_id: downloadPhotoIds[0] });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 404);
+  assert.equal(result.code, "PHOTO_NOT_FOUND");
+  assert.equal(hasObservedQuery(queries, "INSERT INTO public.orange_photo_album_items"), false);
+});
+
+test("guest cannot add a photo when album contributions are disabled", async () => {
+  const queries = configureGuestAddPhoto({ contributions: false });
+  const result = await orangePhotosService.addPhoto(guestAddRequest, albumId, { photo_id: downloadPhotoIds[0] });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 403);
+  assert.equal(result.code, "ALBUM_CONTRIBUTION_DENIED");
+  assert.equal(hasObservedQuery(queries, "INSERT INTO public.orange_photo_album_items"), false);
+});
+
+test("guest cannot add a photo to an album without active ACL", async () => {
+  const queries = configureGuestAddPhoto({ acl: false });
+  const result = await orangePhotosService.addPhoto(guestAddRequest, albumId, { photo_id: downloadPhotoIds[0] });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 404);
+  assert.equal(hasObservedQuery(queries, "INSERT INTO public.orange_photo_album_items"), false);
+});

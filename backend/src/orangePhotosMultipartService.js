@@ -27,9 +27,9 @@ function missingMultipart(error){return ["NoSuchUpload","NotFound","404"].includ
 async function ownedUpload(req,id){
   const auth=resolveAuthenticatedFamily(req);if(!auth.ok)return auth;
   if(!UUID_RE.test(String(id||"")))return photos.bad(404,"UPLOAD_NOT_FOUND","Subida no encontrada.");
-  const row=(await pool.query(`SELECT * FROM public.orange_photo_uploads WHERE id=$1::uuid`,[id])).rows[0];
+  const row=(await pool.query(`SELECT * FROM public.orange_photo_uploads WHERE id=$1::uuid AND family_id=$2::uuid AND owner_user_id=$3::uuid`,[id,auth.familyId,auth.userId])).rows[0];
   if(!row)return photos.bad(404,"UPLOAD_NOT_FOUND","Subida no encontrada.");
-  if(String(row.family_id)!==String(auth.familyId)||String(row.owner_user_id)!==String(auth.userId))return photos.bad(403,"UPLOAD_NOT_OWNED","La subida no pertenece al usuario autenticado.");
+  if(String(row.family_id)!==String(auth.familyId)||String(row.owner_user_id)!==String(auth.userId))return photos.bad(404,"UPLOAD_NOT_FOUND","Subida no encontrada.");
   return photos.ok({auth,upload:row});
 }
 
