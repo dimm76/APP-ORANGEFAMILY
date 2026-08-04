@@ -9,10 +9,11 @@ const wasabiPath = path.resolve(__dirname, "../src/wasabiClient.js");
 const originalDb = require.cache[dbPath];
 const originalWasabi = require.cache[wasabiPath];
 const calls = [];
+const signedCoverCalls = [];
 let currentClient;
 const dbMock = { query: async (...args) => { calls.push(args); return { rows: [] }; }, connect: async () => currentClient };
 require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: dbMock };
-require.cache[wasabiPath] = { id: wasabiPath, filename: wasabiPath, loaded: true, exports: { getSignedOrangePhotoUrl: async record => `https://signed.test/${record.object_key || "file"}` } };
+require.cache[wasabiPath] = { id: wasabiPath, filename: wasabiPath, loaded: true, exports: { getSignedOrangePhotoUrl: async record => { signedCoverCalls.push(record); return `https://signed.test/${record.object_key || "file"}`; } } };
 const guests = require("../src/orangePhotosGuestService.js");
 const orangePhotosService = require("../src/orangePhotosService.js");
 if (originalDb) require.cache[dbPath] = originalDb; else delete require.cache[dbPath];
@@ -131,4 +132,69 @@ test("guest cannot add a photo to an album without active ACL", async () => {
   assert.equal(result.ok, false);
   assert.equal(result.status, 404);
   assert.equal(hasObservedQuery(queries, "INSERT INTO public.orange_photo_album_items"), false);
+});
+
+function configureGuestAlbumCover({ coverPhotoId = downloadPhotoIds[0], coverMediaType = "image", file = { photo_id: downloadPhotoIds[0], variant: "thumbnail", bucket: "test-bucket", object_key: "test/cover-thumbnail.jpg" } } = {}) {
+  const observed = [];
+  dbMock.query = async (sql, params) => {
+    observed.push({ sql, params });
+    if (/FROM public\.orange_photo_files/.test(sql)) return { rows: file ? [file] : [] };
+    return { rows: [{ id: albumId, title: "Album", description: null, cover_photo_id: coverPhotoId, cover_media_type: coverMediaType, allow_contributions: false, allow_comments: false, owner_display_name: "Owner", photo_count: 1 }] };
+  };
+  signedCoverCalls.length = 0;
+  return observed;
+}
+
+test("guest album list returns the valid manual cover", async () => {
+  const observed = configureGuestAlbumCover();
+  const result = await guests.guestAlbums(guestReq);
+  assert.equal(result.ok, true);
+  const album = result.payload.items?.[0] || result.payload.albums?.[0];
+  assert.equal(album.cover_photo_id, downloadPhotoIds[0]);
+  assert.equal(album.cover_media_type, "image");
+  assert.ok(album.cover_url);
+  assert.deepEqual(signedCoverCalls[0], { bucket: "test-bucket", object_key: "test/cover-thumbnail.jpg" });
+  assert.equal(Object.hasOwn(album, "bucket"), false);
+  assert.equal(Object.hasOwn(album, "object_key"), false);
+  assert.equal(Object.hasOwn(album, "storage_key"), false);
+  const main = observed.find(call => /orange_photo_album_access/.test(call.sql));
+  assert.match(main.sql, /LEFT JOIN LATERAL/i);
+  assert.match(main.sql, /orange_photo_album_items/i);
+  assert.match(main.sql, /orange_photos/i);
+  assert.match(main.sql, /is_trashed=false/i);
+  assert.match(main.sql, /cover_photo_id/i);
+});
+
+test("guest album list falls back to the first valid album photo", async () => {
+  const observed = configureGuestAlbumCover({ coverPhotoId: downloadPhotoIds[1], file: { photo_id: downloadPhotoIds[1], variant: "thumbnail", bucket: "test-bucket", object_key: "test/fallback-thumbnail.jpg" } });
+  const result = await guests.guestAlbums(guestReq);
+  const album = result.payload.items[0];
+  assert.equal(album.cover_photo_id, downloadPhotoIds[1]);
+  assert.ok(album.cover_url);
+  const main = observed.find(call => /orange_photo_album_access/.test(call.sql));
+  assert.match(main.sql, /LEFT JOIN LATERAL/i);
+  assert.match(main.sql, /candidate\.is_trashed=false/i);
+  assert.match(main.sql, /candidate_item\.album_id=album\.id/i);
+});
+
+test("guest album list ignores an invalid or trashed manual cover", async () => {
+  const invalidManualCoverId = "99999999-9999-4999-8999-999999999999";
+  const observed = configureGuestAlbumCover({ coverPhotoId: downloadPhotoIds[1], file: { photo_id: downloadPhotoIds[1], variant: "thumbnail", bucket: "test-bucket", object_key: "test/fallback-thumbnail.jpg" } });
+  const result = await guests.guestAlbums(guestReq);
+  const album = result.payload.items[0];
+  assert.notEqual(album.cover_photo_id, invalidManualCoverId);
+  assert.equal(album.cover_photo_id, downloadPhotoIds[1]);
+  const main = observed.find(call => /orange_photo_album_access/.test(call.sql));
+  assert.match(main.sql, /candidate\.is_trashed=false/i);
+  assert.match(main.sql, /candidate_item\.album_id=album\.id/i);
+});
+
+test("guest album list returns null cover fields when no valid photo exists", async () => {
+  const observed = configureGuestAlbumCover({ coverPhotoId: null, coverMediaType: null, file: null });
+  const result = await guests.guestAlbums(guestReq);
+  const album = result.payload.items[0];
+  assert.equal(album.cover_photo_id, null);
+  assert.equal(album.cover_media_type, null);
+  assert.equal(album.cover_url, null);
+  assert.equal(observed.some(call => /FROM public\.orange_photo_files/.test(call.sql)), false);
 });
