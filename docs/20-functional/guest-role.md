@@ -43,3 +43,16 @@ El rol Invitado accede a los ·lbumes mediante `orange_photo_album_access` con `s
 La Fase 2 integra en OrangePhotos normal el listado de ·lbumes accesibles, aportaciones propias, detalle de ·lbum, selecciÛn, visor, descarga individual y descarga ZIP dentro de un ˙nico ·lbum.
 
 La subida restringida y la papelera de aportaciones propias corresponden a la Fase 3.
+# Rol Invitado
+
+Un invitado es un miembro real de la familia con `family_memberships.role = guest`.
+
+## Fase 3
+
+El invitado puede importar fotos y v√≠deos, acceder √∫nicamente a √°lbumes concedidos, a√±adir aportaciones cuando `allow_contributions = true`, visualizar, descargar y enviar a la papelera √∫nicamente sus propias aportaciones.
+
+El invitado no puede crear √°lbumes o categor√≠as, compartir, modificar fotos ajenas, marcar fotos ajenas como favoritas ni eliminar fotos ajenas. En selecciones mixtas se informa de los elementos propios que se eliminar√°n y los ajenos que se omitir√°n.
+
+La propiedad de una foto importada siempre procede de la sesi√≥n autenticada; el frontend no puede elegir `owner_user_id`.
+
+No declarar la Fase 3 completada hasta realizar la prueba manual.
