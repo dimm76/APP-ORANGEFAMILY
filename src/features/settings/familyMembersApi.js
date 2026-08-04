@@ -12,3 +12,4 @@ export const resendInvitation = (id) => request(`/api/settings/family-members/${
 export const sendMemberPasswordReset = (id) => request(`/api/settings/family-members/${encodeURIComponent(id)}/send-password-reset`, { method: "POST", body: "{}" });
 export const listExternalGuests = () => request("/api/settings/external-guests");
 export const revokeGuestAlbumGrant = (albumId, grantId) => request(`/api/orange-photo-albums/${encodeURIComponent(albumId)}/guest-grants/${encodeURIComponent(grantId)}`, { method: "DELETE" });
+export const revokeFamilyGuestAlbumAccess = (albumId, userId) => request(`/api/orange-photo-albums/${encodeURIComponent(albumId)}/family-guest-access/${encodeURIComponent(userId)}`, { method: "DELETE" });

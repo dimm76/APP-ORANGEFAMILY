@@ -14,6 +14,7 @@ function handleOrangePhotosGuestRoutes(app) {
  app.get('/api/orange-photo-albums/:albumId/guest-access', safe(req => service.listAccess(req, req.params.albumId)));
  app.delete('/api/orange-photo-albums/:albumId/guest-invitations/:invitationId', safe(req => service.revokeInvitation(req, req.params.albumId, req.params.invitationId)));
  app.delete('/api/orange-photo-albums/:albumId/guest-grants/:grantId', safe(req => service.revokeGrant(req, req.params.albumId, req.params.grantId)));
+ app.delete('/api/orange-photo-albums/:albumId/family-guest-access/:userId', safe(req => service.revokeFamilyGuestAccess(req, req.params.albumId, req.params.userId)));
  app.get('/api/public/orange-photo-guest-invitations/:token', safe(req => service.publicInvitation(req.params.token)));
  app.post('/api/orange-photo-guest-invitations/:token/accept', safe(req => service.accept(req, req.params.token)));
  app.post('/api/guest/orange-photo-albums/:albumId/download', streamGuestAlbumZip);
