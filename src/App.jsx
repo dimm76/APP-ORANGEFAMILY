@@ -52,8 +52,18 @@ const ROUTES = {
 function currentPathname() {
   return window.location.pathname.replace(/\/$/, "") || "/";
 }
-function isGuestAllowedPath(pathname) { return pathname === "/app/orangephotos" || pathname === "/app/orangephotos/albums" || /^\/app\/orangephotos\/albums\/[^/]+$/.test(pathname); }
-function legacyGuestTarget(pathname) { if(pathname === "/guest") return "/app/orangephotos"; const prefix="/guest/orangephotos/albums/"; if(pathname.startsWith(prefix)){const albumId=pathname.slice(prefix.length);return albumId?`/app/orangephotos/albums/${albumId}`:"/app/orangephotos/albums";} return null; }
+function isGuestAllowedPath(pathname) {
+  return pathname === "/app/orangephotos/albums" || /^\/app\/orangephotos\/albums\/[^/]+$/.test(pathname);
+}
+function legacyGuestTarget(pathname) {
+  if (pathname === "/guest") return "/app/orangephotos/albums";
+  const prefix = "/guest/orangephotos/albums/";
+  if (pathname.startsWith(prefix)) {
+    const albumId = pathname.slice(prefix.length);
+    return albumId ? `/app/orangephotos/albums/${albumId}` : "/app/orangephotos/albums";
+  }
+  return null;
+}
 
 function ModulePlaceholder({ title, description }) {
   return (
@@ -85,7 +95,11 @@ function AppContent() {
       window.removeEventListener(OD_NAV_EVENT, syncPathname);
     };
   }, []);
-  useEffect(() => { if(!guestRole || isGuestAllowedPath(pathname)) return; window.history.replaceState({},"","/app/orangephotos"); window.dispatchEvent(new Event(OD_NAV_EVENT)); }, [guestRole, pathname]);
+  useEffect(() => {
+    if (!guestRole || isGuestAllowedPath(pathname)) return;
+    window.history.replaceState({}, "", "/app/orangephotos/albums");
+    window.dispatchEvent(new Event(OD_NAV_EVENT));
+  }, [guestRole, pathname]);
   if(guestRole && !isGuestAllowedPath(pathname)) return null;
 
   const route = ROUTES[pathname] || ROUTES["/"];
