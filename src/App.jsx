@@ -10,9 +10,6 @@ import StoragePage from "./features/settings/StoragePage.jsx";
 import DownloadsPage from "./features/settings/DownloadsPage.jsx";
 import { useAuth } from "./app/authContext.js";
 import AuthActionPage from "./app/AuthActionPage.jsx";
-import OrangeGuestInvitationPage from "./features/orange-photos/OrangeGuestInvitationPage.jsx";
-import OrangeGuestLandingPage from "./features/orange-photos/OrangeGuestLandingPage.jsx";
-import OrangeGuestAlbumPage from "./features/orange-photos/OrangeGuestAlbumPage.jsx";
 import "./App.css";
 
 const OD_NAV_EVENT = "od-spa-navigate";
@@ -55,6 +52,8 @@ const ROUTES = {
 function currentPathname() {
   return window.location.pathname.replace(/\/$/, "") || "/";
 }
+function isGuestAllowedPath(pathname) { return pathname === "/app/orangephotos" || pathname === "/app/orangephotos/albums" || /^\/app\/orangephotos\/albums\/[^/]+$/.test(pathname); }
+function legacyGuestTarget(pathname) { if(pathname === "/guest") return "/app/orangephotos"; const prefix="/guest/orangephotos/albums/"; if(pathname.startsWith(prefix)){const albumId=pathname.slice(prefix.length);return albumId?`/app/orangephotos/albums/${albumId}`:"/app/orangephotos/albums";} return null; }
 
 function ModulePlaceholder({ title, description }) {
   return (
@@ -75,6 +74,7 @@ function AppContent() {
   const [pathname, setPathname] = useState(currentPathname);
   const { user } = useAuth();
   const isOwner = user?.families?.some((family) => family.role === "owner");
+  const guestRole = user?.families?.[0]?.role === "guest";
 
   useEffect(() => {
     const syncPathname = () => setPathname(currentPathname());
@@ -85,6 +85,8 @@ function AppContent() {
       window.removeEventListener(OD_NAV_EVENT, syncPathname);
     };
   }, []);
+  useEffect(() => { if(!guestRole || isGuestAllowedPath(pathname)) return; window.history.replaceState({},"","/app/orangephotos"); window.dispatchEvent(new Event(OD_NAV_EVENT)); }, [guestRole, pathname]);
+  if(guestRole && !isGuestAllowedPath(pathname)) return null;
 
   const route = ROUTES[pathname] || ROUTES["/"];
 
@@ -106,19 +108,11 @@ function AppContent() {
     </AppLayout>
   );
 }
-function safeDecodePathSegment(value) { try { return decodeURIComponent(value); } catch { return ""; } }
-
-function AuthenticatedRouter() {
-  const [pathname, setPathname] = useState(currentPathname);
-  useEffect(() => { const syncPathname = () => setPathname(currentPathname()); window.addEventListener("popstate", syncPathname); window.addEventListener(OD_NAV_EVENT, syncPathname); return () => { window.removeEventListener("popstate", syncPathname); window.removeEventListener(OD_NAV_EVENT, syncPathname); }; }, []);
-  if (pathname.startsWith("/guest-invitations/")) return <OrangeGuestInvitationPage token={safeDecodePathSegment(pathname.slice("/guest-invitations/".length))} />;
-  if (pathname === "/guest") return <OrangeGuestLandingPage />;
-  if (pathname.startsWith("/guest/orangephotos/albums/")) return <OrangeGuestAlbumPage albumId={safeDecodePathSegment(pathname.slice("/guest/orangephotos/albums/".length))} />;
-  return <AppContent />;
-}
-
 function App() {
   const pathname = currentPathname();
+  const legacyTarget = legacyGuestTarget(pathname);
+  if(legacyTarget){window.history.replaceState({},"",legacyTarget);return <AuthGate><AppContent /></AuthGate>;}
+  if(pathname.startsWith("/guest-invitations/")) return <div className="od-page"><div className="od-page-inner"><h1 className="od-page-title">Invitación no válida</h1><p className="od-status-line od-status-line--error">Esta invitación pertenece al sistema anterior. Solicita al administrador una nueva invitación.</p></div></div>;
   if (pathname.startsWith("/public/wiki/")) {
     const token = decodeURIComponent(pathname.slice("/public/wiki/".length)).trim();
     return <WikiPublicPage token={token} />;
@@ -129,7 +123,7 @@ function App() {
   if (pathname === "/reset-password") return <AuthActionPage mode="reset" />;
   return (
     <AuthGate>
-      <AuthenticatedRouter />
+      <AppContent />
     </AuthGate>
   );
 }

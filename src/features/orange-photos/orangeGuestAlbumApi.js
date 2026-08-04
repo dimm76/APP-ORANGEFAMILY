@@ -8,6 +8,7 @@ export const syncOrangeAlbumRecipients=(albumId,payload)=>request(`/api/orange-p
 export const getOrangeGuestInvitation=token=>request(`/api/public/orange-photo-guest-invitations/${id(token)}`);
 export const acceptOrangeGuestInvitation=token=>request(`/api/orange-photo-guest-invitations/${id(token)}/accept`,body({}));
 export const listOrangeGuestAlbums=()=>request("/api/guest/orange-photo-albums");
+export async function listOrangeGuestOwnedPhotos(params={}) { const search=new URLSearchParams(); if(params.page) search.set("page",String(params.page)); if(params.per_page) search.set("per_page",String(params.per_page)); const query=search.toString(); return request(`/api/guest/orange-photos${query?`?${query}`:""}`); }
 export const getOrangeGuestAlbum=albumId=>request(`/api/guest/orange-photo-albums/${id(albumId)}`);
 export const listOrangeGuestAlbumPhotos=(albumId,query={})=>{const q=new URLSearchParams(query);return request(`/api/guest/orange-photo-albums/${id(albumId)}/photos?${q}`);};
 export const getOrangeGuestAlbumPhotoDownload=(albumId,photoId)=>request(`/api/guest/orange-photo-albums/${id(albumId)}/photos/${id(photoId)}/download`);

@@ -15,3 +15,21 @@ El rol Invitado solo puede tener acceso a OrangePhotos.
 ## Álbumes
 
 El acceso a álbumes concretos se concede mediante ACL a un usuario ya existente. OrangePhotos no crea identidades ni cuentas.
+
+## Aplicación
+
+El rol Invitado utiliza las mismas rutas y componentes:
+
+- `/app/orangephotos`
+- `/app/orangephotos/albums`
+- `/app/orangephotos/albums/:albumId`
+
+No existe portal ni layout independiente.
+
+## Navegación
+
+El invitado solo ve Fotos y Álbumes. No puede acceder a otros módulos ni a Ajustes.
+
+## Fase 2
+
+La visualización, selección, visor y descarga se integran en OrangePhotos normal. La subida restringida y la papelera de aportaciones propias quedan para la Fase 3.

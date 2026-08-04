@@ -21,5 +21,6 @@ function handleOrangePhotosGuestRoutes(app) {
  app.get('/api/guest/orange-photo-albums/:albumId', safe(req => service.guestAlbum(req, req.params.albumId)));
  app.get('/api/guest/orange-photo-albums/:albumId/photos', safe(req => service.guestPhotos(req, req.params.albumId, req.query || {})));
  app.get('/api/guest/orange-photo-albums/:albumId/photos/:photoId/download', safe(req => service.guestPhotoDownload(req, req.params.albumId, req.params.photoId)));
+ app.get('/api/guest/orange-photos', safe(req => service.listGuestOwnedPhotos(req, req.query || {})));
 }
 module.exports = { handleOrangePhotosGuestRoutes };
