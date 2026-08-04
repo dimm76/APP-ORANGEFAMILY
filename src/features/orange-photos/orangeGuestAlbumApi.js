@@ -1,15 +1,14 @@
 const request=async(path,options={})=>{const response=await fetch(path,{credentials:"include",...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});const data=await response.json().catch(()=>null);if(!response.ok)throw new Error(data?.message||"No se pudo completar la operación.");return data;};
 const id=value=>encodeURIComponent(value); const body=value=>({method:"POST",body:JSON.stringify(value)});
-export const createOrangeAlbumGuestInvitation=(albumId,payload)=>request(`/api/orange-photo-albums/${id(albumId)}/guest-invitations`,body(payload));
 export const listOrangeAlbumGuestAccess=albumId=>request(`/api/orange-photo-albums/${id(albumId)}/guest-access`);
 export const revokeOrangeAlbumGuestInvitation=(albumId,invitationId)=>request(`/api/orange-photo-albums/${id(albumId)}/guest-invitations/${id(invitationId)}`,{method:"DELETE"});
 export const revokeOrangeAlbumGuestGrant=(albumId,grantId)=>request(`/api/orange-photo-albums/${id(albumId)}/guest-grants/${id(grantId)}`,{method:"DELETE"});
 export const listOrangeAlbumRecipients=albumId=>request(`/api/orange-photo-albums/${id(albumId)}/recipients`);
 export const syncOrangeAlbumRecipients=(albumId,payload)=>request(`/api/orange-photo-albums/${id(albumId)}/recipients`,{method:"PUT",body:JSON.stringify(payload)});
-export const resendOrangeAlbumGuestInvitation=(albumId,invitationId)=>request(`/api/orange-photo-albums/${id(albumId)}/guest-invitations/${id(invitationId)}/resend`,{method:"POST",body:JSON.stringify({})});
 export const getOrangeGuestInvitation=token=>request(`/api/public/orange-photo-guest-invitations/${id(token)}`);
 export const acceptOrangeGuestInvitation=token=>request(`/api/orange-photo-guest-invitations/${id(token)}/accept`,body({}));
 export const listOrangeGuestAlbums=()=>request("/api/guest/orange-photo-albums");
 export const getOrangeGuestAlbum=albumId=>request(`/api/guest/orange-photo-albums/${id(albumId)}`);
 export const listOrangeGuestAlbumPhotos=(albumId,query={})=>{const q=new URLSearchParams(query);return request(`/api/guest/orange-photo-albums/${id(albumId)}/photos?${q}`);};
 export const getOrangeGuestAlbumPhotoDownload=(albumId,photoId)=>request(`/api/guest/orange-photo-albums/${id(albumId)}/photos/${id(photoId)}/download`);
+export async function downloadOrangeGuestAlbumPhotos(albumId, photoIds) { const response = await fetch(`/api/guest/orange-photo-albums/${id(albumId)}/download`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ photo_ids: photoIds }) }); if (!response.ok) { const data = await response.json().catch(() => null); throw new Error(data?.message || "No se pudo preparar la descarga."); } const blob = await response.blob(); const objectUrl = URL.createObjectURL(blob); try { const anchor = document.createElement("a"); anchor.href = objectUrl; anchor.download = `orangefamily-album-${new Date().toISOString().slice(0, 10)}.zip`; document.body.appendChild(anchor); anchor.click(); anchor.remove(); } finally { URL.revokeObjectURL(objectUrl); } }

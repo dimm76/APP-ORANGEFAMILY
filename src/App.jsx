@@ -109,7 +109,8 @@ function AppContent() {
 function safeDecodePathSegment(value) { try { return decodeURIComponent(value); } catch { return ""; } }
 
 function AuthenticatedRouter() {
-  const pathname = currentPathname();
+  const [pathname, setPathname] = useState(currentPathname);
+  useEffect(() => { const syncPathname = () => setPathname(currentPathname()); window.addEventListener("popstate", syncPathname); window.addEventListener(OD_NAV_EVENT, syncPathname); return () => { window.removeEventListener("popstate", syncPathname); window.removeEventListener(OD_NAV_EVENT, syncPathname); }; }, []);
   if (pathname.startsWith("/guest-invitations/")) return <OrangeGuestInvitationPage token={safeDecodePathSegment(pathname.slice("/guest-invitations/".length))} />;
   if (pathname === "/guest") return <OrangeGuestLandingPage />;
   if (pathname.startsWith("/guest/orangephotos/albums/")) return <OrangeGuestAlbumPage albumId={safeDecodePathSegment(pathname.slice("/guest/orangephotos/albums/".length))} />;

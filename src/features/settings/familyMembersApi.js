@@ -6,7 +6,6 @@ async function request(path, options = {}) {
 }
 
 export const listFamilyMembers = () => request("/api/settings/family-members");
-export const listExternalGuests = () => request("/api/settings/external-guests");
 export const createFamilyMember = (body) => request("/api/settings/family-members", { method: "POST", body: JSON.stringify(body) });
 export const updateFamilyMember = (id, body) => request(`/api/settings/family-members/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) });
 export const resendInvitation = (id) => request(`/api/settings/family-members/${encodeURIComponent(id)}/resend-invitation`, { method: "POST", body: "{}" });

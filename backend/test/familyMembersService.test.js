@@ -1,0 +1,11 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const path = require("node:path");
+const dbPath = path.resolve(__dirname, "../db.js");
+require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: { query: async () => ({ rows: [] }), connect: async () => ({}) } };
+const service = require("../src/familyMembersService.js");
+const ownerReq = { user: { id: "11111111-1111-4111-8111-111111111111", families: [{ id: "22222222-2222-4222-8222-222222222222", role: "owner" }] } };
+test("create rechaza role desconocido antes de conectar a la base de datos", async () => { let connected = false; const pool = { query: async () => ({ rows: [{ id: "x" }] }), connect: async () => { connected = true; } }; const result = await service.create(ownerReq, { first_name: "Ana", last_name: "García", email: "ana@example.com", role: "admin" }, pool); assert.equal(result.ok, false); assert.equal(result.status, 400); assert.equal(connected, false); });
+test("create rechaza module_access no permitido para guest", async () => { let connected = false; const pool = { query: async () => ({ rows: [{ id: "x" }] }), connect: async () => { connected = true; } }; const result = await service.create(ownerReq, { first_name: "Ana", last_name: "García", role: "guest", module_access: { notes: true } }, pool); assert.equal(result.ok, false); assert.equal(result.status, 400); assert.equal(connected, false); });
+test("create rechaza nombre vacío", async () => { const result = await service.create(ownerReq, { first_name: "  ", last_name: "García", role: "guest" }, { connect: async () => { throw new Error("no db"); } }); assert.equal(result.status, 400); });
+test("update rechaza role desconocido", async () => { const result = await service.update(ownerReq, "33333333-3333-4333-8333-333333333333", { role: "admin" }, { query: async () => ({ rows: [] }) }); assert.equal(result.status, 400); });

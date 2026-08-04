@@ -1,18 +1,25 @@
-const service=require('./orangePhotosGuestService');
-function send(res,r){return res.status(r.ok?200:(r.status||400)).json(r.ok?{ok:true,...r.payload}:{ok:false,code:r.code,message:r.reason});}
-function safe(fn){return async(req,res)=>{try{return send(res,await fn(req));}catch(e){console.error('Orange guest',{message:e.message});return res.status(500).json({ok:false,code:'INTERNAL_ERROR',message:'No se pudo completar la operación.'});}};}
-function handleOrangePhotosGuestRoutes(app){
- app.get('/api/settings/external-guests',safe(req=>service.listFamilyExternalGuests(req)));
- app.post('/api/orange-photo-albums/:albumId/guest-invitations',safe(req=>service.createInvitation(req,req.params.albumId,req.body||{})));
- app.post('/api/orange-photo-albums/:albumId/guest-invitations/:invitationId/resend',safe(req=>service.resendInvitation(req,req.params.albumId,req.params.invitationId)));
- app.get('/api/orange-photo-albums/:albumId/guest-access',safe(req=>service.listAccess(req,req.params.albumId)));
- app.delete('/api/orange-photo-albums/:albumId/guest-invitations/:invitationId',safe(req=>service.revokeInvitation(req,req.params.albumId,req.params.invitationId)));
- app.delete('/api/orange-photo-albums/:albumId/guest-grants/:grantId',safe(async req=>service.revokeGrant(req,req.params.albumId,req.params.grantId)));
- app.get('/api/public/orange-photo-guest-invitations/:token',safe(req=>service.publicInvitation(req.params.token)));
- app.post('/api/orange-photo-guest-invitations/:token/accept',safe(req=>service.accept(req,req.params.token)));
- app.get('/api/guest/orange-photo-albums',safe(req=>service.guestAlbums(req)));
- app.get('/api/guest/orange-photo-albums/:albumId',safe(req=>service.guestAlbum(req,req.params.albumId)));
- app.get('/api/guest/orange-photo-albums/:albumId/photos',safe(req=>service.guestPhotos(req,req.params.albumId,req.query||{})));
- app.get('/api/guest/orange-photo-albums/:albumId/photos/:photoId/download',safe(req=>service.guestPhotoDownload(req,req.params.albumId,req.params.photoId)));
+const archiverModule = require("archiver");
+const ZipArchive = archiverModule.ZipArchive || archiverModule.default;
+const archiver = () => new ZipArchive({ zlib: { level: 0 } });
+const service = require("./orangePhotosGuestService");
+function send(res, r) { return res.status(r.ok ? 200 : (r.status || 400)).json(r.ok ? { ok: true, ...r.payload } : { ok: false, code: r.code, message: r.reason }); }
+function safe(fn) { return async (req, res) => { try { return send(res, await fn(req)); } catch (error) { console.error("Orange guest", { message: error.message }); return res.status(500).json({ ok: false, code: "INTERNAL_ERROR", message: "No se pudo completar la operación." }); } }; }
+function cleanZipName(value) { return String(value || "archivo").replace(/[\u0000-\u001f\u007f\\/]/g, "_").replace(/^\.+$/, "").trim() || "archivo"; }
+function uniqueZipNames(items) { const used = new Map(); return items.map(item => { const clean = cleanZipName(item.original_filename); const dot = clean.lastIndexOf("."); const stem = dot > 0 ? clean.slice(0, dot) : clean; const extension = dot > 0 ? clean.slice(dot) : ""; const key = clean.toLocaleLowerCase(); const count = (used.get(key) || 0) + 1; used.set(key, count); return count === 1 ? clean : `${stem} (${count})${extension}`; }); }
+async function streamGuestAlbumZip(req, res) { try { const result = await service.guestDownloadItems(req, req.params.albumId, req.body || {}); if (!result.ok) return send(res, result); const items = result.payload.items; const archive = archiver("zip", { zlib: { level: 0 } }); const filename = `orangefamily-album-${new Date().toISOString().slice(0, 10)}.zip`; res.setHeader("Content-Type", "application/zip"); res.setHeader("Content-Disposition", `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`); archive.on("error", error => { console.error("Orange guest ZIP", { message: error.message }); if (!res.destroyed) res.destroy(error); }); archive.pipe(res); const names = uniqueZipNames(items); for (let index = 0; index < items.length; index += 1) { const download = await service.downloadGuestObject(items[index]); archive.append(download.Body, { name: names[index] }); } await archive.finalize(); } catch (error) { console.error("Orange guest ZIP", { message: error.message }); if (!res.headersSent) return res.status(502).json({ ok: false, code: "INTERNAL_ERROR", message: "No se pudo preparar la descarga." }); if (!res.destroyed) res.destroy(error); } }
+function handleOrangePhotosGuestRoutes(app) {
+ app.get('/api/settings/external-guests', safe(req => service.listFamilyExternalGuests(req)));
+ app.post('/api/orange-photo-albums/:albumId/guest-invitations', safe(req => service.createInvitation(req, req.params.albumId, req.body || {})));
+ app.post('/api/orange-photo-albums/:albumId/guest-invitations/:invitationId/resend', safe(req => service.resendInvitation(req, req.params.albumId, req.params.invitationId)));
+ app.get('/api/orange-photo-albums/:albumId/guest-access', safe(req => service.listAccess(req, req.params.albumId)));
+ app.delete('/api/orange-photo-albums/:albumId/guest-invitations/:invitationId', safe(req => service.revokeInvitation(req, req.params.albumId, req.params.invitationId)));
+ app.delete('/api/orange-photo-albums/:albumId/guest-grants/:grantId', safe(req => service.revokeGrant(req, req.params.albumId, req.params.grantId)));
+ app.get('/api/public/orange-photo-guest-invitations/:token', safe(req => service.publicInvitation(req.params.token)));
+ app.post('/api/orange-photo-guest-invitations/:token/accept', safe(req => service.accept(req, req.params.token)));
+ app.post('/api/guest/orange-photo-albums/:albumId/download', streamGuestAlbumZip);
+ app.get('/api/guest/orange-photo-albums', safe(req => service.guestAlbums(req)));
+ app.get('/api/guest/orange-photo-albums/:albumId', safe(req => service.guestAlbum(req, req.params.albumId)));
+ app.get('/api/guest/orange-photo-albums/:albumId/photos', safe(req => service.guestPhotos(req, req.params.albumId, req.query || {})));
+ app.get('/api/guest/orange-photo-albums/:albumId/photos/:photoId/download', safe(req => service.guestPhotoDownload(req, req.params.albumId, req.params.photoId)));
 }
-module.exports={handleOrangePhotosGuestRoutes};
+module.exports = { handleOrangePhotosGuestRoutes };

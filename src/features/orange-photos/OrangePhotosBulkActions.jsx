@@ -25,7 +25,9 @@ export default function OrangePhotosBulkActions({
   onTrash,
   onFavorite,
   onEdit,
+  capabilities = {},
 }) {
+  const can = { share: capabilities.share !== false, album: capabilities.album !== false, download: capabilities.download !== false, trash: capabilities.trash !== false, favorite: capabilities.favorite !== false, edit: capabilities.edit !== false };
   const [modal, setModal] = useState("");
   const [albumId, setAlbumId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -99,7 +101,7 @@ export default function OrangePhotosBulkActions({
           <IonIcon icon={OD_ICONS.bulkExit} />
         </button>
         <strong>{photos.length} seleccionadas</strong>
-        <button
+        {can.share ? <button
           ref={shareRef}
           className="od-orangephotos-header-icon"
           type="button"
@@ -108,8 +110,8 @@ export default function OrangePhotosBulkActions({
           onClick={() => open("share")}
         >
           <IonIcon icon={shareSocialOutline} />
-        </button>
-        <button
+        </button> : null}
+        {can.album ? <button
           className="od-orangephotos-header-icon"
           type="button"
           aria-label="Añadir a álbum"
@@ -117,8 +119,8 @@ export default function OrangePhotosBulkActions({
           onClick={() => open("album")}
         >
           <IonIcon icon={albumsOutline} />
-        </button>
-        <button
+        </button> : null}
+        {can.download ? <button
           className="od-orangephotos-header-icon"
           type="button"
           aria-label="Descargar"
@@ -132,8 +134,8 @@ export default function OrangePhotosBulkActions({
           }
         >
           <IonIcon icon={OD_ICONS.export} />
-        </button>
-        <button
+        </button> : null}
+        {can.trash ? <button
           className="od-orangephotos-header-icon od-orangephotos-header-icon--danger"
           type="button"
           aria-label="Mover a la papelera"
@@ -141,8 +143,8 @@ export default function OrangePhotosBulkActions({
           onClick={() => open("trash")}
         >
           <IonIcon icon={OD_ICONS.delete} />
-        </button>
-        <button
+        </button> : null}
+        {(can.favorite || can.edit) ? <button
           className="od-orangephotos-header-icon"
           type="button"
           aria-label="Más acciones"
@@ -150,30 +152,30 @@ export default function OrangePhotosBulkActions({
           onClick={() => setModal(modal === "more" ? "" : "more")}
         >
           <IonIcon icon={OD_ICONS.menuMore} />
-        </button>
+        </button> : null}
         {modal === "more" ? (
           <div className="od-orangephotos-bulk-menu">
-            <button
+            {can.favorite ? <button
               className="od-action-menu-item"
               type="button"
               onClick={() => void run(() => onFavorite(!allFavorite))}
             >
               {allFavorite ? "Quitar de favoritas" : "Marcar como favoritas"}
-            </button>
-            <button
+            </button> : null}
+            {can.edit ? <button
               className="od-action-menu-item"
               type="button"
               onClick={() => open("date")}
             >
               Cambiar fecha y hora
-            </button>
-            <button
+            </button> : null}
+            {can.edit ? <button
               className="od-action-menu-item"
               type="button"
               onClick={() => open("location")}
             >
               Editar ubicación
-            </button>
+            </button> : null}
           </div>
         ) : null}
       </div>

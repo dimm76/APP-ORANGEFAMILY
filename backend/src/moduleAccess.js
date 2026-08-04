@@ -5,6 +5,7 @@ const FAMILY_MODULES = Object.freeze([
   "documents",
   "finances",
 ]);
+const GUEST_ALLOWED_MODULES = Object.freeze(["orange_photos"]);
 
 function normalizeModuleAccess(value, role) {
   if (role === "owner") {
@@ -15,6 +16,10 @@ function normalizeModuleAccess(value, role) {
     value && typeof value === "object" && !Array.isArray(value)
       ? value
       : {};
+
+  if (role === "guest") {
+    return Object.fromEntries(FAMILY_MODULES.map((key) => [key, GUEST_ALLOWED_MODULES.includes(key) && source[key] === true]));
+  }
 
   return Object.fromEntries(
     FAMILY_MODULES.map((key) => [key, source[key] === true])
@@ -64,6 +69,7 @@ function requireFamilyModule(moduleKey) {
 
 module.exports = {
   FAMILY_MODULES,
+  GUEST_ALLOWED_MODULES,
   normalizeModuleAccess,
   requireFamilyModule,
 };
