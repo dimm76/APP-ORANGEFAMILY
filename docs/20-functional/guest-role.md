@@ -33,3 +33,13 @@ El invitado solo ve Fotos y √Ålbumes. No puede acceder a otros m√≥dulos ni a Aju
 ## Fase 2
 
 La visualizaci√≥n, selecci√≥n, visor y descarga se integran en OrangePhotos normal. La subida restringida y la papelera de aportaciones propias quedan para la Fase 3.
+
+## AutorizaciÛn de lectura
+
+El rol Invitado accede a los ·lbumes mediante `orange_photo_album_access` con `subject_type = family`, `status = active` y `revoked_at IS NULL`. Las tablas histÛricas de invitados externos no participan en la lectura del nuevo rol Invitado.
+
+## Fase 2 completada
+
+La Fase 2 integra en OrangePhotos normal el listado de ·lbumes accesibles, aportaciones propias, detalle de ·lbum, selecciÛn, visor, descarga individual y descarga ZIP dentro de un ˙nico ·lbum.
+
+La subida restringida y la papelera de aportaciones propias corresponden a la Fase 3.

@@ -89,6 +89,7 @@ async function activationToken(queryable, userId) {
 
 function dbError(error) {
   if (error?.code === "23505") return bad(409, "Ya existe una cuenta con ese email.");
+  if (error?.code === "23514" && (error?.constraint === "family_memberships_role_check" || String(error?.detail || "").includes("family_memberships") || String(error?.message || "").includes("family_memberships"))) return bad(409, "El rol Invitado todavía no está habilitado en la base de datos.");
   return bad(503, "No se pudo completar la operación.");
 }
 
