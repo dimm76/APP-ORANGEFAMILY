@@ -9,8 +9,8 @@ import OrangePhotosBulkEditModal from "./OrangePhotosBulkEditModal.jsx";
 
 const MAX_BULK_SELECTION = 500;
 const MAX_ZIP_SELECTION = 500;
-const BULK_LIMIT_MESSAGE = "Puedes realizar acciones sobre un mÃƒÂ¡ximo de 500 elementos a la vez.";
-const ZIP_LIMIT_MESSAGE = "Puedes descargar un mÃƒÂ¡ximo de 500 elementos a la vez.";
+const BULK_LIMIT_MESSAGE = "Puedes realizar acciones sobre un máximo de 500 elementos a la vez.";
+const ZIP_LIMIT_MESSAGE = "Puedes descargar un máximo de 500 elementos a la vez.";
 
 export default function OrangePhotosBulkActions({
   photos,
@@ -66,7 +66,7 @@ export default function OrangePhotosBulkActions({
     setResult("");
     try {
       const summary = await action();
-      if (summary || showSuccess) setResult(summary || "OperaciÃƒÂ³n completada");
+      if (summary || showSuccess) setResult(summary || "Operación completada");
       return true;
     } catch (error) {
       setResult(error.message);
@@ -91,13 +91,13 @@ export default function OrangePhotosBulkActions({
       <div
         className="od-orangephotos-selection-actions"
         role="toolbar"
-        aria-label="Acciones de selecciÃƒÂ³n"
+        aria-label="Acciones de selección"
       >
         <button
           className="od-orangephotos-header-icon"
           type="button"
-          aria-label="Cerrar selecciÃƒÂ³n"
-          title="Cerrar selecciÃƒÂ³n"
+          aria-label="Cerrar selección"
+          title="Cerrar selección"
           onClick={onClose}
         >
           <IonIcon icon={OD_ICONS.bulkExit} />
@@ -116,8 +116,8 @@ export default function OrangePhotosBulkActions({
         {can.album ? <button
           className="od-orangephotos-header-icon"
           type="button"
-          aria-label="AÃƒÂ±adir a ÃƒÂ¡lbum"
-          title="AÃƒÂ±adir a ÃƒÂ¡lbum"
+          aria-label="Añadir a álbum"
+          title="Añadir a álbum"
           onClick={() => open("album")}
         >
           <IonIcon icon={albumsOutline} />
@@ -149,8 +149,8 @@ export default function OrangePhotosBulkActions({
         {(can.favorite || can.edit) ? <button
           className="od-orangephotos-header-icon"
           type="button"
-          aria-label="MÃƒÂ¡s acciones"
-          title="MÃƒÂ¡s acciones"
+          aria-label="Más acciones"
+          title="Más acciones"
           onClick={() => setModal(modal === "more" ? "" : "more")}
         >
           <IonIcon icon={OD_ICONS.menuMore} />
@@ -176,7 +176,7 @@ export default function OrangePhotosBulkActions({
               type="button"
               onClick={() => open("location")}
             >
-              Editar ubicaciÃƒÂ³n
+              Editar ubicación
             </button> : null}
           </div>
         ) : null}
@@ -192,7 +192,7 @@ export default function OrangePhotosBulkActions({
         <div className="od-modal-backdrop">
           <section className="od-modal" role="dialog" aria-modal="true">
             <header className="od-modal-header">
-              <h2 className="od-modal-title">AÃƒÂ±adir a ÃƒÂ¡lbum</h2>
+              <h2 className="od-modal-title">Añadir a álbum</h2>
               <button
                 className="od-modal-close"
                 type="button"
@@ -200,7 +200,7 @@ export default function OrangePhotosBulkActions({
                 disabled={busy}
                 onClick={() => setModal("")}
               >
-                Ãƒâ€”
+                ×
               </button>
             </header>
             <div className="od-modal-body">
@@ -215,7 +215,7 @@ export default function OrangePhotosBulkActions({
                   onChange={setAlbumId}
                   searchable
                   panelPortal
-                  placeholder="Selecciona un ÃƒÂ¡lbum"
+                  placeholder="Selecciona un álbum"
                 />
                 <div>
                   <button
@@ -227,7 +227,7 @@ export default function OrangePhotosBulkActions({
                       setModal("album-create");
                     }}
                   >
-                    Crear ÃƒÂ¡lbum con la selecciÃƒÂ³n
+                    Crear álbum con la selección
                   </button>
                 </div>
               </div>
@@ -253,7 +253,7 @@ export default function OrangePhotosBulkActions({
                   disabled={!albumId || busy}
                   onClick={() => void submitAlbum(albumId)}
                 >
-                  AÃƒÂ±adir
+                  Añadir
                 </button>
               </footer>
             </div>
@@ -265,7 +265,7 @@ export default function OrangePhotosBulkActions({
         <OrangeAlbumCreateModal
           categories={categories}
           members={members}
-          submitLabel="Crear y aÃƒÂ±adir"
+          submitLabel="Crear y añadir"
           onClose={() => setModal("album")}
           onCreate={onCreateAlbum}
           onCreated={handleCreatedAlbum}
@@ -279,7 +279,7 @@ export default function OrangePhotosBulkActions({
               <h2 className="od-modal-title">Mover a la papelera</h2>
             </header>
             <div className="od-modal-body">
-              {trashSkippedCount > 0 ? <><p>Se moverÃ¡n {trashEligibleCount} elementos propios a la papelera.</p><p>{trashSkippedCount} elementos de otros propietarios no se modificarÃ¡n.</p></> : <p>Se moverÃ¡n {trashEligibleCount} elementos a la papelera. PodrÃ¡n restaurarse despuÃ©s.</p>}
+              {trashSkippedCount > 0 ? <><p>Se moverán {trashEligibleCount} elementos propios a la papelera.</p><p>{trashSkippedCount} elementos de otros propietarios no se modificarán.</p></> : <p>Se moverán {trashEligibleCount} elementos a la papelera. Podrán restaurarse después.</p>}
               <footer className="od-orange-photos-modal__footer">
                 <button
                   className="od-btn od-btn-secondary"
