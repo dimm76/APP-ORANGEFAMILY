@@ -2,8 +2,7 @@
 const service = require("./orangePhotosService");
 const multipartService = require("./orangePhotosMultipartService");
 const express = require("express");
-const archiver = require("archiver");
-
+const { ZipArchive } = require("archiver");
 function send(res, result, status = 200) { if (!result.ok) return res.status(result.status || 400).json({ ok:false,code:result.code||"INTERNAL_ERROR",message:result.reason||"Petición no válida.",details:result.details??null }); return res.status(status).json({ ok:true,...result.payload }); }
 function requestError(code,message,status=400){return Object.assign(new Error(message),{orangePhotosCode:code,status});}
 
@@ -60,7 +59,7 @@ async function streamZip(req,res){
     stage="validate";
     const result=await service.downloadMany(req,req.body||{});if(!result.ok)return send(res,result);
     stage="create_archive";
-    const items=result.payload.items,names=zipEntryNames(items),archive=archiver("zip", { zlib: { level: 0 } });
+    const items=result.payload.items,names=zipEntryNames(items),archive=new ZipArchive({ zlib: { level: 0 } });
     let completed=false,current=null,cancelled=false;
     const cancel=()=>{if(completed||cancelled)return;cancelled=true;current?.destroy();archive.abort();};
     req.once("aborted",cancel);
@@ -91,7 +90,7 @@ async function streamZip(req,res){
   }
 }
 function handleOrangePhotosRoutes(app) {
-  app.post("/api/public/orangephotos/album/:token/download", (req,res)=>express.urlencoded({extended:false,limit:"64kb",parameterLimit:10})(req,res,async error=>{if(error)return res.status(400).json({ok:false,code:"INVALID_METADATA",message:"Selección no válida.",details:null});try{const result=await service.publicAlbumDownloadItems(req.params.token,req.body?.photo_ids);if(!result.ok)return send(res,result);const archive=archiver("zip", { zlib: { level: 0 } }),names=zipEntryNames(result.payload.items);res.setHeader("Content-Type","application/zip");const filename=`orange-photos-${new Date().toISOString().slice(0,10)}.zip`;res.setHeader("Content-Disposition",`attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);archive.pipe(res);for(let i=0;i<result.payload.items.length;i+=1)archive.append((await service.downloadObject(result.payload.items[i])).Body,{name:names[i]});await archive.finalize();}catch(error){if(!res.headersSent)res.status(404).json({ok:false,code:"PUBLIC_NOT_FOUND",message:"Recurso público no encontrado.",details:null});else res.destroy(error);}}));
+  app.post("/api/public/orangephotos/album/:token/download", (req,res)=>express.urlencoded({extended:false,limit:"64kb",parameterLimit:10})(req,res,async error=>{if(error)return res.status(400).json({ok:false,code:"INVALID_METADATA",message:"Selección no válida.",details:null});try{const result=await service.publicAlbumDownloadItems(req.params.token,req.body?.photo_ids);if(!result.ok)return send(res,result);const archive=new ZipArchive({ zlib: { level: 0 } }),names=zipEntryNames(result.payload.items);res.setHeader("Content-Type","application/zip");const filename=`orange-photos-${new Date().toISOString().slice(0,10)}.zip`;res.setHeader("Content-Disposition",`attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);archive.pipe(res);for(let i=0;i<result.payload.items.length;i+=1)archive.append((await service.downloadObject(result.payload.items[i])).Body,{name:names[i]});await archive.finalize();}catch(error){if(!res.headersSent)res.status(404).json({ok:false,code:"PUBLIC_NOT_FOUND",message:"Recurso público no encontrado.",details:null});else res.destroy(error);}}));
   app.get("/api/public/orangephotos/photo/:token", safe(req => service.publicPhotoByToken(req.params.token), "No se pudo cargar el recurso público."));
   app.get("/api/public/orangephotos/photo/:token/url", safe(req => service.publicPhotoUrl(req.params.token), "No se pudo preparar la URL pública."));
   app.get("/api/public/orangephotos/photo/:token/download", async (req,res) => { try { const result=await service.publicPhotoDownload(req.params.token); if(!result.ok)return send(res,result); const {download,filename}=result.payload;res.setHeader("Content-Type",download.ContentType||"application/octet-stream");if(download.ContentLength!=null)res.setHeader("Content-Length",String(download.ContentLength));const clean=attachmentName(filename);res.setHeader("Content-Disposition",`attachment; filename="${clean}"; filename*=UTF-8''${encodeURIComponent(clean)}`);return download.Body.pipe(res); } catch { return res.status(404).json({ok:false,code:"PUBLIC_NOT_FOUND",message:"Recurso público no encontrado.",details:null}); } });
