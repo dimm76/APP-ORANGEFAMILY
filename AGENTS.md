@@ -60,6 +60,49 @@ No asumir comportamientos que puedan comprobarse revisando primero documentació
 - No romper funcionalidad existente.
 - No modificar más archivos de los estrictamente necesarios.
 
+## Formato, estructura y legibilidad del código
+
+Todo código modificado o creado debe quedar estructurado, indentado y legible de forma profesional.
+
+Reglas obligatorias:
+
+- No comprimir manualmente código fuente.
+- No concatenar múltiples declaraciones, instrucciones, estados React o funciones en una sola línea.
+- No escribir árboles JSX completos en una sola línea.
+- Cada bloque debe reflejar visualmente su jerarquía mediante indentación consistente.
+- Los imports con varios elementos deben dividirse en varias líneas cuando no resulten claramente legibles.
+- Los arrays y objetos complejos deben estructurarse en varias líneas.
+- Las funciones con varias operaciones deben usar bloques multilínea.
+- Cada `useState` debe declararse de forma independiente y legible.
+- Las props JSX deben dividirse en varias líneas cuando el elemento sea largo o contenga lógica.
+- Los callbacks complejos no deben quedar incrustados en una única línea de JSX.
+- Los ternarios anidados deben evitarse o formatearse de forma que cada condición sea inequívoca.
+- No realizar minificación manual en archivos fuente.
+- No conservar código deliberadamente condensado solo porque ya existía así.
+
+Cuando un archivo autorizado esté severamente condensado y esto impida modificarlo con seguridad:
+
+1. El agente puede formatear exclusivamente ese archivo.
+2. El formateo debe conservar exactamente el comportamiento existente.
+3. No debe aprovechar el formateo para refactorizar, renombrar o alterar lógica.
+4. No debe modificar archivos fuera del scope.
+5. Debe distinguir en el informe final entre cambio funcional y cambio exclusivamente estructural.
+6. Debe comprobar que el archivo sigue guardado como UTF-8 sin BOM.
+7. Debe ejecutar ESLint, build y `git diff --check` cuando correspondan.
+
+Los comentarios deben explicar decisiones, restricciones, invariantes o comportamientos no evidentes.
+
+No añadir comentarios que se limiten a repetir literalmente lo que hace la siguiente línea.
+
+Si no existe un formateador configurado en el repositorio:
+
+- mantener manualmente un formato profesional y consistente;
+- no añadir Prettier, Biome u otra dependencia sin autorización expresa;
+- no rechazar una modificación únicamente porque el archivo esté condensado;
+- formatear primero el archivo autorizado y aplicar después el cambio solicitado.
+
+Un archivo no puede considerarse terminado si la lógica funciona pero queda comprimido, desestructurado o difícil de revisar.
+
 ## Reglas visuales
 
 Antes de tocar cualquier archivo de interfaz, estilos, componentes visuales, modales, tablas, badges, botones, inputs, selects, popovers, menús contextuales o layouts, el agente debe leer y aplicar:
