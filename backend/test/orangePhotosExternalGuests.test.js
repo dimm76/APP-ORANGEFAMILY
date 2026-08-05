@@ -2,7 +2,8 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const archiverPath = require.resolve("archiver");
 let zipAppends = 0;
-require.cache[archiverPath] = { id: archiverPath, filename: archiverPath, loaded: true, exports: { ZipArchive: class { on() {} pipe() {} append() { zipAppends += 1; } async finalize() {} } } };
+let zipFinalizes = 0;
+require.cache[archiverPath] = { id: archiverPath, filename: archiverPath, loaded: true, exports: (format, options) => { assert.equal(format, "zip"); assert.deepEqual(options, { zlib: { level: 0 } }); return { on() {}, pipe() {}, append() { zipAppends += 1; }, async finalize() { zipFinalizes += 1; }, abort() {} }; } };
 const path = require("node:path");
 const dbPath = path.resolve(__dirname, "../db.js");
 const wasabiPath = path.resolve(__dirname, "../src/wasabiClient.js");
@@ -31,6 +32,12 @@ const ownerReq={user:{id:ownerId,families:[{id:familyId,role:"owner"}]}};
 const guestReq={user:{id:userId,families:[{id:familyId,role:"guest",module_access:{orange_photos:true,wiki:false,notes:false,documents:false,finances:false}}]}};
 const memberReq={user:{id:userId,families:[{id:familyId,role:"member",module_access:{orange_photos:true}}]}};
 const guestWithoutOrangePhotosReq={user:{id:userId,families:[{id:familyId,role:"guest",module_access:{orange_photos:false}}]}};
+test("resolveOrangePhotosFamily acepta owner",()=>{const result=orangePhotosService.resolveOrangePhotosFamily(ownerReq);assert.equal(result.ok,true);assert.equal(result.userId,ownerId);assert.equal(result.familyId,familyId);});
+test("resolveOrangePhotosFamily acepta member",()=>{const result=orangePhotosService.resolveOrangePhotosFamily(memberReq);assert.equal(result.ok,true);assert.equal(result.userId,userId);assert.equal(result.familyId,familyId);});
+test("resolveOrangePhotosFamily acepta guest con OrangePhotos",()=>{const result=orangePhotosService.resolveOrangePhotosFamily(guestReq);assert.equal(result.ok,true);assert.equal(result.userId,userId);assert.equal(result.familyId,familyId);assert.equal(result.role,"guest");});
+test("resolveOrangePhotosFamily rechaza guest sin OrangePhotos",()=>{const result=orangePhotosService.resolveOrangePhotosFamily(guestWithoutOrangePhotosReq);assert.equal(result.ok,false);assert.equal(result.status,403);});
+test("resolveOrangePhotosFamily rechaza guest sin familia válida",()=>{const result=orangePhotosService.resolveOrangePhotosFamily({user:{id:userId,families:[]}});assert.equal(result.ok,false);assert.equal(result.status,403);});
+test("resolveOrangePhotosFamily rechaza petición no autenticada",()=>{const result=orangePhotosService.resolveOrangePhotosFamily({});assert.equal(result.ok,false);assert.equal(result.status,401);});
 function normalizeSql(sql){return String(sql).replace(/\s+/g," ").trim().toLowerCase();}
 function isGuestFamilyAclQuery(sql){const text=normalizeSql(sql);return text.includes("orange_photo_album_access")&&/status\s*=\s*'active'/i.test(text)&&/revoked_at\s+is\s+null/i.test(text);}
 function transactionClient({grant=true,failOn=null}={}) { const clientCalls=[]; let count=0; const client={query:async(sql,params)=>{clientCalls.push({sql,params});count+=1;if(failOn&&count===failOn)throw new Error("SQL failure");if(sql==="BEGIN"||sql==="COMMIT"||sql==="ROLLBACK")return{rows:[]};if(/guest_invitations/.test(sql)&&/SELECT i/.test(sql))return{rows:[{id:invitationId,album_id:albumId,title:"Album",is_archived:false,status:"pending",revoked_at:null,expires_at:new Date(Date.now()+60000),invited_email:"guest@example.com",invited_by_user_id:ownerId,can_view:true,can_contribute:false,can_comment:false}]};if(/orange_photo_albums/.test(sql)&&/SELECT/.test(sql))return{rows:[{id:albumId,title:"Album",family_id:familyId}]};if(/auth_users/.test(sql))return{rows:[{email:"guest@example.com",status:"active"}]};if(/guest_grants/.test(sql)&&/SELECT/.test(sql))return{rows:grant?[{id:grantId,status:"revoked"}]:[]};if(/guest_grants/.test(sql)&&/UPDATE/.test(sql))return{rows:grant?[{id:grantId,user_id:userId}]:[]};return{rows:[]};},release(){client.released=true;}};currentClient=client;return{client,clientCalls};}

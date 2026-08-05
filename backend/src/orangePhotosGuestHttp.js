@@ -1,6 +1,4 @@
-const archiverModule = require("archiver");
-const ZipArchive = archiverModule.ZipArchive || archiverModule.default;
-const archiver = () => new ZipArchive({ zlib: { level: 0 } });
+const archiver = require("archiver");
 const service = require("./orangePhotosGuestService");
 function send(res, r) { return res.status(r.ok ? 200 : (r.status || 400)).json(r.ok ? { ok: true, ...r.payload } : { ok: false, code: r.code, message: r.reason }); }
 function safe(fn) { return async (req, res) => { try { return send(res, await fn(req)); } catch (error) { console.error("Orange guest", { message: error.message }); return res.status(500).json({ ok: false, code: "INTERNAL_ERROR", message: "No se pudo completar la operación." }); } }; }

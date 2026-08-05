@@ -1,7 +1,6 @@
 /* global require, module, Buffer, setImmediate */
 const { createHash } = require("node:crypto");
 const pool = require("../db");
-const { resolveAuthenticatedFamily } = require("./attachmentsService");
 const photos = require("./orangePhotosService");
 const {
   abortOrangePhotoMultipartUpload,
@@ -25,7 +24,7 @@ function expired(upload){return new Date(upload.expires_at).getTime()<=Date.now(
 function missingMultipart(error){return ["NoSuchUpload","NotFound","404"].includes(String(error?.name||error?.Code||error?.$metadata?.httpStatusCode));}
 
 async function ownedUpload(req,id){
-  const auth=resolveAuthenticatedFamily(req);if(!auth.ok)return auth;
+  const auth=photos.resolveOrangePhotosFamily(req);if(!auth.ok)return auth;
   if(!UUID_RE.test(String(id||"")))return photos.bad(404,"UPLOAD_NOT_FOUND","Subida no encontrada.");
   const row=(await pool.query(`SELECT * FROM public.orange_photo_uploads WHERE id=$1::uuid AND family_id=$2::uuid AND owner_user_id=$3::uuid`,[id,auth.familyId,auth.userId])).rows[0];
   if(!row)return photos.bad(404,"UPLOAD_NOT_FOUND","Subida no encontrada.");
@@ -34,7 +33,7 @@ async function ownedUpload(req,id){
 }
 
 async function initiate(req,body={}){
-  const auth=resolveAuthenticatedFamily(req);if(!auth.ok)return auth;
+  const auth=photos.resolveOrangePhotosFamily(req);if(!auth.ok)return auth;
   const originalFilename=String(body.original_filename||"").replace(/\\/g,"/").split("/").pop().trim().normalize("NFKC").replace(/\s+/g," ").slice(0,500),size=Number(body.size_bytes),mime=String(body.mime_type||"").toLowerCase();
   const clientUploadKey=String(body.client_upload_key||"").trim().slice(0,200)||null;
   if(!originalFilename)return photos.bad(400,"INVALID_METADATA","Nombre original obligatorio.");

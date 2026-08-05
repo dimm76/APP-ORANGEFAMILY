@@ -37,6 +37,37 @@ const bad=(status,code,reason,details=null)=>{
   return {ok:false,status,code,reason,details};
 };
 const uuid=v=>UUID_RE.test(String(v||"").trim()); const text=(v,n=500)=>v==null?null:String(v).trim().slice(0,n)||null;
+function resolveOrangePhotosFamily(req) {
+  const standardAuth = resolveAuthenticatedFamily(req);
+
+  if (standardAuth.ok) {
+    return standardAuth;
+  }
+
+  if (!req.user?.id) {
+    return standardAuth;
+  }
+
+  const family = Array.isArray(req.user.families)
+    ? req.user.families[0]
+    : null;
+
+  if (
+    family?.role !== "guest" ||
+    family?.module_access?.orange_photos !== true ||
+    !uuid(family.id)
+  ) {
+    return standardAuth;
+  }
+
+  return {
+    ok: true,
+    userId: String(req.user.id),
+    familyId: String(family.id),
+    membership: family,
+    role: "guest",
+  };
+}
 const number=value=>{if(value==null||value==="")return null;const parsed=Number(value);return Number.isFinite(parsed)?parsed:null;}; const bool=v=>v===true||v==="true"||v===1||v==="1";
 const dateIso=value=>{if(value==null||value==="")return null;const parsed=new Date(value);return Number.isNaN(parsed.getTime())?null:parsed.toISOString();};
 function normalizedCategoryName(value){return String(value||"").trim().replace(/\s+/g," ").toLocaleLowerCase("es-ES").slice(0,120);}
@@ -119,7 +150,7 @@ function uploadModeFor(mimeType, sizeBytes) {
 }
 
 async function checkUpload(req, body = {}) {
-  const a=resolveAuthenticatedFamily(req); if(!a.ok)return a;
+  const a=resolveOrangePhotosFamily(req); if(!a.ok)return a;
   const context=clientContext(req);
   const filename=normalizeDuplicateFilename(body.original_filename), size=Number(body.size_bytes), mime=String(body.mime_type||"").toLowerCase();
   if(!filename)return bad(400,"INVALID_METADATA","Nombre original obligatorio.");
@@ -142,7 +173,7 @@ async function checkUpload(req, body = {}) {
 }
 
 async function checkStorageStatus(req, body = {}) {
-  const auth = resolveAuthenticatedFamily(req);
+  const auth = resolveOrangePhotosFamily(req);
   if (!auth.ok) return auth;
   if (!Array.isArray(body.items) || body.items.length < 1 || body.items.length > 200) {
     return bad(400, "INVALID_METADATA", "items debe contener entre 1 y 200 elementos.");
@@ -539,4 +570,4 @@ async function publicAlbumPhoto(token,photoId){const album=await publicAlbumByTo
 async function publicAlbumPhotoUrl(token,photoId){const result=await publicAlbumPhoto(token,photoId);if(!result.ok)return result;const file=(await pool.query(`SELECT bucket,object_key,variant FROM public.orange_photo_files WHERE photo_id=$1::uuid AND variant=ANY($2::text[]) ORDER BY array_position($2::text[],variant) LIMIT 1`,[photoId,["preview","original"]])).rows[0];return file?ok({url:await getSignedOrangePhotoUrl(file),variant:file.variant,expires_in:3600}):bad(404,"PUBLIC_NOT_FOUND","Recurso público no encontrado.");}
 async function publicAlbumPhotoDownload(token,photoId){const result=await publicAlbumPhoto(token,photoId);if(!result.ok)return result;const file=(await pool.query(`SELECT bucket,object_key,mime_type,size_bytes FROM public.orange_photo_files WHERE photo_id=$1::uuid AND variant='original' LIMIT 1`,[photoId])).rows[0];if(!file)return bad(404,"PUBLIC_NOT_FOUND","Recurso público no encontrado.");return ok({download:await getOrangePhotoObjectStream(file),filename:result.payload.raw.original_filename||`orange-photo-${photoId}`,mime_type:file.mime_type,size_bytes:file.size_bytes==null?null:Number(file.size_bytes)});}
 async function publicAlbumDownloadItems(token,ids){const album=await publicAlbumByToken(token);if(!album.ok)return album;let requested;try{requested=typeof ids==='string'?JSON.parse(ids):ids;}catch{return bad(400,"INVALID_METADATA","Selección no válida.");}if(!Array.isArray(requested)||!requested.length||requested.length>500||requested.some(id=>!uuid(id)))return bad(400,"INVALID_METADATA","Selección no válida.");const unique=[...new Set(requested)],rows=(await pool.query(`SELECT p.id,p.original_filename,f.bucket,f.object_key FROM public.orange_photo_album_items ai JOIN public.orange_photos p ON p.id=ai.photo_id JOIN public.orange_photo_files f ON f.photo_id=p.id AND f.variant='original' WHERE ai.album_id=$1::uuid AND p.is_trashed=false AND p.id=ANY($2::uuid[])`,[album.payload.item.id,unique])).rows;if(rows.length!==unique.length)return bad(404,"PUBLIC_NOT_FOUND","Recurso público no encontrado.");return ok({items:unique.map(id=>rows.find(row=>String(row.id)===String(id)))});}
-module.exports={familyMembers,createFromExisting,upload,uploadDirect,checkUpload,checkStorageStatus,list:listSafe,timeline,aroundDate,detail,events,update,generateVideoPoster,trash,purge,emptyTrash,signedUrl,download,recordCompletedDownload,recordCompletedBulkDownload,downloadMany,downloadObject,share,albums,createAlbum,albumPhotoIds,updateAlbum,addPhoto,shareAlbum,albumCategories,createAlbumCategory,updateAlbumCategory,deleteAlbumCategory,setAlbumCategories,tags,createTag,updatePublicLink,revokePublicLink,publicPhotoByToken,publicPhotoUrl,publicPhotoDownload,publicAlbumByToken,publicAlbumPhotos,publicAlbumPhoto,publicAlbumPhotoUrl,publicAlbumPhotoDownload,publicAlbumDownloadItems,insertPhoto,recordPhotoEvent,clientContext,applyStoredImageMetadata,normalizeMetadata,validateMetadata,findPossibleDuplicate,findExactDuplicate,findUploadSuppression,uploadCheckDecision,normalizeDuplicateFilename,uploadModeFor,ok,bad,bool,MIME_EXT,MAX_IMAGE_BYTES,SIMPLE_VIDEO_MAX_BYTES,MAX_VIDEO_BYTES,MULTIPART_PART_BYTES,MULTIPART_UPLOAD_TTL_HOURS};
+module.exports={familyMembers,createFromExisting,upload,uploadDirect,checkUpload,checkStorageStatus,list:listSafe,timeline,aroundDate,detail,events,update,generateVideoPoster,trash,purge,emptyTrash,signedUrl,download,recordCompletedDownload,recordCompletedBulkDownload,downloadMany,downloadObject,share,albums,createAlbum,albumPhotoIds,updateAlbum,addPhoto,shareAlbum,albumCategories,createAlbumCategory,updateAlbumCategory,deleteAlbumCategory,setAlbumCategories,tags,createTag,updatePublicLink,revokePublicLink,publicPhotoByToken,publicPhotoUrl,publicPhotoDownload,publicAlbumByToken,publicAlbumPhotos,publicAlbumPhoto,publicAlbumPhotoUrl,publicAlbumPhotoDownload,publicAlbumDownloadItems,insertPhoto,recordPhotoEvent,clientContext,applyStoredImageMetadata,normalizeMetadata,validateMetadata,findPossibleDuplicate,findExactDuplicate,findUploadSuppression,uploadCheckDecision,normalizeDuplicateFilename,uploadModeFor,resolveOrangePhotosFamily,ok,bad,bool,MIME_EXT,MAX_IMAGE_BYTES,SIMPLE_VIDEO_MAX_BYTES,MAX_VIDEO_BYTES,MULTIPART_PART_BYTES,MULTIPART_UPLOAD_TTL_HOURS};

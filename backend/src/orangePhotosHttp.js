@@ -2,7 +2,7 @@
 const service = require("./orangePhotosService");
 const multipartService = require("./orangePhotosMultipartService");
 const express = require("express");
-const { ZipArchive } = require("archiver");
+const archiver = require("archiver");
 
 function send(res, result, status = 200) { if (!result.ok) return res.status(result.status || 400).json({ ok:false,code:result.code||"INTERNAL_ERROR",message:result.reason||"Petición no válida.",details:result.details??null }); return res.status(status).json({ ok:true,...result.payload }); }
 function requestError(code,message,status=400){return Object.assign(new Error(message),{orangePhotosCode:code,status});}
@@ -60,7 +60,7 @@ async function streamZip(req,res){
     stage="validate";
     const result=await service.downloadMany(req,req.body||{});if(!result.ok)return send(res,result);
     stage="create_archive";
-    const items=result.payload.items,names=zipEntryNames(items),archive=new ZipArchive({zlib:{level:0}});
+    const items=result.payload.items,names=zipEntryNames(items),archive=archiver("zip", { zlib: { level: 0 } });
     let completed=false,current=null,cancelled=false;
     const cancel=()=>{if(completed||cancelled)return;cancelled=true;current?.destroy();archive.abort();};
     req.once("aborted",cancel);
@@ -91,7 +91,7 @@ async function streamZip(req,res){
   }
 }
 function handleOrangePhotosRoutes(app) {
-  app.post("/api/public/orangephotos/album/:token/download", (req,res)=>express.urlencoded({extended:false,limit:"64kb",parameterLimit:10})(req,res,async error=>{if(error)return res.status(400).json({ok:false,code:"INVALID_METADATA",message:"Selección no válida.",details:null});try{const result=await service.publicAlbumDownloadItems(req.params.token,req.body?.photo_ids);if(!result.ok)return send(res,result);const archive=new ZipArchive({zlib:{level:0}}),names=zipEntryNames(result.payload.items);res.setHeader("Content-Type","application/zip");const filename=`orange-photos-${new Date().toISOString().slice(0,10)}.zip`;res.setHeader("Content-Disposition",`attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);archive.pipe(res);for(let i=0;i<result.payload.items.length;i+=1)archive.append((await service.downloadObject(result.payload.items[i])).Body,{name:names[i]});await archive.finalize();}catch(error){if(!res.headersSent)res.status(404).json({ok:false,code:"PUBLIC_NOT_FOUND",message:"Recurso público no encontrado.",details:null});else res.destroy(error);}}));
+  app.post("/api/public/orangephotos/album/:token/download", (req,res)=>express.urlencoded({extended:false,limit:"64kb",parameterLimit:10})(req,res,async error=>{if(error)return res.status(400).json({ok:false,code:"INVALID_METADATA",message:"Selección no válida.",details:null});try{const result=await service.publicAlbumDownloadItems(req.params.token,req.body?.photo_ids);if(!result.ok)return send(res,result);const archive=archiver("zip", { zlib: { level: 0 } }),names=zipEntryNames(result.payload.items);res.setHeader("Content-Type","application/zip");const filename=`orange-photos-${new Date().toISOString().slice(0,10)}.zip`;res.setHeader("Content-Disposition",`attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);archive.pipe(res);for(let i=0;i<result.payload.items.length;i+=1)archive.append((await service.downloadObject(result.payload.items[i])).Body,{name:names[i]});await archive.finalize();}catch(error){if(!res.headersSent)res.status(404).json({ok:false,code:"PUBLIC_NOT_FOUND",message:"Recurso público no encontrado.",details:null});else res.destroy(error);}}));
   app.get("/api/public/orangephotos/photo/:token", safe(req => service.publicPhotoByToken(req.params.token), "No se pudo cargar el recurso público."));
   app.get("/api/public/orangephotos/photo/:token/url", safe(req => service.publicPhotoUrl(req.params.token), "No se pudo preparar la URL pública."));
   app.get("/api/public/orangephotos/photo/:token/download", async (req,res) => { try { const result=await service.publicPhotoDownload(req.params.token); if(!result.ok)return send(res,result); const {download,filename}=result.payload;res.setHeader("Content-Type",download.ContentType||"application/octet-stream");if(download.ContentLength!=null)res.setHeader("Content-Length",String(download.ContentLength));const clean=attachmentName(filename);res.setHeader("Content-Disposition",`attachment; filename="${clean}"; filename*=UTF-8''${encodeURIComponent(clean)}`);return download.Body.pipe(res); } catch { return res.status(404).json({ok:false,code:"PUBLIC_NOT_FOUND",message:"Recurso público no encontrado.",details:null}); } });
@@ -126,8 +126,30 @@ function handleOrangePhotosRoutes(app) {
   app.get("/api/orange-photos/:id/url", safe(req => service.signedUrl(req, req.params.id), "No se pudo firmar la URL."));
   app.get("/api/orange-photos/:id/original-url", safe(req => service.signedUrl(req, req.params.id, true), "No se pudo firmar la URL original."));
   app.get("/api/orange-photos/:id/download", async (req, res) => { try { const result = await service.download(req, req.params.id); if (!result.ok) return send(res, result); const { download, filename, event } = result.payload;let finished=false;res.once("finish",()=>{finished=true;service.recordCompletedDownload(event).catch(error=>console.error("OrangePhotos download event",{message:error.message}));});res.once("close",()=>{if(!finished)console.warn("OrangePhotos download aborted",{photo_id:req.params.id});});res.setHeader("Content-Type", download.ContentType); if (download.ContentLength != null) res.setHeader("Content-Length", String(download.ContentLength)); res.setHeader("Content-Disposition", `attachment; filename="${attachmentName(filename)}"; filename*=UTF-8''${encodeURIComponent(attachmentName(filename))}`); download.Body.on?.("error", error => { console.error("OrangePhotos download", error); if (!res.headersSent) res.status(502).end(); else res.destroy(error); }); return download.Body.pipe(res); } catch (error) { console.error("OrangePhotos download", error); return res.status(502).json({ ok: false, message: "No se pudo descargar el archivo." }); } });
-  app.post("/api/orange-photos/download",(req,res)=>express.urlencoded({extended:false,limit:"64kb",parameterLimit:10})(req,res,error=>error?res.status(error.type==="entity.too.large"?413:400).json({ok:false,code:"INVALID_METADATA",message:error.type==="entity.too.large"?"La selección enviada es demasiado grande.":"La selección enviada no es válida.",details:null}):streamZip(req,res)));
-  app.post("/api/orange-photos/:id/share", safe(req => service.share(req, req.params.id, req.body || {}), "No se pudo compartir la foto."));
+  app.post("/api/orange-photos/download", (req, res) => {
+    if (req.is("application/json")) {
+      return streamZip(req, res);
+    }
+
+    return express.urlencoded({
+      extended: false,
+      limit: "64kb",
+      parameterLimit: 10,
+    })(req, res, error => {
+      if (error) {
+        const tooLarge = error.type === "entity.too.large";
+        return res.status(tooLarge ? 413 : 400).json({
+          ok: false,
+          code: "INVALID_METADATA",
+          message: tooLarge
+            ? "La selección enviada es demasiado grande."
+            : "La selección enviada no es válida.",
+          details: null,
+        });
+      }
+      return streamZip(req, res);
+    });
+  });  app.post("/api/orange-photos/:id/share", safe(req => service.share(req, req.params.id, req.body || {}), "No se pudo compartir la foto."));
   app.get("/api/orange-photo-albums", safe(async req => {const result=await service.albums(req);if(!result.ok)return result;for(const row of result.payload.items){const enabled=row.public_enabled===true&&row.public_token!=null&&row.public_revoked_at==null,token=enabled&&row.is_owner?row.public_token:null;row.public_link_active=enabled;row.public_link={enabled,token,path:token?`/public/orangephotos/album/${token}`:null};if(!row.is_owner)row.public_token=null;}return result;}, "No se pudieron cargar los álbumes."));
   app.post("/api/orange-photo-albums/:id/public-link", safe(req => service.updatePublicLink(req, req.params.id, "album", req.body?.regenerate === true), "No se pudo crear el enlace público del álbum."));
   app.delete("/api/orange-photo-albums/:id/public-link", safe(req => service.revokePublicLink(req, req.params.id, "album"), "No se pudo desactivar el enlace público del álbum."));
