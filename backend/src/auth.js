@@ -110,7 +110,7 @@ async function insertAuditLog(queryable, userId, action, req) {
   }
 }
 
-function mapUser(row, memberships = []) {
+function mapUser(row, memberships = [], externalAccess = null) {
   const displayName = row.preferred_name
     || [row.first_name, row.last_name].filter(Boolean).join(" ")
     || null;
@@ -132,7 +132,14 @@ function mapUser(row, memberships = []) {
       role: String(membership.role),
       module_access: normalizeModuleAccess(membership.module_access, membership.role),
     })),
+    external_access: { has_album_grants: Number(externalAccess?.count || 0) > 0, album_grant_count: Number(externalAccess?.count || 0) },
   };
+}
+
+async function loadExternalAccess(queryable, userId) {
+  if (!userId) return { count: 0 };
+  const result = await queryable.query(`SELECT count(*)::int FROM public.orange_photo_album_guest_grants WHERE user_id=$1::uuid AND status='active' AND revoked_at IS NULL AND can_view=true`, [userId]);
+  return { count: result.rows[0]?.count || 0 };
 }
 
 async function loadUserMemberships(queryable, personId) {
@@ -176,7 +183,7 @@ async function attachAuthToRequest(req, _res, next) {
     }
 
     const memberships = await loadUserMemberships(pool, row.person_id);
-    req.user = { ...mapUser(row, memberships), _sessionId: String(row.session_id) };
+    req.user = { ...mapUser(row, memberships, await loadExternalAccess(pool, row.user_id)), _sessionId: String(row.session_id) };
   } catch {
     req.user = null;
   }
@@ -288,7 +295,7 @@ async function handleAuthLogin(req) {
     const memberships = await loadUserMemberships(pool, userRow.person_id);
     return {
       status: 200,
-      body: { ok: true, user: mapUser(userRow, memberships) },
+      body: { ok: true, user: mapUser(userRow, memberships, await loadExternalAccess(pool, userId)) },
       setCookie: buildSessionCookie(token, expiresAt),
     };
   } catch {

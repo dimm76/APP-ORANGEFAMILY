@@ -66,12 +66,18 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
   }
 
   const isOwner = user?.families?.some((family) => family.role === "owner");
+  const guestRole = user?.families?.[0]?.role === "guest";
+  const orangePhotosHref = guestRole ? "/app/orangephotos/albums" : "/app/orangephotos";
   const settingsHref = isOwner ? "/app/settings/family" : "/app/settings/downloads";
-  const visibleItems = NAV_ITEMS.filter(
-    (item) =>
-      (!item.ownerOnly || isOwner) &&
-      (!item.moduleKey || hasModuleAccess(item.moduleKey))
-  ).map((item) => item.settingsItem ? { ...item, href: settingsHref } : item);
+  const visibleItems = NAV_ITEMS
+    .filter((item) => guestRole
+      ? item.moduleKey === "orange_photos" && hasModuleAccess("orange_photos")
+      : (!item.ownerOnly || isOwner) && (!item.moduleKey || hasModuleAccess(item.moduleKey)))
+    .map((item) => {
+      if (item.moduleKey === "orange_photos") return { ...item, href: orangePhotosHref };
+      if (item.settingsItem) return { ...item, href: settingsHref };
+      return item;
+    });
 
   if (hasModuleAccess("orange_photos") && pathname.startsWith("/app/orangephotos")) {
     return <OrangePhotosSidebar pathname={pathname} onNavigate={onNavigate} />;

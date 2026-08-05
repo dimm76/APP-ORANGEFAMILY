@@ -5,33 +5,107 @@ import { ellipsisVerticalOutline, people as peopleOutline } from "ionicons/icons
 import OrangeAlbumShareModal from "./OrangeAlbumShareModal.jsx";
 import OrangeAlbumOptionsModal from "./OrangeAlbumOptionsModal.jsx";
 import OrangeAlbumCreateModal from "./OrangeAlbumCreateModal.jsx";
+const dateFormatter=new Intl.DateTimeFormat("es-ES",{day:"numeric",month:"short",year:"numeric"});
+function parseDate(value){if(!value)return null;const date=new Date(`${String(value).slice(0,10)}T12:00:00`);return Number.isNaN(date.getTime())?null:date;}
+function clean(value){return value.replaceAll(".","");}
+export function formatAlbumDate(album){const start=parseDate(album.date_start);if(!start||!album.date_mode)return "";if(album.date_mode==="single")return clean(dateFormatter.format(start));const end=parseDate(album.date_end);return end?`${clean(dateFormatter.format(start))}–${clean(dateFormatter.format(end))}`:clean(dateFormatter.format(start));}
+function sortAlbums(items,mode){return [...items].sort((a,b)=>mode==="title_desc"?String(b.title||"").localeCompare(String(a.title||""),"es"):String(a.title||"").localeCompare(String(b.title||""),"es"));}
+function shareTitle(album){return album.is_shared_effectively?(album.is_owner?"Compartido":`Compartido por ${album.shared_by_display_name||"otro miembro"}`):"";}
+export default function OrangeAlbumsView({albums=[],categories=[],members=[],search="",onOpen,onCreate,onRename,onShare,onDelete,onSetCover,onSaveOptions,createRequestKey=0,onCreateRequestHandled,restrictedRole=false,canCreateAlbums=true,canUseAlbumMenu=true}){
+  void onSetCover;const [filter,setFilter]=useState("all"),[creating,setCreating]=useState(false),[title,setTitle]=useState(""),[selectedCategoryIds,setSelectedCategoryIds]=useState([]),[categoriesExpanded,setCategoriesExpanded]=useState(false),[sortMode,setSortMode]=useState("album_date_desc"),[activeMenuAlbum,setActiveMenuAlbum]=useState(null),[renameAlbum,setRenameAlbum]=useState(null),[shareAlbum,setShareAlbum]=useState(null),[deleteAlbum,setDeleteAlbum]=useState(null),[optionsAlbum,setOptionsAlbum]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState("");
+  useEffect(()=>{if(createRequestKey&&!restrictedRole){setCreating(true);onCreateRequestHandled?.();}},[createRequestKey,onCreateRequestHandled,restrictedRole]);
+  useEffect(() => {
+    if (!activeMenuAlbum) {
+      return undefined;
+    }
 
-const albumDateFormatter=new Intl.DateTimeFormat("es-ES",{day:"numeric",month:"short",year:"numeric"});
-const albumDayMonthFormatter=new Intl.DateTimeFormat("es-ES",{day:"numeric",month:"short"});
-function parseAlbumDate(value){if(!value)return null;const date=new Date(`${String(value).slice(0,10)}T12:00:00`);return Number.isNaN(date.getTime())?null:date;}
-function cleanDateLabel(value){return value.replaceAll(".","");}
-export function formatAlbumDate(album){const start=parseAlbumDate(album.date_start);if(!start||!album.date_mode)return"";if(album.date_mode==="single")return cleanDateLabel(albumDateFormatter.format(start));const end=parseAlbumDate(album.date_end);if(!end)return cleanDateLabel(albumDateFormatter.format(start));const sameYear=start.getFullYear()===end.getFullYear(),sameMonth=sameYear&&start.getMonth()===end.getMonth();if(sameMonth)return`${start.getDate()}–${cleanDateLabel(albumDateFormatter.format(end))}`;if(sameYear)return`${cleanDateLabel(albumDayMonthFormatter.format(start))}–${cleanDateLabel(albumDateFormatter.format(end))}`;return`${cleanDateLabel(albumDateFormatter.format(start))}–${cleanDateLabel(albumDateFormatter.format(end))}`;}
-function compareAlbumTitles(left,right){const result=String(left.title||"").localeCompare(String(right.title||""),"es",{sensitivity:"base"});return result||String(left.id).localeCompare(String(right.id));}
-function compareOptionalAlbumDates(left,right,direction){const a=left.date_start?String(left.date_start).slice(0,10):"",b=right.date_start?String(right.date_start).slice(0,10):"";if(!a&&!b)return compareAlbumTitles(left,right);if(!a)return 1;if(!b)return-1;const result=a.localeCompare(b);return result?(direction==="asc"?result:-result):compareAlbumTitles(left,right);}
-function sortAlbums(items,mode){return[...items].sort((a,b)=>{if(mode==="album_date_asc")return compareOptionalAlbumDates(a,b,"asc");if(mode==="album_date_desc")return compareOptionalAlbumDates(a,b,"desc");if(mode==="created_asc")return String(a.created_at||"").localeCompare(String(b.created_at||""))||compareAlbumTitles(a,b);if(mode==="created_desc")return String(b.created_at||"").localeCompare(String(a.created_at||""))||compareAlbumTitles(a,b);if(mode==="title_desc")return-compareAlbumTitles(a,b);return compareAlbumTitles(a,b);});}
-function albumShareTitle(album){if(!album.is_shared_effectively)return"";if(!album.is_owner)return`Compartido por ${album.shared_by_display_name||"otro miembro"}`;if(album.visibility==="family")return"Compartido con toda la familia";const names=(album.shared_people||[]).map(person=>person.display_name).filter(Boolean);return names.length?`Compartido con ${names.join(", ")}`:"Compartido con miembros concretos";}
+    const closeMenu = event => {
+      if (event.target.closest(".od-orange-album-card__menu-wrap")) {
+        return;
+      }
+      setActiveMenuAlbum(null);
+    };
 
-export default function OrangeAlbumsView({albums,categories,members,search,onOpen,onCreate,onRename,onShare,onDelete,onSetCover,onSaveOptions,createRequestKey=0,onCreateRequestHandled}){
-  const[filter,setFilter]=useState("all"),[creating,setCreating]=useState(false),[title,setTitle]=useState(""),[selectedCategoryIds,setSelectedCategoryIds]=useState([]),[categoriesExpanded,setCategoriesExpanded]=useState(false),[sortMode,setSortMode]=useState("album_date_desc"),[activeMenuAlbum,setActiveMenuAlbum]=useState(null),[renameAlbum,setRenameAlbum]=useState(null),[shareAlbum,setShareAlbum]=useState(null),[deleteAlbum,setDeleteAlbum]=useState(null),[optionsAlbum,setOptionsAlbum]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState("");
-  useEffect(()=>{if(createRequestKey){setCreating(true);onCreateRequestHandled?.();}},[createRequestKey,onCreateRequestHandled]);
-  const visible=useMemo(()=>sortAlbums(albums.filter(album=>{if(search&&!String(album.title||"").toLowerCase().includes(search.toLowerCase()))return false;if(filter==="mine"&&!album.is_owner)return false;if(filter==="shared"&&album.is_owner)return false;if(selectedCategoryIds.length){const ids=new Set((album.categories||[]).map(category=>category.id));if(!selectedCategoryIds.some(id=>ids.has(id)))return false;}return true;}),sortMode),[albums,search,filter,selectedCategoryIds,sortMode]);
-  const run=async action=>{setBusy(true);setError("");try{return await action();}catch(actionError){setError(actionError.message);return null;}finally{setBusy(false);}};
-  const close=setter=>{if(!busy){setter(null);setError("");}};
-  const toggleCategory=id=>setSelectedCategoryIds(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id]);
-  const visibleCategories=categoriesExpanded?categories:categories.slice(0,4);
-  return <div className="od-orange-albums-view">
-    <header><div><h1 className="od-page-title">Álbumes</h1><p>{visible.length} álbumes</p></div><select className="od-filter-input od-orange-albums-view__sort" value={sortMode} onChange={event=>setSortMode(event.target.value)} aria-label="Ordenar álbumes"><option value="album_date_desc">Fecha del álbum · más reciente</option><option value="album_date_asc">Fecha del álbum · más antigua</option><option value="created_desc">Fecha de creación · más reciente</option><option value="created_asc">Fecha de creación · más antigua</option><option value="title_asc">Título · A–Z</option><option value="title_desc">Título · Z–A</option></select><button className="od-btn od-btn-primary od-orange-albums-view__create" type="button" onClick={()=>setCreating(true)}>Crear álbum</button></header>
-    <div className="od-orange-albums-view__filters"><button className={`od-filter-button${filter==="all"?" od-filter-button--active":""}`} onClick={()=>setFilter("all")}>Todos</button><button className={`od-filter-button${filter==="mine"?" od-filter-button--active":""}`} onClick={()=>setFilter("mine")}>Mis álbumes</button><button className={`od-filter-button${filter==="shared"?" od-filter-button--active":""}`} onClick={()=>setFilter("shared")}>Compartidos conmigo</button>{visibleCategories.map(category=><button key={category.id} type="button" className={`od-filter-button${selectedCategoryIds.includes(category.id)?" od-filter-button--active":""}`} onClick={()=>toggleCategory(category.id)}>{category.name}</button>)}{categories.length>4?<button type="button" className="od-filter-button od-orange-albums-view__category-more" onClick={()=>setCategoriesExpanded(value=>!value)}>{categoriesExpanded?"Ver menos":"Ver más"}</button>:null}</div>
-    <div className="od-orange-albums-view__scroller"><div className="od-orange-albums-view__grid">{visible.map(album=>{const shareTitle=albumShareTitle(album),dateLabel=formatAlbumDate(album);return <div className="od-orange-album-card" key={album.id} role="button" tabIndex="0" onClick={()=>onOpen(album)} onKeyDown={event=>{if(event.key==="Enter"||event.key===" ")onOpen(album);}}><div className="od-orange-album-card__cover">{album.cover_thumbnail_url?<img src={album.cover_thumbnail_url} alt=""/>:<span className="od-orange-album-card__placeholder">Álbum</span>}{shareTitle?<span className={`od-orange-album-card__share od-orange-album-card__share--${album.is_owner?"owned":"received"} od-orange-photo-card__share--${album.is_owner?"owned":"received"}`} title={shareTitle} aria-label={shareTitle} onClick={event=>event.stopPropagation()}><IonIcon icon={peopleOutline}/></span>:null}{album.categories?.length?<div className="od-orange-album-card__categories">{album.categories.map(category=><span key={category.id} className="od-orange-album-card__category">{category.name}</span>)}</div>:null}</div><div className="od-orange-album-card__footer"><div className="od-orange-album-card__text"><strong>{album.title}</strong><div className="od-orange-album-card__meta"><small>{album.photo_count} elementos</small>{dateLabel?<small className={`od-orange-album-card__date${dateLabel.length>20?" od-orange-album-card__date--compact":""}`} title={dateLabel}>{dateLabel}</small>:null}</div></div><div className="od-orange-album-card__menu-wrap" onKeyDown={event=>event.stopPropagation()}><button type="button" className="od-orange-album-card__menu-button" aria-label={`Acciones de ${album.title}`} onClick={event=>{event.stopPropagation();setActiveMenuAlbum(activeMenuAlbum?.id===album.id?null:album);}}><IonIcon icon={ellipsisVerticalOutline}/></button>{activeMenuAlbum?.id===album.id?<div className="od-orange-album-card__menu" onClick={event=>event.stopPropagation()}>{album.is_owner?<><button className="od-action-menu-item" type="button" onClick={()=>{setRenameAlbum(album);setTitle(album.title);setActiveMenuAlbum(null);setError("");}}>Cambiar nombre</button><button className="od-action-menu-item" type="button" onClick={()=>{setShareAlbum(album);setActiveMenuAlbum(null);setError("");}}>Compartir álbum</button><button className="od-action-menu-item" type="button" onClick={()=>{setActiveMenuAlbum(null);onSetCover(album);}}>Elegir imagen de portada</button></>:null}<button className="od-action-menu-item" type="button" onClick={()=>{setOptionsAlbum(album);setActiveMenuAlbum(null);setError("");}}>Opciones</button>{album.is_owner?<button className="od-action-menu-item od-orange-album-card__menu-danger" type="button" onClick={()=>{setDeleteAlbum(album);setActiveMenuAlbum(null);setError("");}}>Eliminar álbum</button>:null}</div>:null}</div></div></div>;})}</div></div>
-    {creating?<OrangeAlbumCreateModal categories={categories} members={members} onClose={()=>setCreating(false)} onCreate={onCreate} onCreated={album=>{setCreating(false);onOpen(album);}}/>:null}
-    {renameAlbum?<div className="od-modal-backdrop"><section className="od-modal"><form className="od-modal-body od-orange-album-form" onSubmit={async event=>{event.preventDefault();if(await run(()=>onRename(renameAlbum.id,{title:title.trim()})))setRenameAlbum(null);}}><h2 className="od-modal-title">Cambiar nombre</h2><label className="od-form-field"><span className="od-form-label">Título</span><input className="od-filter-input" value={title} onChange={event=>setTitle(event.target.value)} required/></label>{error?<p className="od-status-line od-status-line--error">{error}</p>:null}<div className="od-modal-actions"><button type="button" className="od-btn od-btn-secondary" onClick={()=>close(setRenameAlbum)}>Cancelar</button><button className="od-btn od-btn-primary" disabled={busy||!title.trim()}>Guardar</button></div></form></section></div>:null}
-    {shareAlbum?<OrangeAlbumShareModal album={shareAlbum} members={members} busy={busy} error={error} onClose={()=>close(setShareAlbum)} onSave={async body=>{if(await run(()=>onShare(shareAlbum.id,body)))setShareAlbum(null);}}/>:null}
-    {optionsAlbum?<OrangeAlbumOptionsModal album={optionsAlbum} categories={categories} busy={busy} error={error} onClose={()=>close(setOptionsAlbum)} onSave={async payload=>{const updated=await run(()=>onSaveOptions(optionsAlbum,payload));if(updated)setOptionsAlbum(null);}}/>:null}
-    {deleteAlbum?<div className="od-modal-backdrop"><section className="od-modal"><div className="od-modal-body"><h2 className="od-modal-title">Eliminar álbum</h2><p>Se eliminará el álbum, pero sus fotos permanecerán en tu biblioteca.</p>{error?<p className="od-status-line od-status-line--error">{error}</p>:null}<div className="od-modal-actions"><button className="od-btn od-btn-secondary" type="button" onClick={()=>close(setDeleteAlbum)}>Cancelar</button><button className="od-btn od-btn-danger" type="button" disabled={busy} onClick={async()=>{if(await run(()=>onDelete(deleteAlbum.id)))setDeleteAlbum(null);}}>Eliminar álbum</button></div></div></section></div>:null}
-  </div>;
+    const closeOnEscape = event => {
+      if (event.key === "Escape") {
+        setActiveMenuAlbum(null);
+      }
+    };
+
+    document.addEventListener("pointerdown", closeMenu);
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.removeEventListener("pointerdown", closeMenu);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [activeMenuAlbum]);
+  const visible = useMemo(() => {
+    const normalizedSearch = search
+      .trim()
+      .toLocaleLowerCase("es");
+
+    if (restrictedRole) {
+      const guestAlbums = albums.filter((album) => {
+        if (!normalizedSearch) {
+          return true;
+        }
+
+        return String(album.title || "")
+          .toLocaleLowerCase("es")
+          .includes(normalizedSearch);
+      });
+
+      return sortAlbums(guestAlbums, "title_asc");
+    }
+
+    const filteredAlbums = albums.filter((album) => {
+      if (
+        normalizedSearch &&
+        !String(album.title || "")
+          .toLocaleLowerCase("es")
+          .includes(normalizedSearch)
+      ) {
+        return false;
+      }
+
+      if (filter === "mine" && !album.is_owner) {
+        return false;
+      }
+
+      if (filter === "shared" && album.is_owner) {
+        return false;
+      }
+
+      if (selectedCategoryIds.length) {
+        const albumCategoryIds = new Set(
+          (album.categories || []).map(
+            (category) => category.id,
+          ),
+        );
+
+        const matchesSelectedCategory =
+          selectedCategoryIds.some((categoryId) =>
+            albumCategoryIds.has(categoryId),
+          );
+
+        if (!matchesSelectedCategory) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    return sortAlbums(filteredAlbums, sortMode);
+  }, [
+    albums,
+    search,
+    filter,
+    selectedCategoryIds,
+    sortMode,
+    restrictedRole,
+  ]);
+  const run=async action=>{setBusy(true);setError("");try{return await action();}catch(exception){setError(exception.message);return null;}finally{setBusy(false);}},close=setter=>{if(!busy){setter(null);setError("");}},visibleCategories=categoriesExpanded?categories:categories.slice(0,4);
+  return <div className="od-orange-albums-view"><header><div><h1 className="od-page-title">Álbumes</h1><p>{visible.length}{" "}{restrictedRole?(visible.length===1?"álbum compartido":"álbumes compartidos"):"álbumes"}</p></div>{canCreateAlbums?<><select className="od-filter-input od-orange-albums-view__sort" value={sortMode} onChange={event=>setSortMode(event.target.value)} aria-label="Ordenar álbumes"><option value="album_date_desc">Fecha del álbum · más reciente</option><option value="album_date_asc">Fecha del álbum · más antigua</option><option value="title_desc">Título · Z–A</option></select><button className="od-btn od-btn-primary od-orange-albums-view__create" type="button" onClick={()=>setCreating(true)}>Crear álbum</button></>:null}</header>{restrictedRole?null:<div className="od-orange-albums-view__filters">{[...[{id:"all",name:"Todos"},{id:"mine",name:"Mis álbumes"},{id:"shared",name:"Compartidos conmigo"}],...visibleCategories].map(category=><button key={category.id} type="button" className={`od-filter-button${filter===category.id||selectedCategoryIds.includes(category.id)?" od-filter-button--active":""}`} onClick={()=>category.id==="all"||category.id==="mine"||category.id==="shared"?setFilter(category.id):setSelectedCategoryIds(current=>current.includes(category.id)?current.filter(value=>value!==category.id):[...current,category.id])}>{category.name}</button>)}{categories.length>4?<button type="button" className="od-filter-button" onClick={()=>setCategoriesExpanded(value=>!value)}>{categoriesExpanded?"Ver menos":"Ver más"}</button>:null}</div>}<div className="od-orange-albums-view__scroller"><div className="od-orange-albums-view__grid">{visible.map(album=>{const title=shareTitle(album),date=formatAlbumDate(album);return <div className="od-orange-album-card" key={album.id} role="button" tabIndex="0" onClick={()=>onOpen?.(album)} onKeyDown={event=>{if(event.key==="Enter"||event.key===" ")onOpen?.(album);}}><div className="od-orange-album-card__cover">{album.cover_thumbnail_url?<img src={album.cover_thumbnail_url} alt=""/>:<span className="od-orange-album-card__placeholder">Álbum</span>}{!restrictedRole&&title?<span className="od-orange-album-card__share" title={title}><IonIcon icon={peopleOutline}/></span>:null}</div><div className="od-orange-album-card__footer"><div className="od-orange-album-card__text"><strong>{album.title}</strong><div className="od-orange-album-card__meta"><small>{album.photo_count} elementos</small>{restrictedRole&&album.owner_display_name?<small>Compartido por {album.owner_display_name}</small>:!restrictedRole&&date?<small className="od-orange-album-card__date">{date}</small>:null}</div></div>{canUseAlbumMenu?<div className="od-orange-album-card__menu-wrap"><button type="button" className="od-orange-album-card__menu-button" aria-label={`Acciones de ${album.title}`} onClick={event=>{event.stopPropagation();setActiveMenuAlbum(activeMenuAlbum?.id===album.id?null:album);}}><IonIcon icon={ellipsisVerticalOutline}/></button>{activeMenuAlbum?.id===album.id?<div className="od-orange-album-card__menu" onClick={event=>event.stopPropagation()}>{album.is_owner?<><button className="od-action-menu-item" type="button" onClick={()=>{setActiveMenuAlbum(null);setRenameAlbum(album);setTitle(album.title);}}>Cambiar nombre</button><button className="od-action-menu-item" type="button" onClick={()=>{setActiveMenuAlbum(null);setShareAlbum(album);}}>Compartir álbum</button></>:null}<button className="od-action-menu-item" type="button" onClick={()=>{setActiveMenuAlbum(null);setOptionsAlbum(album);}}>Opciones</button>{album.is_owner?<button className="od-action-menu-item od-orange-album-card__menu-danger" type="button" onClick={()=>{setActiveMenuAlbum(null);setDeleteAlbum(album);}}>Eliminar álbum</button>:null}</div>:null}</div>:null}</div></div>})}</div></div>{!restrictedRole&&creating?<OrangeAlbumCreateModal categories={categories} members={members} onClose={()=>setCreating(false)} onCreate={onCreate} onCreated={album=>{setCreating(false);onOpen?.(album);}}/>:null}{!restrictedRole&&renameAlbum?<div className="od-modal-backdrop"><section className="od-modal"><form className="od-modal-body" onSubmit={async event=>{event.preventDefault();if(await run(()=>onRename(renameAlbum.id,{title:title.trim()})))setRenameAlbum(null);}}><h2 className="od-modal-title">Cambiar nombre</h2><input className="od-filter-input" value={title} onChange={event=>setTitle(event.target.value)} required/><div className="od-modal-actions"><button type="button" className="od-btn od-btn-secondary" onClick={()=>close(setRenameAlbum)}>Cancelar</button><button className="od-btn od-btn-primary" disabled={busy}>Guardar</button></div></form></section></div>:null}{!restrictedRole&&shareAlbum?<OrangeAlbumShareModal album={shareAlbum} members={members} busy={busy} error={error} onClose={()=>close(setShareAlbum)} onSave={async body=>{if(await run(()=>onShare(shareAlbum.id,body)))setShareAlbum(null);}}/>:null}{!restrictedRole&&optionsAlbum?<OrangeAlbumOptionsModal album={optionsAlbum} categories={categories} busy={busy} error={error} onClose={()=>close(setOptionsAlbum)} onSave={async payload=>{if(await run(()=>onSaveOptions(optionsAlbum,payload)))setOptionsAlbum(null);}}/>:null}{!restrictedRole&&deleteAlbum?<div className="od-modal-backdrop"><section className="od-modal"><div className="od-modal-body"><h2 className="od-modal-title">Eliminar álbum</h2><p>Se eliminará el álbum, pero sus fotos permanecerán en tu biblioteca.</p><div className="od-modal-actions"><button className="od-btn od-btn-secondary" type="button" onClick={()=>close(setDeleteAlbum)}>Cancelar</button><button className="od-btn od-btn-danger" type="button" disabled={busy} onClick={async()=>{if(await run(()=>onDelete(deleteAlbum.id)))setDeleteAlbum(null);}}>Eliminar álbum</button></div></div></section></div>:null}</div>;
 }

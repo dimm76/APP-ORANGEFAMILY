@@ -7,9 +7,9 @@ import "./app-layout.css";
 
 const OD_NAV_EVENT = "od-spa-navigate";
 
-function navigateToDashboard(event) {
+function navigateTo(event, pathname) {
   event.preventDefault();
-  window.history.pushState({}, "", "/");
+  window.history.pushState({}, "", pathname);
   window.dispatchEvent(new Event(OD_NAV_EVENT));
 }
 
@@ -78,7 +78,7 @@ export default function AppLayout({ children }) {
           <a
             className="od-app-header-brand-link"
             href="/"
-            onClick={navigateToDashboard}
+            onClick={event => navigateTo(event, "/")}
           >
             <img
               className="od-app-header-brand"

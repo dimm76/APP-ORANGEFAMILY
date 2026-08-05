@@ -14,6 +14,8 @@ const {
 const { handleAttachmentsRoutes } = require("./src/attachmentsHttp");
 const { handleWikiRoutes } = require("./src/wikiHttp");
 const { handleOrangePhotosRoutes } = require("./src/orangePhotosHttp");
+const { handleOrangePhotoAlbumAccessRoutes } = require("./src/orangePhotoAlbumAccessHttp");
+const { handleOrangePhotosGuestRoutes } = require("./src/orangePhotosGuestHttp");
 const { handleFamilyMembersRoutes } = require("./src/familyMembersHttp");
 const { handleStorageUsageRoutes } = require("./src/storageUsageHttp");
 const { handleAppReleaseRoutes } = require("./src/appReleasesHttp");
@@ -24,6 +26,8 @@ const port = Number(process.env.PORT || 3001);
 
 app.use(express.json());
 app.use(attachAuthToRequest);
+
+handleOrangePhotosGuestRoutes(app);
 
 function sendAuthResult(res, result) {
   if (result.setCookie) res.setHeader("Set-Cookie", result.setCookie);
@@ -56,6 +60,7 @@ app.use("/api/orange-photo-members", requireFamilyModule("orange_photos"));
 
 handleAttachmentsRoutes(app);
 handleWikiRoutes(app);
+handleOrangePhotoAlbumAccessRoutes(app);
 handleOrangePhotosRoutes(app);
 handleFamilyMembersRoutes(app);
 handleStorageUsageRoutes(app);

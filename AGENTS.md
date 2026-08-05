@@ -60,6 +60,49 @@ No asumir comportamientos que puedan comprobarse revisando primero documentació
 - No romper funcionalidad existente.
 - No modificar más archivos de los estrictamente necesarios.
 
+## Formato, estructura y legibilidad del código
+
+Todo código modificado o creado debe quedar estructurado, indentado y legible de forma profesional.
+
+Reglas obligatorias:
+
+- No comprimir manualmente código fuente.
+- No concatenar múltiples declaraciones, instrucciones, estados React o funciones en una sola línea.
+- No escribir árboles JSX completos en una sola línea.
+- Cada bloque debe reflejar visualmente su jerarquía mediante indentación consistente.
+- Los imports con varios elementos deben dividirse en varias líneas cuando no resulten claramente legibles.
+- Los arrays y objetos complejos deben estructurarse en varias líneas.
+- Las funciones con varias operaciones deben usar bloques multilínea.
+- Cada `useState` debe declararse de forma independiente y legible.
+- Las props JSX deben dividirse en varias líneas cuando el elemento sea largo o contenga lógica.
+- Los callbacks complejos no deben quedar incrustados en una única línea de JSX.
+- Los ternarios anidados deben evitarse o formatearse de forma que cada condición sea inequívoca.
+- No realizar minificación manual en archivos fuente.
+- No conservar código deliberadamente condensado solo porque ya existía así.
+
+Cuando un archivo autorizado esté severamente condensado y esto impida modificarlo con seguridad:
+
+1. El agente puede formatear exclusivamente ese archivo.
+2. El formateo debe conservar exactamente el comportamiento existente.
+3. No debe aprovechar el formateo para refactorizar, renombrar o alterar lógica.
+4. No debe modificar archivos fuera del scope.
+5. Debe distinguir en el informe final entre cambio funcional y cambio exclusivamente estructural.
+6. Debe comprobar que el archivo sigue guardado como UTF-8 sin BOM.
+7. Debe ejecutar ESLint, build y `git diff --check` cuando correspondan.
+
+Los comentarios deben explicar decisiones, restricciones, invariantes o comportamientos no evidentes.
+
+No añadir comentarios que se limiten a repetir literalmente lo que hace la siguiente línea.
+
+Si no existe un formateador configurado en el repositorio:
+
+- mantener manualmente un formato profesional y consistente;
+- no añadir Prettier, Biome u otra dependencia sin autorización expresa;
+- no rechazar una modificación únicamente porque el archivo esté condensado;
+- formatear primero el archivo autorizado y aplicar después el cambio solicitado.
+
+Un archivo no puede considerarse terminado si la lógica funciona pero queda comprimido, desestructurado o difícil de revisar.
+
 ## Reglas visuales
 
 Antes de tocar cualquier archivo de interfaz, estilos, componentes visuales, modales, tablas, badges, botones, inputs, selects, popovers, menús contextuales o layouts, el agente debe leer y aplicar:
@@ -137,6 +180,81 @@ Antes de escribir código, el agente debe identificar brevemente:
 - qué queda explícitamente fuera de scope.
 
 Si no puede determinar alguno de estos puntos con seguridad, debe parar y pedir aclaración.
+
+## Ejecución de instrucciones preparadas para Codex y Cursor
+
+Cuando el usuario entregue una instrucción preparada expresamente para Codex o Cursor, el agente debe tratarla como un encargo de ejecución dirigido.
+
+La instrucción debe definir previamente:
+
+- el objetivo funcional;
+- el alcance exacto;
+- los archivos autorizados;
+- los bloques que deben modificarse;
+- el cambio que debe aplicarse;
+- las restricciones arquitectónicas;
+- las áreas explícitamente fuera de scope;
+- los checks obligatorios;
+- si se permite o no commit y push.
+
+El agente debe ejecutar el cambio indicado respetando la implementación real del repositorio.
+
+El agente puede:
+
+- localizar dentro del archivo autorizado el bloque descrito en la instrucción;
+- adaptar únicamente detalles sintácticos mínimos cuando el código indicado no pueda insertarse literalmente;
+- mantener imports, nombres y convenciones ya existentes;
+- corregir errores de sintaxis, ESLint, compilación o tipado causados directamente por el cambio solicitado;
+- informar de una incompatibilidad técnica real antes de alterar la solución indicada.
+
+El agente no debe:
+
+- volver a investigar el problema funcional;
+- rediseñar la solución;
+- reinterpretar el objetivo;
+- decidir un alcance diferente;
+- modificar archivos no autorizados;
+- ampliar el cambio para resolver problemas adyacentes;
+- cambiar arquitectura;
+- cambiar contratos de API;
+- añadir dependencias;
+- crear endpoints, tablas, componentes, helpers, hooks o abstracciones no indicados;
+- realizar refactorizaciones generales;
+- aplicar mejoras opcionales;
+- sustituir la solución indicada por otra diferente;
+- usar el encargo para limpiar o modernizar código no relacionado;
+- hacer commit o push salvo autorización expresa.
+
+Cuando el código indicado no coincida literalmente con el archivo actual, el agente debe:
+
+1. localizar el bloque funcional equivalente dentro del archivo autorizado;
+2. mantener exactamente el objetivo y el comportamiento solicitado;
+3. aplicar la adaptación mínima necesaria;
+4. no modificar otros bloques;
+5. explicar la adaptación en el informe final.
+
+El agente solo debe detenerse cuando:
+
+- el bloque indicado no exista;
+- el archivo real contradiga materialmente la instrucción;
+- el cambio requiera modificar un archivo no autorizado;
+- falte una decisión funcional que altere significativamente la implementación;
+- exista riesgo real de pérdida o corrupción de datos;
+- el cambio requiera una migración, dependencia o modificación arquitectónica no autorizada.
+
+En ese caso debe indicar exactamente:
+
+- archivo;
+- función o bloque;
+- contradicción o impedimento;
+- evidencia técnica;
+- cambio adicional imprescindible;
+- parte ya aplicada;
+- parte pendiente.
+
+No es válido responder únicamente que el cambio no puede realizarse “de forma segura”.
+
+No debe presentar alternativas ni recomendaciones generales salvo que la instrucción las solicite expresamente.
 
 ## Funcionalidad completa frente a soporte parcial
 

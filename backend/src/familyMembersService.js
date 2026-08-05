@@ -2,6 +2,7 @@ const pool = require("../db");
 const { createPasswordResetForUser, createSecureToken, hashToken } = require("./auth");
 const { sendActivationEmail, sendPasswordResetEmail } = require("./mailService");
 const { FAMILY_MODULES, normalizeModuleAccess } = require("./moduleAccess");
+const FAMILY_MEMBER_ROLES = Object.freeze(["member", "guest"]);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ok = (payload = {}) => ({ ok: true, payload });
@@ -17,9 +18,7 @@ function resolveOwner(req) {
 
 function normalizeInput(body, partial = false) {
   const value = body && typeof body === "object" ? body : {};
-  const allowed = new Set(partial
-    ? ["first_name", "last_name", "email", "membership_status", "has_access", "module_access"]
-    : ["first_name", "last_name", "email"]);
+  const allowed = new Set(partial ? ["first_name", "last_name", "email", "membership_status", "has_access", "module_access", "role"] : ["first_name", "last_name", "email", "role", "module_access"]);
   if (Object.keys(value).some((key) => !allowed.has(key))) return bad(400, "El formulario contiene campos no permitidos.");
   const result = {};
   if (!partial || Object.hasOwn(value, "first_name")) {
@@ -42,7 +41,11 @@ function normalizeInput(body, partial = false) {
     if (!["active", "inactive"].includes(value.membership_status)) return bad(400, "El estado del familiar no es válido.");
     result.membership_status = value.membership_status;
   }
-  if (partial && Object.hasOwn(value, "module_access")) {
+  if (!partial || Object.hasOwn(value, "role")) {
+    result.role = String(value.role || "member").trim();
+    if (!FAMILY_MEMBER_ROLES.includes(result.role)) return bad(400, "El rol seleccionado no es válido.");
+  }
+  if (Object.hasOwn(value, "module_access")) {
     if (!value.module_access || typeof value.module_access !== "object" || Array.isArray(value.module_access)) {
       return bad(400, "Los permisos de módulos deben ser un objeto.");
     }
@@ -52,7 +55,7 @@ function normalizeInput(body, partial = false) {
     if (Object.values(value.module_access).some((item) => typeof item !== "boolean")) {
       return bad(400, "Todos los permisos de módulos deben ser booleanos.");
     }
-    result.module_access = normalizeModuleAccess(value.module_access, "member");
+    result.module_access = normalizeModuleAccess(value.module_access, result.role || String(value.role || "member"));
   }
   if (!partial && !result.email) return bad(400, "El email es obligatorio.");
   return { ok: true, value: result };
@@ -86,6 +89,7 @@ async function activationToken(queryable, userId) {
 
 function dbError(error) {
   if (error?.code === "23505") return bad(409, "Ya existe una cuenta con ese email.");
+  if (error?.code === "23514" && (error?.constraint === "family_memberships_role_check" || String(error?.detail || "").includes("family_memberships") || String(error?.message || "").includes("family_memberships"))) return bad(409, "El rol Invitado todavía no está habilitado en la base de datos.");
   return bad(503, "No se pudo completar la operación.");
 }
 
@@ -96,11 +100,12 @@ async function create(req, body) {
   try {
     await client.query("BEGIN");
     const person = await client.query(`INSERT INTO public.persons(first_name,last_name) VALUES($1,$2) RETURNING id`, [input.value.first_name, input.value.last_name]);
-    const moduleAccess = normalizeModuleAccess({ orange_photos: true }, "member");
-    await client.query(`INSERT INTO public.family_memberships(family_id,person_id,role,status,module_access) VALUES($1,$2,'member','active',$3::jsonb)`, [owner.familyId, person.rows[0].id, JSON.stringify(moduleAccess)]);
+    const role = input.value.role || "member";
+    const moduleAccess = normalizeModuleAccess(input.value.module_access || { orange_photos: true }, role);
+    await client.query(`INSERT INTO public.family_memberships (family_id,person_id,role,status,module_access) VALUES ($1::uuid,$2::uuid,$3,'active',$4::jsonb)`, [owner.familyId, person.rows[0].id, role, JSON.stringify(moduleAccess)]);
     const user = await client.query(`INSERT INTO public.auth_users(person_id,email,status,password_hash,email_verified) VALUES($1,$2,'pending',NULL,false) RETURNING id`, [person.rows[0].id, input.value.email]);
     token = await activationToken(client, user.rows[0].id);
-    await audit(client, owner, "family_member_created", person.rows[0].id, null, { first_name: input.value.first_name, last_name: input.value.last_name, email: input.value.email, module_access: moduleAccess });
+    await audit(client, owner, "family_member_created", person.rows[0].id, null, { first_name: input.value.first_name, last_name: input.value.last_name, email: input.value.email, role, module_access: moduleAccess });
     row = (await client.query(`${selectMembers} WHERE fm.family_id=$1 AND p.id=$2`, [owner.familyId, person.rows[0].id])).rows[0];
     await client.query("COMMIT");
   } catch (error) {
@@ -141,10 +146,13 @@ async function update(req, personId, body) {
     if (before.role === "owner" || before.person_id === owner.personId) { await client.query("ROLLBACK"); return bad(403, "No se puede modificar al administrador."); }
     const nextEmail = Object.hasOwn(input.value, "email") ? input.value.email : before.email;
     const nextAccess = Object.hasOwn(input.value, "has_access") ? input.value.has_access : before.has_access;
+    const nextRole = Object.hasOwn(input.value, "role") ? input.value.role : before.role;
+    const requestedModuleAccess = Object.hasOwn(input.value, "module_access") ? input.value.module_access : before.module_access;
+    const nextModuleAccess = normalizeModuleAccess(requestedModuleAccess, nextRole);
     if (nextAccess && !nextEmail) { await client.query("ROLLBACK"); return bad(400, "El email es obligatorio para permitir acceso."); }
     await client.query(`UPDATE public.persons SET first_name=COALESCE($2,first_name),last_name=CASE WHEN $3 THEN $4 ELSE last_name END WHERE id=$1`, [personId, input.value.first_name || null, Object.hasOwn(input.value, "last_name"), input.value.last_name || null]);
     if (input.value.membership_status) await client.query(`UPDATE public.family_memberships SET status=$3 WHERE family_id=$1 AND person_id=$2`, [owner.familyId, personId, input.value.membership_status]);
-    if (input.value.module_access) await client.query(`UPDATE public.family_memberships SET module_access=$3::jsonb WHERE family_id=$1::uuid AND person_id=$2::uuid`, [owner.familyId, personId, JSON.stringify(input.value.module_access)]);
+    await client.query(`UPDATE public.family_memberships SET role=$3,module_access=$4::jsonb WHERE family_id=$1::uuid AND person_id=$2::uuid`, [owner.familyId, personId, nextRole, JSON.stringify(nextModuleAccess)]);
     if (!before.auth_user_id && nextAccess) {
       const user = await client.query(`INSERT INTO public.auth_users(person_id,email,status,password_hash,email_verified) VALUES($1,$2,'pending',NULL,false) RETURNING id`, [personId, nextEmail]);
       token = await activationToken(client, user.rows[0].id);
@@ -164,7 +172,7 @@ async function update(req, personId, body) {
       }
     }
     after = await getMember(client, owner, personId);
-    await audit(client, owner, "family_member_updated", personId, { first_name: before.first_name, last_name: before.last_name, email: before.email, membership_status: before.membership_status, has_access: before.has_access, module_access: normalizeModuleAccess(before.module_access, before.role) }, { first_name: after.first_name, last_name: after.last_name, email: after.email, membership_status: after.membership_status, has_access: after.has_access, module_access: normalizeModuleAccess(after.module_access, after.role) });
+    await audit(client, owner, "family_member_updated", personId, { first_name: before.first_name, last_name: before.last_name, email: before.email, role: before.role, membership_status: before.membership_status, has_access: before.has_access, module_access: normalizeModuleAccess(before.module_access, before.role) }, { first_name: after.first_name, last_name: after.last_name, email: after.email, role: after.role, membership_status: after.membership_status, has_access: after.has_access, module_access: normalizeModuleAccess(after.module_access, after.role) });
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});

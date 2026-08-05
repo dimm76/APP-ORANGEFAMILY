@@ -52,6 +52,18 @@ const ROUTES = {
 function currentPathname() {
   return window.location.pathname.replace(/\/$/, "") || "/";
 }
+function isGuestAllowedPath(pathname) {
+  return pathname === "/app/orangephotos/albums" || /^\/app\/orangephotos\/albums\/[^/]+$/.test(pathname);
+}
+function legacyGuestTarget(pathname) {
+  if (pathname === "/guest") return "/app/orangephotos/albums";
+  const prefix = "/guest/orangephotos/albums/";
+  if (pathname.startsWith(prefix)) {
+    const albumId = pathname.slice(prefix.length);
+    return albumId ? `/app/orangephotos/albums/${albumId}` : "/app/orangephotos/albums";
+  }
+  return null;
+}
 
 function ModulePlaceholder({ title, description }) {
   return (
@@ -72,6 +84,7 @@ function AppContent() {
   const [pathname, setPathname] = useState(currentPathname);
   const { user } = useAuth();
   const isOwner = user?.families?.some((family) => family.role === "owner");
+  const guestRole = user?.families?.[0]?.role === "guest";
 
   useEffect(() => {
     const syncPathname = () => setPathname(currentPathname());
@@ -82,6 +95,12 @@ function AppContent() {
       window.removeEventListener(OD_NAV_EVENT, syncPathname);
     };
   }, []);
+  useEffect(() => {
+    if (!guestRole || isGuestAllowedPath(pathname)) return;
+    window.history.replaceState({}, "", "/app/orangephotos/albums");
+    window.dispatchEvent(new Event(OD_NAV_EVENT));
+  }, [guestRole, pathname]);
+  if(guestRole && !isGuestAllowedPath(pathname)) return null;
 
   const route = ROUTES[pathname] || ROUTES["/"];
 
@@ -103,9 +122,11 @@ function AppContent() {
     </AppLayout>
   );
 }
-
 function App() {
   const pathname = currentPathname();
+  const legacyTarget = legacyGuestTarget(pathname);
+  if(legacyTarget){window.history.replaceState({},"",legacyTarget);return <AuthGate><AppContent /></AuthGate>;}
+  if(pathname.startsWith("/guest-invitations/")) return <div className="od-page"><div className="od-page-inner"><h1 className="od-page-title">Invitación no válida</h1><p className="od-status-line od-status-line--error">Esta invitación pertenece al sistema anterior. Solicita al administrador una nueva invitación.</p></div></div>;
   if (pathname.startsWith("/public/wiki/")) {
     const token = decodeURIComponent(pathname.slice("/public/wiki/".length)).trim();
     return <WikiPublicPage token={token} />;

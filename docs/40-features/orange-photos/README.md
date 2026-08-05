@@ -1,5 +1,23 @@
 # OrangePhotos
 
+## Estado final de invitados externos — Fase 1
+
+Los invitados externos son `auth_users` normales sin `family_membership`. El acceso se concede exclusivamente mediante grants por álbum. Las invitaciones se gestionan desde Compartir álbum, usan tokens hasheados, caducan a los siete días, requieren coincidencia exacta de email y pueden revocarse.
+
+La Fase 1 incluye landing de invitado, grid, viewer, descarga autenticada y paginación. No incluye subida de fotos ni comentarios.
+
+Migración pendiente: `docs/30-database/migration/20260803140000_orange_photo_album_external_guests.sql`.
+
+No ejecutar la migración hasta la revisión final y el merge coordinado.
+
+## Invitados externos — Fase 1
+
+El acceso público continúa siendo de lectura y descarga. Los miembros familiares se autorizan mediante `family_memberships`; los invitados externos son cuentas de autenticación normales sin membresía familiar y reciben un grant explícito por álbum. No existe `role='guest'` en `family_memberships`.
+
+Las invitaciones usan tokens aleatorios almacenados únicamente como SHA-256, caducan a los siete días y pueden revocarse. Los permisos `can_view`, `can_contribute` y `can_comment` son independientes, aunque ver siempre queda activo cuando se concede otra capacidad.
+
+La Fase 1 deja pendiente la creación automática de cuentas, envío de correo, subida de fotos, comentarios, autoría de aportaciones y política de eliminación. Las rutas de invitación y acceso invitado deben permanecer protegidas por Node y ownership/grants; no se devuelven `token_hash`, `storage_key` ni datos de familia.
+
 OrangePhotos es la biblioteca privada de fotografías y vídeos de OrangeFamily. Cada elemento pertenece a una familia y a un usuario propietario; admite álbumes, etiquetas, papelera reversible y visibilidad `private`, `family` o `selected`.
 
 ## Entidades

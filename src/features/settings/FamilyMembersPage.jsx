@@ -1,10 +1,21 @@
-import { useEffect, useState } from "react";
-import { IonBadge } from "@ionic/react";
+import { Fragment, useEffect, useState } from "react";
+import { IonBadge, IonIcon } from "@ionic/react";
+import {
+  addOutline,
+  chatbubblesOutline,
+  chevronDownOutline,
+  chevronUpOutline,
+  eyeOutline,
+  imageOutline,
+} from "ionicons/icons";
+
+/* eslint-disable react-hooks/set-state-in-effect */
 import {
   createFamilyMember,
+  listExternalGuests,
   listFamilyMembers,
-  resendInvitation,
-  sendMemberPasswordReset,
+  revokeFamilyGuestAlbumAccess,
+  revokeGuestAlbumGrant,
   updateFamilyMember,
 } from "./familyMembersApi.js";
 import "./familyMembers.css";
@@ -17,297 +28,428 @@ const MODULES = [
   ["finances", "Finanzas"],
 ];
 
+const ROLE_ORDER = {
+  owner: 0,
+  member: 1,
+  guest: 2,
+};
+
 const emptyModuleAccess = Object.fromEntries(
-  MODULES.map(([key]) => [key, false])
+  MODULES.map(([key]) => [key, false]),
 );
+
 const emptyForm = {
   first_name: "",
   last_name: "",
   email: "",
-  module_access: emptyModuleAccess,
+  role: "member",
+  module_access: {
+    ...emptyModuleAccess,
+    orange_photos: true,
+  },
 };
 
-function readableStatus(item) {
-  if (item.role === "owner") return "Activo";
-  if (item.membership_status === "inactive") return "Inactivo";
-  if (item.auth_status === "pending") return "Pendiente de activación";
-  if (item.auth_status === "active") return "Activo";
-  if (item.auth_status === "disabled") return "Acceso desactivado";
-  return "Sin acceso";
+function GuestPermissionIcon({
+  icon,
+  active,
+  label,
+  withAdd = false,
+}) {
+  return (
+    <span
+      className={`of-family-guest-permission ${
+        active
+          ? "of-family-guest-permission--active"
+          : "of-family-guest-permission--inactive"
+      }`}
+      title={label}
+      aria-label={label}
+    >
+      <IonIcon icon={icon} />
+
+      {withAdd ? (
+        <IonIcon
+          className="of-family-guest-permission__add"
+          icon={addOutline}
+        />
+      ) : null}
+    </span>
+  );
 }
+
+const roleLabel = (role) => {
+  if (role === "owner" || role === "admin") {
+    return "Propietario";
+  }
+
+  return role === "guest" ? "Invitado" : "Familiar";
+};
+
+const roleBadge = (role) => {
+  if (role === "guest") {
+    return "od-badge--style-7";
+  }
+
+  return role === "owner" || role === "admin"
+    ? "od-badge--style-3"
+    : "od-badge--style-2";
+};
+
+const displayName = (item) =>
+  [
+    item.preferred_name,
+    item.display_name,
+    item.first_name,
+    item.last_name,
+  ]
+    .filter(Boolean)
+    .join(" ") ||
+  item.email ||
+  "";
 
 export default function FamilyMembersPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
   const [message, setMessage] = useState("");
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState({
+    ...emptyForm,
+    module_access: {
+      ...emptyForm.module_access,
+    },
+  });
   const [saving, setSaving] = useState(false);
-  const [modalError, setModalError] = useState("");
+  const [expandedGuestIds, setExpandedGuestIds] = useState(
+    () => new Set(),
+  );
+  const [revokingGrantId, setRevokingGrantId] = useState("");
+  const [guestAccessError, setGuestAccessError] = useState("");
 
-  async function load() {
+  const load = async () => {
     setLoading(true);
     setError("");
+
     try {
-      setItems((await listFamilyMembers()).items || []);
+      const [membersResult, guestsResult] = await Promise.all([
+        listFamilyMembers(),
+        listExternalGuests(),
+      ]);
+
+      const guestsByUserId = new Map(
+        (guestsResult.items || [])
+          .map((guest) => [
+            String(guest.auth_user_id || guest.user_id || ""),
+            guest,
+          ])
+          .filter(([userId]) => userId),
+      );
+
+      const mergedItems = (membersResult.items || []).map(
+        (member) => {
+          const userId = String(
+            member.auth_user_id || member.user_id || "",
+          );
+          const guestSummary = userId
+            ? guestsByUserId.get(userId)
+            : null;
+
+          return {
+            ...member,
+            guest_albums:
+              member.role === "guest"
+                ? guestSummary?.albums || guestSummary?.grants || []
+                : [],
+          };
+        },
+      );
+
+      mergedItems.sort((left, right) => {
+        const roleDifference =
+          (ROLE_ORDER[left.role] ?? 99) -
+          (ROLE_ORDER[right.role] ?? 99);
+
+        if (roleDifference) {
+          return roleDifference;
+        }
+
+        const leftName = [left.first_name, left.last_name]
+          .filter(Boolean)
+          .join(" ");
+        const rightName = [right.first_name, right.last_name]
+          .filter(Boolean)
+          .join(" ");
+
+        return leftName.localeCompare(rightName, "es", {
+          sensitivity: "base",
+        });
+      });
+
+      setItems(mergedItems);
     } catch (loadError) {
       setError(loadError.message);
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    let cancelled = false;
-    listFamilyMembers()
-      .then((result) => {
-        if (!cancelled) setItems(result.items || []);
-      })
-      .catch((loadError) => {
-        if (!cancelled) setError(loadError.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    void load();
   }, []);
 
-  function openCreate() {
-    setEditing("new");
-    setForm(emptyForm);
-    setModalError("");
-    setMessage("");
-  }
+  const getItemKey = (item) =>
+    String(
+      item.person_id ||
+        item.auth_user_id ||
+        item.user_id ||
+        item.email,
+    );
 
-  function closeCreate() {
-    setEditing(null);
-    setForm(emptyForm);
-    setModalError("");
-  }
+  const toggleGuestAccess = (item) => {
+    setExpandedGuestIds((current) => {
+      const next = new Set(current);
+      const key = getItemKey(item);
 
-  function openEdit(item) {
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+
+      return next;
+    });
+  };
+
+  const openEdit = (item) => {
+    setFormError("");
     setEditing(item.person_id);
     setForm({
       first_name: item.first_name,
       last_name: item.last_name || "",
       email: item.email || "",
+      role: item.role || "member",
       has_access: item.has_access,
       membership_status: item.membership_status,
-      module_access: { ...emptyModuleAccess, ...item.module_access },
+      module_access: {
+        ...emptyModuleAccess,
+        ...item.module_access,
+      },
     });
-    setMessage("");
-    setError("");
-  }
+  };
 
-  async function submitCreate(event) {
+  const setRole = (role) => {
+    setForm((current) => ({
+      ...current,
+      role,
+      module_access:
+        role === "guest"
+          ? {
+              ...emptyModuleAccess,
+              orange_photos: true,
+            }
+          : current.module_access,
+    }));
+  };
+
+  const submit = async (event) => {
     event.preventDefault();
+    setFormError("");
     setSaving(true);
-    setModalError("");
+
     try {
-      const result = await createFamilyMember({
+      const payload = {
         first_name: form.first_name,
         last_name: form.last_name,
         email: form.email,
-      });
-      closeCreate();
-      setMessage(
-        result.invitation_sent === false
-          ? "Familiar guardado, pero la invitación no pudo enviarse."
-          : "Familiar guardado e invitación procesada."
-      );
-      await load();
-    } catch (createError) {
-      setModalError(createError.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function submitEdit(event) {
-    event.preventDefault();
-    setSaving(true);
-    setError("");
-    try {
-      const result = await updateFamilyMember(editing, {
-        first_name: form.first_name,
-        last_name: form.last_name,
-        email: form.email,
-        has_access: form.has_access,
-        membership_status: form.membership_status,
+        role: form.role,
         module_access: form.module_access,
-      });
+      };
+
+      const result =
+        editing === "new"
+          ? await createFamilyMember(payload)
+          : await updateFamilyMember(editing, {
+              ...payload,
+              has_access: form.has_access,
+              membership_status: form.membership_status,
+            });
+
       setMessage(
         result.invitation_sent === false
-          ? "Familiar guardado, pero la invitación no pudo enviarse."
-          : "Familiar guardado."
+          ? "Usuario guardado, pero el email no pudo enviarse."
+          : "Usuario guardado.",
       );
       setEditing(null);
-      setForm(emptyForm);
+      setForm({
+        ...emptyForm,
+        module_access: {
+          ...emptyForm.module_access,
+        },
+      });
       await load();
-    } catch (updateError) {
-      setError(updateError.message);
+    } catch (saveError) {
+      setFormError(
+        saveError.message || "No se pudo guardar el usuario.",
+      );
     } finally {
       setSaving(false);
     }
-  }
+  };
 
-  async function action(callback, success) {
-    setError("");
-    setMessage("");
-    try {
-      await callback();
-      setMessage(success);
-      await load();
-    } catch (actionError) {
-      setError(actionError.message);
+  const revokeAlbumAccess = async (item, grant) => {
+    const grantId = grant.grant_id || null;
+    const albumId = grant.album_id;
+    const guestUserId = grant.user_id || item.auth_user_id;
+
+    if (
+      !albumId ||
+      (!grantId && !guestUserId) ||
+      revokingGrantId
+    ) {
+      return;
     }
-  }
+
+    const albumTitle =
+      grant.album_title ||
+      grant.title ||
+      grant.name ||
+      "este álbum";
+
+    const confirmed = window.confirm(
+      `¿Revocar el acceso de este invitado a «${albumTitle}»?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const revokeKey = grantId
+      ? `grant:${grantId}`
+      : `family:${albumId}:${guestUserId}`;
+
+    setGuestAccessError("");
+    setRevokingGrantId(revokeKey);
+
+    const previousItems = items;
+    const itemKey = getItemKey(item);
+
+    setItems((current) =>
+      current.map((currentItem) => {
+        if (getItemKey(currentItem) !== itemKey) {
+          return currentItem;
+        }
+
+        return {
+          ...currentItem,
+          guest_albums: (
+            currentItem.guest_albums || []
+          ).filter((currentGrant) => {
+            if (grantId) {
+              return (
+                String(currentGrant.grant_id || "") !==
+                String(grantId)
+              );
+            }
+
+            return !(
+              String(currentGrant.album_id) ===
+                String(albumId) &&
+              String(
+                currentGrant.user_id ||
+                  currentItem.auth_user_id,
+              ) === String(guestUserId)
+            );
+          }),
+        };
+      }),
+    );
+
+    try {
+      if (grantId) {
+        await revokeGuestAlbumGrant(albumId, grantId);
+      } else {
+        await revokeFamilyGuestAlbumAccess(
+          albumId,
+          guestUserId,
+        );
+      }
+    } catch (revokeError) {
+      setItems(previousItems);
+      setGuestAccessError(
+        revokeError.message ||
+          "No se pudo revocar el acceso al álbum.",
+      );
+    } finally {
+      setRevokingGrantId("");
+    }
+  };
+
+  const close = () => {
+    if (saving) {
+      return;
+    }
+
+    setEditing(null);
+    setFormError("");
+  };
 
   return (
     <div className="od-page">
       <div className="od-page-inner od-page-inner--full od-page-inner--align-stretch">
         <div className="od-page-header">
           <div>
-            <h1 className="od-page-title">Ajustes · Familiares</h1>
+            <h1 className="od-page-title">
+              Ajustes · Familiares
+            </h1>
             <p className="od-page-subtitle">
-              Configura el acceso de cada familiar a OrangeFamily y sus módulos.
+              Configura los usuarios, roles y accesos de
+              OrangeFamily.
             </p>
           </div>
+
           <button
             type="button"
-            className="od-modal-primary of-family-add-button"
-            onClick={openCreate}
+            className="od-btn od-btn-primary of-family-add-button"
+            onClick={() => {
+              setError("");
+              setFormError("");
+              setEditing("new");
+              setForm({
+                ...emptyForm,
+                module_access: {
+                  ...emptyForm.module_access,
+                },
+              });
+            }}
           >
-            + Añadir familiar
+            + Añadir usuario
           </button>
         </div>
 
         {error ? (
-          <p className="od-status-line od-status-line--error" role="alert">
+          <p className="od-status-line od-status-line--error">
             {error}
           </p>
         ) : null}
-        {message ? <p className="od-status-line">{message}</p> : null}
 
-        {editing && editing !== "new" ? (
-          <form className="of-family-form" onSubmit={submitEdit}>
-            <div className="of-family-form__grid">
-              <label className="od-form-field">
-                <span className="od-form-label">Nombre *</span>
-                <input
-                  className="od-filter-input"
-                  required
-                  maxLength="120"
-                  value={form.first_name}
-                  onChange={(event) =>
-                    setForm({ ...form, first_name: event.target.value })
-                  }
-                />
-              </label>
-              <label className="od-form-field">
-                <span className="od-form-label">Apellidos</span>
-                <input
-                  className="od-filter-input"
-                  maxLength="160"
-                  value={form.last_name}
-                  onChange={(event) =>
-                    setForm({ ...form, last_name: event.target.value })
-                  }
-                />
-              </label>
-              <label className="od-form-field">
-                <span className="od-form-label">Email</span>
-                <input
-                  className="od-filter-input"
-                  type="email"
-                  required={form.has_access}
-                  value={form.email}
-                  onChange={(event) =>
-                    setForm({ ...form, email: event.target.value })
-                  }
-                />
-              </label>
-              <label className="od-form-field">
-                <span className="od-form-label">Estado</span>
-                <select
-                  className="od-filter-select"
-                  value={form.membership_status}
-                  onChange={(event) =>
-                    setForm({
-                      ...form,
-                      membership_status: event.target.value,
-                    })
-                  }
-                >
-                  <option value="active">Activo</option>
-                  <option value="inactive">Inactivo</option>
-                </select>
-              </label>
-            </div>
+        {message ? (
+          <p className="od-status-line">{message}</p>
+        ) : null}
 
-            <label className="of-family-form__check">
-              <input
-                type="checkbox"
-                checked={form.has_access}
-                onChange={(event) =>
-                  setForm({ ...form, has_access: event.target.checked })
-                }
-              />
-              Permitir acceso a OrangeFamily
-            </label>
-
-            <fieldset className="of-family-modules">
-              <legend className="od-form-label">Acceso a módulos</legend>
-              <div className="of-family-modules__grid">
-                {MODULES.map(([key, label]) => (
-                  <label className="of-family-form__check" key={key}>
-                    <input
-                      type="checkbox"
-                      disabled={!form.has_access}
-                      checked={form.module_access[key]}
-                      onChange={(event) =>
-                        setForm({
-                          ...form,
-                          module_access: {
-                            ...form.module_access,
-                            [key]: event.target.checked,
-                          },
-                        })
-                      }
-                    />
-                    {label}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-
-            <div className="od-modal-actions">
-              <button
-                type="button"
-                className="od-button-secondary"
-                onClick={() => {
-                  setEditing(null);
-                  setForm(emptyForm);
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="od-modal-primary"
-                disabled={saving}
-              >
-                {saving ? "Guardando…" : "Guardar"}
-              </button>
-            </div>
-          </form>
+        {guestAccessError ? (
+          <p
+            className="od-status-line od-status-line--error"
+            role="alert"
+          >
+            {guestAccessError}
+          </p>
         ) : null}
 
         {loading ? (
-          <p className="od-status-line">Cargando familiares…</p>
+          <p className="od-status-line">
+            Cargando familiares…
+          </p>
         ) : (
           <div className="od-table-wrap">
             <table className="od-table od-table--fill">
@@ -321,88 +463,225 @@ export default function FamilyMembersPage() {
                   <th>Acciones</th>
                 </tr>
               </thead>
+
               <tbody>
                 {items.map((item) => {
-                  const allowedModules = MODULES.filter(
-                    ([key]) => item.module_access?.[key]
-                  );
+                  const itemKey = getItemKey(item);
+                  const isGuest = item.role === "guest";
+                  const isExpanded =
+                    expandedGuestIds.has(itemKey);
+                  const guestAlbums = Array.isArray(
+                    item.guest_albums,
+                  )
+                    ? item.guest_albums
+                    : [];
+
                   return (
-                    <tr key={item.person_id}>
-                      <td>
-                        {[item.first_name, item.last_name]
-                          .filter(Boolean)
-                          .join(" ")}
-                      </td>
-                      <td>{item.email || "—"}</td>
-                      <td>
-                        <IonBadge className="od-badge od-badge--style-1">
-                          {item.role === "owner"
-                            ? "Administrador"
-                            : "Familiar"}
-                        </IonBadge>
-                      </td>
-                      <td>{readableStatus(item)}</td>
-                      <td>
-                        {allowedModules.length ? (
-                          <span className="of-family-module-badges">
-                            {allowedModules.map(([key, label]) => (
-                              <IonBadge
-                                key={key}
-                                className="od-badge-compact od-badge--style-6"
-                              >
-                                {label}
-                              </IonBadge>
-                            ))}
-                          </span>
-                        ) : (
-                          "Sin módulos"
-                        )}
-                      </td>
-                      <td>
-                        {item.role === "owner" ? (
-                          "—"
-                        ) : (
-                          <div className="of-family-actions">
-                            <button
-                              type="button"
-                              className="od-button-secondary"
-                              onClick={() => openEdit(item)}
-                            >
-                              Editar
-                            </button>
-                            {item.auth_status === "pending" ? (
+                    <Fragment key={itemKey}>
+                      <tr>
+                        <td>{displayName(item) || "—"}</td>
+                        <td>{item.email || "—"}</td>
+                        <td>
+                          <IonBadge
+                            className={`od-badge ${roleBadge(
+                              item.role,
+                            )}`}
+                          >
+                            {roleLabel(item.role)}
+                          </IonBadge>
+                        </td>
+                        <td>
+                          {item.membership_status === "inactive"
+                            ? "Inactivo"
+                            : item.auth_status === "pending"
+                              ? "Pendiente de activación"
+                              : item.auth_status === "active"
+                                ? "Activo"
+                                : "Sin acceso"}
+                        </td>
+                        <td>
+                          {MODULES.filter(
+                            ([key]) =>
+                              item.module_access?.[key],
+                          )
+                            .map(([, label]) => label)
+                            .join(", ") || "Sin módulos"}
+                        </td>
+                        <td>
+                          {item.role === "owner" ? (
+                            "—"
+                          ) : (
+                            <div className="of-family-row-actions">
                               <button
                                 type="button"
-                                className="od-button-secondary"
-                                onClick={() =>
-                                  void action(
-                                    () => resendInvitation(item.person_id),
-                                    "Invitación procesada."
-                                  )
-                                }
+                                className="od-btn od-btn-secondary"
+                                onClick={() => openEdit(item)}
                               >
-                                Reenviar invitación
+                                Editar
                               </button>
-                            ) : null}
-                            {item.auth_status === "active" ? (
-                              <button
-                                type="button"
-                                className="od-button-secondary"
-                                onClick={() =>
-                                  void action(
-                                    () =>
-                                      sendMemberPasswordReset(item.person_id),
-                                    "Recuperación solicitada."
-                                  )
-                                }
-                              >
-                                Recuperar contraseña
-                              </button>
-                            ) : null}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
+
+                              {isGuest ? (
+                                <button
+                                  type="button"
+                                  className="od-icon-button of-family-guest-toggle"
+                                  aria-label={
+                                    isExpanded
+                                      ? "Ocultar accesos a álbumes"
+                                      : "Mostrar accesos a álbumes"
+                                  }
+                                  aria-expanded={isExpanded}
+                                  onClick={() =>
+                                    toggleGuestAccess(item)
+                                  }
+                                >
+                                  <IonIcon
+                                    icon={
+                                      isExpanded
+                                        ? chevronUpOutline
+                                        : chevronDownOutline
+                                    }
+                                  />
+                                </button>
+                              ) : null}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+
+                      {isGuest && isExpanded ? (
+                        <tr className="of-family-guest-access-row">
+                          <td colSpan={6}>
+                            <div className="of-family-guest-access">
+                              <div className="of-family-guest-access__header">
+                                <div className="of-family-guest-access__heading">
+                                  <strong>
+                                    Acceso a álbumes
+                                  </strong>
+
+                                  <span className="of-family-guest-access__count">
+                                    {guestAlbums.length === 1
+                                      ? "— 1 álbum"
+                                      : `— ${guestAlbums.length} álbumes`}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {guestAlbums.length ? (
+                                <div className="of-family-guest-access__list">
+                                  {guestAlbums.map((grant) => {
+                                    const grantId =
+                                      grant.grant_id || null;
+                                    const albumTitle =
+                                      grant.album_title ||
+                                      grant.title ||
+                                      grant.name ||
+                                      "Álbum sin título";
+                                    const guestUserId =
+                                      grant.user_id ||
+                                      item.auth_user_id;
+                                    const revokeKey = grantId
+                                      ? `grant:${grantId}`
+                                      : `family:${grant.album_id}:${guestUserId}`;
+
+                                    return (
+                                      <div
+                                        className="of-family-guest-access__item"
+                                        key={
+                                          grantId ||
+                                          `${grant.album_id}:${guestUserId}`
+                                        }
+                                      >
+                                        <div className="of-family-guest-access__content">
+                                          <strong className="of-family-guest-access__title">
+                                            {albumTitle}
+                                          </strong>
+
+                                          <div
+                                            className="of-family-guest-access__permissions"
+                                            role="group"
+                                            aria-label={`Permisos de ${albumTitle}`}
+                                          >
+                                            <GuestPermissionIcon
+                                              icon={eyeOutline}
+                                              active={
+                                                grant.can_view ===
+                                                true
+                                              }
+                                              label={
+                                                grant.can_view ===
+                                                true
+                                                  ? "Puede ver"
+                                                  : "No puede ver"
+                                              }
+                                            />
+
+                                            <GuestPermissionIcon
+                                              icon={imageOutline}
+                                              withAdd
+                                              active={
+                                                grant.can_contribute ===
+                                                true
+                                              }
+                                              label={
+                                                grant.can_contribute ===
+                                                true
+                                                  ? "Puede añadir fotos"
+                                                  : "No puede añadir fotos"
+                                              }
+                                            />
+
+                                            <GuestPermissionIcon
+                                              icon={
+                                                chatbubblesOutline
+                                              }
+                                              active={
+                                                grant.can_comment ===
+                                                true
+                                              }
+                                              label={
+                                                grant.can_comment ===
+                                                true
+                                                  ? "Puede comentar"
+                                                  : "No puede comentar"
+                                              }
+                                            />
+                                          </div>
+                                        </div>
+
+                                        <button
+                                          type="button"
+                                          className="od-btn od-btn-secondary of-family-guest-access__revoke"
+                                          disabled={
+                                            revokingGrantId ===
+                                            revokeKey
+                                          }
+                                          onClick={() =>
+                                            revokeAlbumAccess(
+                                              item,
+                                              grant,
+                                            )
+                                          }
+                                        >
+                                          {revokingGrantId ===
+                                          revokeKey
+                                            ? "Revocando…"
+                                            : "Revocar acceso"}
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <p className="of-family-guest-access__empty">
+                                  Este invitado no tiene acceso a
+                                  ningún álbum.
+                                </p>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -410,91 +689,169 @@ export default function FamilyMembersPage() {
           </div>
         )}
 
-        {editing === "new" ? (
-          <div className="od-modal-backdrop" role="presentation">
-            <div
+        {editing ? (
+          <div
+            className="od-modal-backdrop"
+            onMouseDown={close}
+          >
+            <section
               className="od-modal of-family-create-modal"
               role="dialog"
               aria-modal="true"
-              aria-labelledby="of-family-create-title"
+              aria-labelledby="of-family-modal-title"
+              onMouseDown={(event) => event.stopPropagation()}
             >
-              <form onSubmit={submitCreate}>
-                <div className="od-modal-header">
-                  <h2
-                    id="of-family-create-title"
-                    className="od-modal-title"
+              <form
+                className="of-family-create-form"
+                onSubmit={submit}
+              >
+                <header className="od-modal-header">
+                  <div>
+                    <h2
+                      className="od-modal-title"
+                      id="of-family-modal-title"
+                    >
+                      {editing === "new"
+                        ? "Añadir usuario"
+                        : "Editar usuario"}
+                    </h2>
+                    <p className="of-family-create-modal__subtitle">
+                      {editing === "new"
+                        ? "Crea un acceso familiar y define los módulos disponibles."
+                        : "Actualiza los datos, el rol y los permisos del usuario."}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="od-modal-close"
+                    aria-label="Cerrar"
+                    disabled={saving}
+                    onClick={close}
                   >
-                    Añadir familiar
-                  </h2>
-                </div>
+                    ×
+                  </button>
+                </header>
+
                 <div className="od-modal-body">
-                  <div className="of-family-form__grid">
+                  <div className="of-family-create-modal__fields">
+                    {[
+                      ["first_name", "Nombre", true],
+                      ["last_name", "Apellidos", false],
+                      ["email", "Email", true],
+                    ].map(([key, label, required]) => (
+                      <label
+                        className="od-form-field"
+                        key={key}
+                      >
+                        <span className="od-form-label">
+                          {label}
+                        </span>
+                        <input
+                          className="od-filter-input"
+                          type={
+                            key === "email" ? "email" : "text"
+                          }
+                          required={required}
+                          autoFocus={key === "first_name"}
+                          value={form[key]}
+                          onChange={(event) =>
+                            setForm((current) => ({
+                              ...current,
+                              [key]: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                    ))}
+
                     <label className="od-form-field">
-                      <span className="od-form-label">Nombre *</span>
-                      <input
-                        className="od-filter-input"
-                        required
-                        maxLength="120"
-                        value={form.first_name}
+                      <span className="od-form-label">Rol</span>
+                      <select
+                        className="od-filter-select"
+                        value={form.role}
                         onChange={(event) =>
-                          setForm({
-                            ...form,
-                            first_name: event.target.value,
-                          })
+                          setRole(event.target.value)
                         }
-                      />
-                    </label>
-                    <label className="od-form-field">
-                      <span className="od-form-label">Apellidos</span>
-                      <input
-                        className="od-filter-input"
-                        maxLength="160"
-                        value={form.last_name}
-                        onChange={(event) =>
-                          setForm({
-                            ...form,
-                            last_name: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                    <label className="od-form-field">
-                      <span className="od-form-label">Email *</span>
-                      <input
-                        className="od-filter-input"
-                        type="email"
-                        required
-                        value={form.email}
-                        onChange={(event) =>
-                          setForm({ ...form, email: event.target.value })
-                        }
-                      />
+                      >
+                        <option value="member">Familiar</option>
+                        <option value="guest">Invitado</option>
+                      </select>
                     </label>
                   </div>
-                  {modalError ? (
-                    <p className="od-inline-msg" role="alert">
-                      {modalError}
+
+                  <fieldset className="of-family-modules">
+                    <legend className="of-family-modules__legend">
+                      Acceso a módulos
+                    </legend>
+                    <p className="of-family-modules__description">
+                      {form.role === "guest"
+                        ? "Los invitados solo pueden acceder a Orange Photos."
+                        : "Selecciona los módulos disponibles para este usuario."}
+                    </p>
+
+                    <div className="of-family-modules__grid">
+                      {MODULES.map(([key, label]) => (
+                        <label
+                          className="of-family-form__check"
+                          key={key}
+                        >
+                          <input
+                            type="checkbox"
+                            className="of-family-module-checkbox"
+                            disabled={form.role === "guest"}
+                            checked={
+                              form.role === "guest"
+                                ? key === "orange_photos"
+                                : Boolean(
+                                    form.module_access[key],
+                                  )
+                            }
+                            onChange={(event) =>
+                              setForm((current) => ({
+                                ...current,
+                                module_access: {
+                                  ...current.module_access,
+                                  [key]: event.target.checked,
+                                },
+                              }))
+                            }
+                          />
+                          <span>{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+
+                  {formError ? (
+                    <p
+                      className="od-status-line od-status-line--error of-family-create-modal__error"
+                      role="alert"
+                    >
+                      {formError}
                     </p>
                   ) : null}
                 </div>
-                <div className="od-modal-actions">
+
+                <footer className="od-modal-actions of-family-create-modal__actions">
                   <button
                     type="button"
-                    className="od-button-secondary"
-                    onClick={closeCreate}
+                    className="od-btn od-btn-secondary"
+                    disabled={saving}
+                    onClick={close}
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="od-modal-primary"
+                    className="od-btn od-btn-primary"
                     disabled={saving}
                   >
-                    {saving ? "Enviando…" : "Enviar invitación"}
+                    {saving ? "Guardando…" : "Guardar"}
                   </button>
-                </div>
+                </footer>
               </form>
-            </div>
+            </section>
           </div>
         ) : null}
       </div>

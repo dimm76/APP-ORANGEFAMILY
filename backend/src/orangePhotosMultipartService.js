@@ -1,7 +1,6 @@
 /* global require, module, Buffer, setImmediate */
 const { createHash } = require("node:crypto");
 const pool = require("../db");
-const { resolveAuthenticatedFamily } = require("./attachmentsService");
 const photos = require("./orangePhotosService");
 const {
   abortOrangePhotoMultipartUpload,
@@ -25,16 +24,16 @@ function expired(upload){return new Date(upload.expires_at).getTime()<=Date.now(
 function missingMultipart(error){return ["NoSuchUpload","NotFound","404"].includes(String(error?.name||error?.Code||error?.$metadata?.httpStatusCode));}
 
 async function ownedUpload(req,id){
-  const auth=resolveAuthenticatedFamily(req);if(!auth.ok)return auth;
+  const auth=photos.resolveOrangePhotosFamily(req);if(!auth.ok)return auth;
   if(!UUID_RE.test(String(id||"")))return photos.bad(404,"UPLOAD_NOT_FOUND","Subida no encontrada.");
-  const row=(await pool.query(`SELECT * FROM public.orange_photo_uploads WHERE id=$1::uuid`,[id])).rows[0];
+  const row=(await pool.query(`SELECT * FROM public.orange_photo_uploads WHERE id=$1::uuid AND family_id=$2::uuid AND owner_user_id=$3::uuid`,[id,auth.familyId,auth.userId])).rows[0];
   if(!row)return photos.bad(404,"UPLOAD_NOT_FOUND","Subida no encontrada.");
-  if(String(row.family_id)!==String(auth.familyId)||String(row.owner_user_id)!==String(auth.userId))return photos.bad(403,"UPLOAD_NOT_OWNED","La subida no pertenece al usuario autenticado.");
+  if(String(row.family_id)!==String(auth.familyId)||String(row.owner_user_id)!==String(auth.userId))return photos.bad(404,"UPLOAD_NOT_FOUND","Subida no encontrada.");
   return photos.ok({auth,upload:row});
 }
 
 async function initiate(req,body={}){
-  const auth=resolveAuthenticatedFamily(req);if(!auth.ok)return auth;
+  const auth=photos.resolveOrangePhotosFamily(req);if(!auth.ok)return auth;
   const originalFilename=String(body.original_filename||"").replace(/\\/g,"/").split("/").pop().trim().normalize("NFKC").replace(/\s+/g," ").slice(0,500),size=Number(body.size_bytes),mime=String(body.mime_type||"").toLowerCase();
   const clientUploadKey=String(body.client_upload_key||"").trim().slice(0,200)||null;
   if(!originalFilename)return photos.bad(400,"INVALID_METADATA","Nombre original obligatorio.");
@@ -123,6 +122,6 @@ async function status(req,id){
   return photos.ok({upload:{id:u.id,original_filename:u.original_filename,mime_type:u.mime_type,media_type:u.media_type,size_bytes:Number(u.size_bytes),part_size:photos.MULTIPART_PART_BYTES,parts_total:partsTotal(u),status:u.status,error_code:u.error_code,error_message:u.error_message,created_at:u.created_at,updated_at:u.updated_at,completed_at:u.completed_at,expires_at:u.expires_at,completed_parts:completedParts}});
 }
 
-async function listActive(req){const auth=resolveAuthenticatedFamily(req);if(!auth.ok)return auth;const uploads=(await pool.query(`SELECT id,client_upload_key,original_filename,mime_type,media_type,size_bytes,status,created_at,updated_at,expires_at FROM public.orange_photo_uploads WHERE family_id=$1::uuid AND owner_user_id=$2::uuid AND status IN ('initiated','uploading','completing','processing') AND expires_at>now() ORDER BY created_at ASC`,[auth.familyId,auth.userId])).rows.map(upload=>({...upload,size_bytes:Number(upload.size_bytes)}));return photos.ok({uploads});}
+async function listActive(req){const auth=photos.resolveOrangePhotosFamily(req);if(!auth.ok)return auth;const uploads=(await pool.query(`SELECT id,client_upload_key,original_filename,mime_type,media_type,size_bytes,status,created_at,updated_at,expires_at FROM public.orange_photo_uploads WHERE family_id=$1::uuid AND owner_user_id=$2::uuid AND status IN ('initiated','uploading','completing','processing') AND expires_at>now() ORDER BY created_at ASC`,[auth.familyId,auth.userId])).rows.map(upload=>({...upload,size_bytes:Number(upload.size_bytes)}));return photos.ok({uploads});}
 
 module.exports={initiate,signParts,complete,abort,status,listActive};
