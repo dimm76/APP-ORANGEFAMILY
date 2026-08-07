@@ -27,6 +27,7 @@ const {
 
 let cachedClient = null;
 let cachedClientKey = null;
+const ORANGE_PHOTO_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function getS3Client() {
   const config = getAttachmentsConfig();
@@ -103,10 +104,11 @@ async function uploadOrangePhotoToWasabi(buffer, { familyId, mimeType, extension
   if (!Buffer.isBuffer(buffer) || !buffer.length) throw new Error("El archivo está vacío.");
   const now = new Date();
   const ext = String(extension || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const foldersByVariant = { original: "originals", thumbnail: "thumbnails", preview: "previews", poster: "posters", playback: "playback" };
+  const foldersByVariant = { original: "originals", thumbnail: "thumbnails", preview: "previews", poster: "posters" };
   const normalizedVariant = String(variant || "original").trim().toLowerCase();
-  const folder = foldersByVariant[normalizedVariant] || "derivatives";
-  const safePhotoId = /^[0-9a-f-]{36}$/i.test(String(photoId || "")) ? String(photoId) : null;
+  const folder = foldersByVariant[normalizedVariant];
+  if (!folder) throw new Error(`Variante de Orange Photos no soportada: ${normalizedVariant || "(vacía)"}.`);
+  const safePhotoId = ORANGE_PHOTO_UUID_RE.test(String(photoId || "")) ? String(photoId) : null;
   const objectFilename = normalizedVariant !== "original" && safePhotoId
     ? `${safePhotoId}_${normalizedVariant}_${randomUUID()}.${ext}`
     : `${randomUUID()}.${ext}`;

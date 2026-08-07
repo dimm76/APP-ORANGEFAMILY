@@ -14,6 +14,7 @@ const { clientContext } = require("./orangePhotosClientContext");
 const { assertReadableOrangePhotosStorageKey, deleteOrangePhotoObject, getSignedOrangePhotoUrl, getOrangePhotoObjectStream, uploadOrangePhotoFileToWasabi, uploadOrangePhotoToWasabi } = require("./wasabiClient");
 const { getAttachmentsConfig } = require("./attachmentsConfig");
 const { probeVideoFile, createVideoPoster, processStoredOrangePhotoVideo } = require("./orangePhotosVideoProcessor");
+const { processStoredOrangePhotoImage } = require("./orangePhotosImageProcessor");
 const exifr = require("exifr");
 
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -23,6 +24,13 @@ const SHARE_SCOPES=new Set(["all","family","selected"]);
 const ACCESS_SOURCES=new Set(["owned","direct","album"]);
 const FILTER_MODES=new Set(["include","exclude"]);
 const SHARE_STATES=new Set(["private","family","selected","public_link"]);
+function scheduleStoredOrangePhotoImageDerivatives(photoId, logLabel) {
+  setImmediate(() => {
+    processStoredOrangePhotoImage(photoId, { createThumbnail: true, createPreview: true }).catch(error => {
+      console.error(logLabel, { photo_id: photoId, message: error.message, possible_orphans: error.possibleOrphans || [] });
+    });
+  });
+}
 const MIME_EXT={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/heic":"heic","video/mp4":"mp4","video/quicktime":"mov","video/webm":"webm"};
 const MAX_IMAGE_BYTES = 30 * 1024 * 1024;
 const SIMPLE_VIDEO_MAX_BYTES = 500 * 1024 * 1024;
@@ -313,6 +321,9 @@ async function upload(req, file, fields = {}, posterFile = null) {
         processStoredOrangePhotoVideo(photoId, { createPoster:false, createPreview:true, updateMetadata:false })
           .catch(error => console.error("OrangePhotos delayed video preview", { photo_id:photoId, message:error.message, possible_orphans:error.possibleOrphans || [] }));
       });
+    }
+    if (result.ok && m.media_type === "image" && result.payload?.item?.id) {
+      scheduleStoredOrangePhotoImageDerivatives(result.payload.item.id, "OrangePhotos delayed image derivatives");
     }
     return result;
   } catch (error) {

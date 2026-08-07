@@ -388,28 +388,35 @@ Fotografías
 
 El original se conserva intacto.
 
-Las fotografÃ­as pueden disponer de derivados registrados en
-`orange_photo_files`:
+Las fotografías pueden disponer de derivados registrados en
+`orange_photo_files`.
 
-- `thumbnail`: lado mÃ¡ximo de 480 px, destinado a timelines y cuadrÃ­culas;
-- `preview`: lado mÃ¡ximo de 1920 px, destinado a visualizaciÃ³n ordinaria y
-  lightbox;
-- `original`: archivo fuente conservado sin modificaciÃ³n.
+El contrato normativo de variantes, hashes, almacenamiento, generación,
+consumo y borrado se documenta en
+[`MEDIA_DERIVATIVES.md`](./MEDIA_DERIVATIVES.md).
+
+Actualmente está implementada la infraestructura backend para generar:
+
+- `thumbnail`: lado máximo de 480 px;
+- `preview`: lado máximo de 1920 px.
 
 Los derivados nunca sustituyen al original.
 
-La relaciÃ³n canÃ³nica entre original y derivados se establece mediante
-`photo_id + variant`, no mediante el nombre fÃ­sico del objeto.
+La relación canónica entre original y derivados se establece mediante
+`photo_id + variant`.
 
-Cada archivo conserva su propio checksum SHA-256. El checksum utilizado para
-deduplicaciÃ³n sigue siendo el del original.
+Cada archivo conserva su propio checksum SHA-256. La deduplicación continúa
+utilizando exclusivamente el checksum del original.
 
 Los derivados conservan PNG o WebP cuando corresponde; JPEG y HEIC generan
-derivados JPEG. No se amplÃ­an imÃ¡genes cuya resoluciÃ³n ya sea inferior al tamaÃ±o
-objetivo.
+derivados JPEG. No se amplían imágenes cuya resolución ya sea inferior al
+tamaño objetivo.
 
-La orientaciÃ³n visual se aplica durante la generaciÃ³n y los derivados no
+La orientación visual se aplica durante la generación y los derivados no
 conservan metadatos EXIF.
+
+La generación automática para nuevas subidas y la reconstrucción de elementos
+históricos todavía no están activadas.
 
 La fecha de captura utiliza esta prioridad:
 

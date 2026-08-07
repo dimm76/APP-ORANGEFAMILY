@@ -39,7 +39,7 @@ async function probeImageFile(filePath) {
   const stream = JSON.parse(stdout).streams?.[0];
   const width = Number(stream?.width);
   const height = Number(stream?.height);
-  if (!Number.isInteger(width) || width <= 0 || !Number.isInteger(height) || height <= 0) throw new Error("ffprobe no devolviÃ³ dimensiones vÃ¡lidas para la imagen.");
+  if (!Number.isInteger(width) || width <= 0 || !Number.isInteger(height) || height <= 0) throw new Error("ffprobe no devolvió dimensiones válidas para la imagen.");
   return { width, height, pix_fmt: stream?.pix_fmt || null };
 }
 
@@ -52,7 +52,7 @@ async function createImageDerivative(inputPath, outputPath, { maxSide, format, q
   args.push(outputPath);
   await execFileAsync(ffmpegPath, args, { timeout: 180000, maxBuffer: 16 * 1024 * 1024, windowsHide: true });
   const stat = await fs.stat(outputPath);
-  if (!stat.size) throw new Error("ffmpeg generÃ³ un derivado de imagen vacÃ­o.");
+  if (!stat.size) throw new Error("ffmpeg generó un derivado de imagen vacío.");
   return { size: stat.size, metadata: await probeImageFile(outputPath) };
 }
 
@@ -63,7 +63,7 @@ async function register(row, derivatives, possibleOrphans) {
     await client.query("BEGIN");
     for (const derivative of derivatives) {
       const inserted = await query(`INSERT INTO public.orange_photo_files(family_id,photo_id,variant,provider,bucket,object_key,mime_type,width,height,size_bytes,checksum_sha256,etag) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NULL) ON CONFLICT(photo_id,variant) DO NOTHING RETURNING id`, [row.family_id,row.id,derivative.variant,derivative.upload.provider,derivative.upload.bucket,derivative.upload.object_key,derivative.mime_type,derivative.metadata.width,derivative.metadata.height,derivative.upload.size_bytes,derivative.upload.checksum_sha256], client);
-      if (!inserted.rowCount) throw new Error(`La variante ${derivative.variant} ya existe; el objeto subido queda como posible huÃ©rfano.`);
+      if (!inserted.rowCount) throw new Error(`La variante ${derivative.variant} ya existe; el objeto subido queda como posible huérfano.`);
     }
     await client.query("COMMIT");
   } catch (error) {
