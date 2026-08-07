@@ -129,8 +129,8 @@ export default function OrangePhotoViewer({
       <AttachmentsImageLightbox
         viewer={{
           url:
-            photo.original_url ||
             photo.preview_url ||
+            photo.original_url ||
             photo.thumbnail_url,
           poster: photo.poster_url || photo.thumbnail_url,
           mediaType: photo.media_type,
