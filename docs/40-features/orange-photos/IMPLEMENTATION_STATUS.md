@@ -951,3 +951,5 @@ Room;
 preferencias;
 inventario;
 cola.
+
+Los vídeos pueden disponer de thumbnail JPEG de máximo 480 px; los vídeos con poster existente generan el thumbnail desde el poster sin descargar ni transcodificar el original únicamente para ello; los vídeos históricos completan thumbnails mediante el reconciliador; la timeline/grid web prioriza thumbnail y utiliza poster como fallback.
