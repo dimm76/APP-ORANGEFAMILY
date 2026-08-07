@@ -415,8 +415,14 @@ tamaño objetivo.
 La orientación visual se aplica durante la generación y los derivados no
 conservan metadatos EXIF.
 
-La generación automática para nuevas subidas y la reconstrucción de elementos
-históricos todavía no están activadas.
+La generación automática de `thumbnail` y `preview` está activada para las
+nuevas imágenes registradas mediante la subida estándar y mediante el flujo
+multipart compartido por web y Android.
+
+Los fallos al generar derivados no invalidan el original ya registrado.
+
+La reconstrucción de derivados para fotografías históricas se realiza mediante
+el reconciliador específico de imágenes.
 
 La fecha de captura utiliza esta prioridad:
 
