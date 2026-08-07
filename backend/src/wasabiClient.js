@@ -98,13 +98,19 @@ function assertWritableOrangePhotosStorageKey(storageKey, envPrefix) {
   return key;
 }
 
-async function uploadOrangePhotoToWasabi(buffer, { familyId, mimeType, extension, originalFilename, variant = "original", checksumSha256 = null } = {}) {
+async function uploadOrangePhotoToWasabi(buffer, { familyId, mimeType, extension, originalFilename, variant = "original", checksumSha256 = null, photoId = null } = {}) {
   const { client, config } = getS3Client();
   if (!Buffer.isBuffer(buffer) || !buffer.length) throw new Error("El archivo está vacío.");
   const now = new Date();
   const ext = String(extension || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const folder = variant === "poster" ? "posters" : variant === "preview" ? "previews" : "originals";
-  const key = assertWritableOrangePhotosStorageKey(`${config.orangePhotosPrefix}/${folder}/${familyId}/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}/${randomUUID()}.${ext}`, config.envPrefix);
+  const foldersByVariant = { original: "originals", thumbnail: "thumbnails", preview: "previews", poster: "posters", playback: "playback" };
+  const normalizedVariant = String(variant || "original").trim().toLowerCase();
+  const folder = foldersByVariant[normalizedVariant] || "derivatives";
+  const safePhotoId = /^[0-9a-f-]{36}$/i.test(String(photoId || "")) ? String(photoId) : null;
+  const objectFilename = normalizedVariant !== "original" && safePhotoId
+    ? `${safePhotoId}_${normalizedVariant}_${randomUUID()}.${ext}`
+    : `${randomUUID()}.${ext}`;
+  const key = assertWritableOrangePhotosStorageKey(`${config.orangePhotosPrefix}/${folder}/${familyId}/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}/${objectFilename}`, config.envPrefix);
   await client.send(new PutObjectCommand({ Bucket: config.bucket, Key: key, Body: buffer, ContentType: mimeType }));
   return { provider: "wasabi", bucket: config.bucket, object_key: key, mime_type: mimeType,
     original_filename: String(originalFilename || "archivo").slice(0, 500), size_bytes: buffer.length,

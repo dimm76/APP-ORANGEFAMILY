@@ -388,6 +388,29 @@ Fotografías
 
 El original se conserva intacto.
 
+Las fotografÃ­as pueden disponer de derivados registrados en
+`orange_photo_files`:
+
+- `thumbnail`: lado mÃ¡ximo de 480 px, destinado a timelines y cuadrÃ­culas;
+- `preview`: lado mÃ¡ximo de 1920 px, destinado a visualizaciÃ³n ordinaria y
+  lightbox;
+- `original`: archivo fuente conservado sin modificaciÃ³n.
+
+Los derivados nunca sustituyen al original.
+
+La relaciÃ³n canÃ³nica entre original y derivados se establece mediante
+`photo_id + variant`, no mediante el nombre fÃ­sico del objeto.
+
+Cada archivo conserva su propio checksum SHA-256. El checksum utilizado para
+deduplicaciÃ³n sigue siendo el del original.
+
+Los derivados conservan PNG o WebP cuando corresponde; JPEG y HEIC generan
+derivados JPEG. No se amplÃ­an imÃ¡genes cuya resoluciÃ³n ya sea inferior al tamaÃ±o
+objetivo.
+
+La orientaciÃ³n visual se aplica durante la generaciÃ³n y los derivados no
+conservan metadatos EXIF.
+
 La fecha de captura utiliza esta prioridad:
 
 fecha manual;
