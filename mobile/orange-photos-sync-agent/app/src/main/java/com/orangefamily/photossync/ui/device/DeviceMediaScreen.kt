@@ -73,6 +73,7 @@ val OrangeMoreIcon:ImageVector by lazy{ImageVector.Builder("OrangeMore",24.dp,24
     onSettings:()->Unit,onTrash:()->Unit,onOpen:(LocalMediaItem)->Unit,
     onUpload:(List<LocalMediaItem>,Boolean)->Unit,onSyncNow:()->Unit,onDelete:(List<LocalMediaItem>)->Unit,
     refreshVersion:Int,
+    librarySelector: @Composable () -> Unit,
     modifier:Modifier=Modifier,
 ){
     val scope=rememberCoroutineScope();val drawerState=rememberDrawerState(DrawerValue.Closed);val gridState=rememberLazyGridState();val listState=rememberLazyListState()
@@ -95,7 +96,7 @@ val OrangeMoreIcon:ImageVector by lazy{ImageVector.Builder("OrangeMore",24.dp,24
     val uploadStatusAction:@Composable RowScope.()->Unit={UploadStatusAction(uploadCounts.pending>0||uploadCounts.uploading>0||uploadProgress.running,uploadCounts.uploading>0||uploadProgress.running){showUploadProgress=true}}
 
     ModalNavigationDrawer(drawerState=drawerState,gesturesEnabled=folder==null,drawerContent={ModalDrawerSheet{Spacer(Modifier.height(20.dp));NavigationDrawerItem(label={Text(stringResource(R.string.settings_title))},selected=false,onClick={scope.launch{drawerState.close()};onSettings()},icon={Text("⚙")});NavigationDrawerItem(label={Text(stringResource(R.string.trash_title))},selected=false,onClick={scope.launch{drawerState.close()};onTrash()},icon={Icon(OrangeDeleteIcon,null,Modifier.size(24.dp))})}}){
-        Scaffold(modifier=modifier,topBar={if(selected.isNotEmpty())SelectionTopBar(selected.size,{selected=emptySet();anchorId=null},{uploadConfirmation=media.filter{DeviceMediaRules.stableId(it) in selected}},{deleteConfirmation=media.filter{DeviceMediaRules.stableId(it) in selected}})else if(folder==null)FolderListTopBar(query,{query=it},{scope.launch{drawerState.open()}},uploadStatusAction)else FolderTopBar(folder!!.name,{folder=null;loadFolders()},{val current=folder?:return@FolderTopBar;scope.launch{verifying=true;try{verifier.verifyBucket(accountUserId,current.stableId,true)}finally{verifying=false}}},verifying,mediaView,{mediaView=if(mediaView==DeviceMediaView.GRID)DeviceMediaView.LIST else DeviceMediaView.GRID},sortMenuExpanded,{sortMenuExpanded=it},{mediaSort=it},uploadStatusAction)}){padding->
+        Scaffold(modifier=modifier,topBar={if(selected.isNotEmpty())SelectionTopBar(selected.size,{selected=emptySet();anchorId=null},{uploadConfirmation=media.filter{DeviceMediaRules.stableId(it) in selected}},{deleteConfirmation=media.filter{DeviceMediaRules.stableId(it) in selected}})else if(folder==null)FolderListTopBar(query,{query=it},{scope.launch{drawerState.open()}},librarySelector,uploadStatusAction)else FolderTopBar(folder!!.name,{folder=null;loadFolders()},{val current=folder?:return@FolderTopBar;scope.launch{verifying=true;try{verifier.verifyBucket(accountUserId,current.stableId,true)}finally{verifying=false}}},verifying,mediaView,{mediaView=if(mediaView==DeviceMediaView.GRID)DeviceMediaView.LIST else DeviceMediaView.GRID},sortMenuExpanded,{sortMenuExpanded=it},{mediaSort=it},uploadStatusAction)}){padding->
             Column(Modifier.padding(padding).fillMaxSize()){
                 if(permission==MediaPermissionAccess.PARTIAL)Text("Acceso parcial: solo se muestran los elementos autorizados.",Modifier.padding(12.dp))
                 if(folder==null)LazyColumn{items(filteredFolders,key={it.stableId}){value->Card(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=5.dp).combinedClickable(onClick={folder=value})){Column(Modifier.padding(16.dp)){Text(value.name,style=MaterialTheme.typography.titleMedium);Text("${value.itemCount} elementos${if(value.containsVideo)" · incluye vídeo" else ""}")}}}}
@@ -108,7 +109,47 @@ val OrangeMoreIcon:ImageVector by lazy{ImageVector.Builder("OrangeMore",24.dp,24
     if(showUploadProgress)UploadProgressDialog(uploadProgress,uploadCounts,folder!=null,{showUploadProgress=false},{showUploadProgress=false;onSyncNow()},{showUploadProgress=false;mediaFilter=MediaFilter.FAILED})
 }
 
-@OptIn(ExperimentalMaterial3Api::class) @Composable private fun FolderListTopBar(query:String,onQuery:(String)->Unit,onMenu:()->Unit,actions:@Composable RowScope.()->Unit){TopAppBar(title={OutlinedTextField(query,onQuery,Modifier.fillMaxWidth(),placeholder={Text(stringResource(R.string.search_folders))},singleLine=true,trailingIcon={if(query.isNotEmpty())IconButton(onClick={onQuery("")},modifier=Modifier.semantics{contentDescription="Borrar búsqueda"}){Text("×")}})},navigationIcon={IconButton(onClick=onMenu,modifier=Modifier.semantics{contentDescription="Abrir menú"}){Text("☰",style=MaterialTheme.typography.titleLarge)}},actions=actions)}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FolderListTopBar(
+    query: String,
+    onQuery: (String) -> Unit,
+    onMenu: () -> Unit,
+    librarySelector: @Composable () -> Unit,
+    actions: @Composable RowScope.() -> Unit,
+) {
+    TopAppBar(
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                librarySelector()
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = onQuery,
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text(stringResource(R.string.search_folders)) },
+                    singleLine = true,
+                    trailingIcon = {
+                        if (query.isNotEmpty()) {
+                            IconButton(onClick = { onQuery("") }, modifier = Modifier.semantics { contentDescription = "Borrar búsqueda" }) {
+                                Text("×")
+                            }
+                        }
+                    },
+                )
+            }
+        },
+        navigationIcon = {
+            IconButton(onClick = onMenu, modifier = Modifier.semantics { contentDescription = "Abrir menú" }) {
+                Text("☰", style = MaterialTheme.typography.titleLarge)
+            }
+        },
+        actions = actions,
+    )
+}
 @OptIn(ExperimentalMaterial3Api::class) @Composable private fun FolderTopBar(name:String,onBack:()->Unit,onVerify:()->Unit,verifying:Boolean,mediaView:DeviceMediaView,onToggleView:()->Unit,sortMenuExpanded:Boolean,onSortMenuExpandedChange:(Boolean)->Unit,onSortSelected:(DeviceMediaSort)->Unit,actions:@Composable RowScope.()->Unit){val verifyDescription=stringResource(R.string.verify_copies);val viewDescription=stringResource(if(mediaView==DeviceMediaView.GRID)R.string.show_list_view else R.string.show_grid_view);val sortDescription=stringResource(R.string.sort_options);TopAppBar(title={Text(name)},navigationIcon={IconButton(onClick=onBack,modifier=Modifier.semantics{contentDescription="Volver"}){Text("←",style=MaterialTheme.typography.titleLarge)}},actions={if(verifying)CircularProgressIndicator(Modifier.padding(horizontal=12.dp).size(22.dp),strokeWidth=2.dp,color=OrangePrimary)else IconButton(onClick=onVerify,modifier=Modifier.semantics{contentDescription=verifyDescription}){Icon(OrangeVerifyIcon,null,tint=Color.Unspecified)};actions();IconButton(onClick=onToggleView,modifier=Modifier.semantics{contentDescription=viewDescription}){Icon(if(mediaView==DeviceMediaView.GRID)OrangeListIcon else OrangeGridIcon,null)};Box{IconButton(onClick={onSortMenuExpandedChange(true)},modifier=Modifier.semantics{contentDescription=sortDescription}){Icon(OrangeMoreIcon,null)};DropdownMenu(expanded=sortMenuExpanded,onDismissRequest={onSortMenuExpandedChange(false)}){DropdownMenuItem(text={Text(stringResource(R.string.sort_date_desc))},onClick={onSortSelected(DeviceMediaSort.DATE_DESC);onSortMenuExpandedChange(false)});DropdownMenuItem(text={Text(stringResource(R.string.sort_date_asc))},onClick={onSortSelected(DeviceMediaSort.DATE_ASC);onSortMenuExpandedChange(false)});DropdownMenuItem(text={Text(stringResource(R.string.sort_size_desc))},onClick={onSortSelected(DeviceMediaSort.SIZE_DESC);onSortMenuExpandedChange(false)});DropdownMenuItem(text={Text(stringResource(R.string.sort_size_asc))},onClick={onSortSelected(DeviceMediaSort.SIZE_ASC);onSortMenuExpandedChange(false)});DropdownMenuItem(text={Text(stringResource(R.string.sort_name_asc))},onClick={onSortSelected(DeviceMediaSort.NAME_ASC);onSortMenuExpandedChange(false)});DropdownMenuItem(text={Text(stringResource(R.string.sort_name_desc))},onClick={onSortSelected(DeviceMediaSort.NAME_DESC);onSortMenuExpandedChange(false)})}}})}
 @OptIn(ExperimentalMaterial3Api::class) @Composable private fun SelectionTopBar(count:Int,onClose:()->Unit,onUpload:()->Unit,onDelete:()->Unit){TopAppBar(title={Text(pluralStringResource(R.plurals.selected_media_count,count,count))},navigationIcon={IconButton(onClick=onClose,modifier=Modifier.semantics{contentDescription="Cerrar selección"}){Text("×",style=MaterialTheme.typography.titleLarge)}},actions={IconButton(onClick=onUpload){Icon(OrangeCloudUploadIcon,stringResource(R.string.upload_action),Modifier.size(24.dp))};IconButton(onClick=onDelete){Icon(OrangeDeleteIcon,stringResource(R.string.delete_action),Modifier.size(24.dp))}})}
 

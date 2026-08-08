@@ -17,7 +17,7 @@ class OrangePhotosCloudApi(
     }
 
     suspend fun timeline(page: Int = 1, perPage: Int = 100): CloudPhotoPage = withContext(Dispatchers.IO) {
-        val connection = URL("${baseUrl}api/orange-photos/timeline?page=$page&per_page=$perPage")
+        val connection = URL("${baseUrl}api/orange-photos?page=$page&per_page=$perPage")
             .openConnection() as HttpURLConnection
         try {
             connection.requestMethod = "GET"

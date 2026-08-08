@@ -22,11 +22,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,6 +40,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -300,35 +306,48 @@ private fun AuthContent(
                 cloudSessionToken?.let { OrangePhotosCloudApi(BuildConfig.API_BASE_URL, it) }
             }
             val remoteThumbnailLoader = androidx.compose.runtime.remember { RemoteThumbnailLoader() }
+            val librarySelector: @Composable () -> Unit = {
+                LibrarySourceSelector(
+                    selected = librarySource,
+                    onSelect = { librarySource = it },
+                )
+            }
             if (screen == AgentScreen.FOLDERS) {
-                Column(modifier = modifier) {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (librarySource == LibrarySource.CLOUD) Button(onClick = {}, Modifier.weight(1f)) { Text(stringResource(R.string.cloud_library)) }
-                        else OutlinedButton(onClick = { librarySource = LibrarySource.CLOUD }, Modifier.weight(1f)) { Text(stringResource(R.string.cloud_library)) }
-                        if (librarySource == LibrarySource.DEVICE) Button(onClick = {}, Modifier.weight(1f)) { Text(stringResource(R.string.device_library)) }
-                        else OutlinedButton(onClick = { librarySource = LibrarySource.DEVICE }, Modifier.weight(1f)) { Text(stringResource(R.string.device_library)) }
-                    }
-                    if (librarySource == LibrarySource.DEVICE) {
-                        DeviceMediaScreen(
-                    accountUserId=state.user.id,
-                    permission=mediaPermissionAccess,
-                    scanner=deviceScanner,
-                    repository=repository,
-                    verifier=deviceVerifier,
-                    thumbnailLoader=thumbnailLoader,
-                    onSettings={screen=AgentScreen.SETTINGS},
-                    onTrash={screen=AgentScreen.TRASH},
-                    onOpen=onOpenMedia,
-                    onUpload=onUploadMedia,
-                    onSyncNow={onSyncNow(state.user.id)},
-                    onDelete=onDeleteMedia,
-                    refreshVersion=mediaRefreshVersion,
-                            modifier=Modifier.weight(1f).fillMaxWidth(),
-                        )
-                    } else if (cloudApi == null) {
-                        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                    } else {
-                        CloudPhotosScreen(cloudApi, remoteThumbnailLoader, Modifier.weight(1f).fillMaxWidth())
+                if (librarySource == LibrarySource.DEVICE) {
+                    DeviceMediaScreen(
+                        accountUserId = state.user.id,
+                        permission = mediaPermissionAccess,
+                        scanner = deviceScanner,
+                        repository = repository,
+                        verifier = deviceVerifier,
+                        thumbnailLoader = thumbnailLoader,
+                        onSettings = { screen = AgentScreen.SETTINGS },
+                        onTrash = { screen = AgentScreen.TRASH },
+                        onOpen = onOpenMedia,
+                        onUpload = onUploadMedia,
+                        onSyncNow = { onSyncNow(state.user.id) },
+                        onDelete = onDeleteMedia,
+                        refreshVersion = mediaRefreshVersion,
+                        librarySelector = librarySelector,
+                        modifier = modifier,
+                    )
+                } else {
+                    Scaffold(
+                        modifier = modifier,
+                        topBar = { androidx.compose.material3.TopAppBar(title = { librarySelector() }) },
+                    ) { cloudPadding ->
+                        if (cloudApi == null) {
+                            Box(
+                                modifier = Modifier.fillMaxSize().padding(cloudPadding),
+                                contentAlignment = Alignment.Center,
+                            ) { CircularProgressIndicator() }
+                        } else {
+                            CloudPhotosScreen(
+                                api = cloudApi,
+                                thumbnailLoader = remoteThumbnailLoader,
+                                modifier = Modifier.fillMaxSize().padding(cloudPadding),
+                            )
+                        }
                     }
                 }
             } else if(screen==AgentScreen.TRASH){
@@ -353,6 +372,32 @@ private fun AuthContent(
             ) }
         }
     }
+}
+
+@Composable
+private fun LibrarySourceSelector(
+    selected: LibrarySource,
+    onSelect: (LibrarySource) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+        LibrarySourceButton(stringResource(R.string.cloud_library), selected == LibrarySource.CLOUD) { onSelect(LibrarySource.CLOUD) }
+        LibrarySourceButton(stringResource(R.string.device_library), selected == LibrarySource.DEVICE) { onSelect(LibrarySource.DEVICE) }
+    }
+}
+
+@Composable
+private fun LibrarySourceButton(text: String, selected: Boolean, onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier.height(32.dp).defaultMinSize(minWidth = 0.dp, minHeight = 32.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.textButtonColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+            contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+        ),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+    ) { Text(text, style = MaterialTheme.typography.labelMedium, maxLines = 1) }
 }
 
 @Composable
