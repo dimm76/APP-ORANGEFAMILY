@@ -384,6 +384,28 @@ presentación;
 enlace público;
 descarga completa del álbum.
 Procesamiento multimedia
+
+Exposición eficiente mediante API
+
+La fase de exposición eficiente mediante API está implementada. La API expone
+por separado las variantes:
+
+- `thumbnail_url`;
+- `preview_url`;
+- `poster_url`;
+- `video_preview_url`;
+- `original_url`.
+
+El consumo actual es:
+
+- timeline y cuadrículas: `thumbnail`;
+- portadas de álbum: `thumbnail`, con fallback controlado;
+- visor de imágenes: `preview`;
+- descarga explícita: `original`;
+- vídeo en timeline: `thumbnail` o `poster`.
+
+El playback queda como futura variante pendiente.
+
 Fotografías
 
 El original se conserva intacto.
@@ -437,9 +459,23 @@ Para un vídeo nuevo:
 se almacena el original;
 ffprobe obtiene duración y dimensiones;
 se genera el poster JPEG;
-se registra el original y el poster;
-se genera el preview MP4 de forma aplazada;
+se genera un thumbnail JPEG de lado máximo 480 px;
+cuando ya existe poster, el thumbnail se genera desde el poster sin descargar
+el vídeo original únicamente para esa operación;
+se genera el preview MP4 corto;
+los nuevos vídeos generan sus derivados mediante el procesador backend;
 el reconciliador completa los derivados ausentes.
+
+El backfill histórico de vídeo está completado en producción:
+
+- 1788 vídeos totales;
+- 1779 con poster;
+- 1776 con thumbnail;
+- 1777 con preview;
+- 12 elementos incompletos conocidos por errores aislados de FFmpeg, ffprobe o
+  descarga del original.
+
+Estos 12 elementos incompletos no representan un fallo sistémico.
 
 La fecha de captura utiliza esta prioridad:
 
