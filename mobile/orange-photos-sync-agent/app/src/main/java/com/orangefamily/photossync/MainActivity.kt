@@ -18,8 +18,15 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -56,12 +64,17 @@ import com.orangefamily.photossync.sync.OrangePhotosSyncApi
 import com.orangefamily.photossync.sync.UploadNetworkPolicy
 import com.orangefamily.photossync.ui.device.DeviceMediaScreen
 import com.orangefamily.photossync.ui.device.DeviceTrashScreen
+import com.orangefamily.photossync.cloud.OrangePhotosCloudApi
+import com.orangefamily.photossync.cloud.RemoteThumbnailLoader
+import com.orangefamily.photossync.ui.cloud.CloudPhotosScreen
 import android.content.ActivityNotFoundException
 import android.widget.Toast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 internal enum class AgentScreen { FOLDERS, SETTINGS, TRASH }
+internal enum class LibrarySource { CLOUD, DEVICE }
 internal fun initialAuthenticatedScreen() = AgentScreen.FOLDERS
 private enum class MediaOperation { TRASH, RESTORE, DELETE }
 
@@ -124,6 +137,7 @@ class MainActivity : ComponentActivity() {
             OrangeFamilyPhotosSyncTheme {
                 AuthContent(
                         state = authController.state,
+                        sessionStore = sessionStore,
                         cameraBackupController = cameraBackupController,
                         mediaPermissionAccess = mediaPermissionAccess,
                         onLogin = { email, password ->
@@ -221,6 +235,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AuthContent(
     state: AuthController.AuthState,
+    sessionStore: SecureSessionStore,
     cameraBackupController: CameraBackupController,
     mediaPermissionAccess: MediaPermissionAccess,
     onLogin: (String, String) -> Unit,
@@ -276,8 +291,25 @@ private fun AuthContent(
                     permission = mediaPermissionAccess,
                 )
             }
+            var librarySource by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(LibrarySource.DEVICE) }
+            var cloudSessionToken by androidx.compose.runtime.remember(state.user.id) { mutableStateOf<String?>(null) }
+            LaunchedEffect(state.user.id) {
+                cloudSessionToken = withContext(Dispatchers.IO) { sessionStore.load(BuildConfig.API_BASE_URL) }
+            }
+            val cloudApi = androidx.compose.runtime.remember(cloudSessionToken) {
+                cloudSessionToken?.let { OrangePhotosCloudApi(BuildConfig.API_BASE_URL, it) }
+            }
+            val remoteThumbnailLoader = androidx.compose.runtime.remember { RemoteThumbnailLoader() }
             if (screen == AgentScreen.FOLDERS) {
-                DeviceMediaScreen(
+                Column(modifier = modifier) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (librarySource == LibrarySource.CLOUD) Button(onClick = {}, Modifier.weight(1f)) { Text(stringResource(R.string.cloud_library)) }
+                        else OutlinedButton(onClick = { librarySource = LibrarySource.CLOUD }, Modifier.weight(1f)) { Text(stringResource(R.string.cloud_library)) }
+                        if (librarySource == LibrarySource.DEVICE) Button(onClick = {}, Modifier.weight(1f)) { Text(stringResource(R.string.device_library)) }
+                        else OutlinedButton(onClick = { librarySource = LibrarySource.DEVICE }, Modifier.weight(1f)) { Text(stringResource(R.string.device_library)) }
+                    }
+                    if (librarySource == LibrarySource.DEVICE) {
+                        DeviceMediaScreen(
                     accountUserId=state.user.id,
                     permission=mediaPermissionAccess,
                     scanner=deviceScanner,
@@ -291,8 +323,14 @@ private fun AuthContent(
                     onSyncNow={onSyncNow(state.user.id)},
                     onDelete=onDeleteMedia,
                     refreshVersion=mediaRefreshVersion,
-                    modifier=modifier,
-                )
+                            modifier=Modifier.weight(1f).fillMaxWidth(),
+                        )
+                    } else if (cloudApi == null) {
+                        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                    } else {
+                        CloudPhotosScreen(cloudApi, remoteThumbnailLoader, Modifier.weight(1f).fillMaxWidth())
+                    }
+                }
             } else if(screen==AgentScreen.TRASH){
                 DeviceTrashScreen(scanner=deviceScanner,accountUserId=state.user.id,thumbnailLoader=thumbnailLoader,onBack={screen=AgentScreen.FOLDERS},onRestore=onRestoreMedia,onDeleteForever=onDeleteForever,refreshVersion=mediaRefreshVersion,modifier=modifier)
             } else Scaffold(topBar={androidx.compose.material3.TopAppBar(title={androidx.compose.material3.Text(stringResource(R.string.settings_title))},navigationIcon={androidx.compose.material3.IconButton(onClick={screen=AgentScreen.FOLDERS}){androidx.compose.material3.Text("←")}})}) { settingsPadding -> StatusScreen(

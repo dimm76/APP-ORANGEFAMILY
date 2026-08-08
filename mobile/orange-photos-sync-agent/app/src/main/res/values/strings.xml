@@ -137,4 +137,13 @@
     <string name="download_app_update">Descargar actualización</string>
     <string name="app_is_updated">La aplicación está actualizada.</string>
     <string name="app_is_newer_than_published">Esta instalación es posterior a la versión publicada.</string>
+    <string name="cloud_library">Nube</string>
+    <string name="device_library">Móvil</string>
+    <string name="cloud_loading">Cargando biblioteca…</string>
+    <string name="cloud_load_more">Cargar más</string>
+    <string name="cloud_retry">Reintentar</string>
+    <string name="cloud_load_error">No se pudo cargar la biblioteca.</string>
+    <string name="cloud_video">Vídeo</string>
+    <string name="cloud_video_playback_pending">Reproducción de vídeo pendiente</string>
+    <string name="cloud_close">Cerrar</string>
 </resources>
