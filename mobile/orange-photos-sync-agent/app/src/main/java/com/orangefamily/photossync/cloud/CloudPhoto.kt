@@ -34,3 +34,17 @@ data class CloudPhotoPage(
     val total: Int,
     val hasMore: Boolean,
 )
+
+data class CloudTimelineMonth(val year: Int, val month: Int, val count: Int, val cursor: String?) {
+    val key: String get() = "%04d-%02d".format(year, month)
+}
+
+data class CloudTimelineYear(val year: Int, val months: List<CloudTimelineMonth>)
+
+data class CloudPhotoWindow(
+    val items: List<CloudPhoto>, val page: Int, val perPage: Int, val total: Int,
+    val hasMore: Boolean, val hasNewer: Boolean, val hasOlder: Boolean,
+    val newerCursor: String?, val olderCursor: String?,
+)
+
+data class CloudAlbum(val id: String, val title: String, val photoCount: Int, val coverThumbnailUrl: String?)

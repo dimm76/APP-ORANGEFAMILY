@@ -146,4 +146,10 @@
     <string name="cloud_video">Vídeo</string>
     <string name="cloud_video_playback_pending">Reproducción de vídeo pendiente</string>
     <string name="cloud_close">Cerrar</string>
+    <string name="cloud_all_photos">Biblioteca</string>
+    <string name="cloud_albums">Álbumes</string>
+    <string name="cloud_album_items">%1$d elementos</string>
+    <string name="cloud_no_albums">No hay álbumes disponibles</string>
+    <string name="cloud_timeline_error">No se pudo cargar el timeline.</string>
+    <string name="cloud_album_error">No se pudieron cargar los álbumes.</string>
 </resources>

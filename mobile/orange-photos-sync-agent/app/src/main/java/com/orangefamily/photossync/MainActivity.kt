@@ -73,6 +73,8 @@ import com.orangefamily.photossync.ui.device.DeviceTrashScreen
 import com.orangefamily.photossync.cloud.OrangePhotosCloudApi
 import com.orangefamily.photossync.cloud.RemoteThumbnailLoader
 import com.orangefamily.photossync.ui.cloud.CloudPhotosScreen
+import com.orangefamily.photossync.ui.theme.OrangePrimary
+import com.orangefamily.photossync.ui.theme.OrangeText
 import android.content.ActivityNotFoundException
 import android.widget.Toast
 import kotlinx.coroutines.Dispatchers
@@ -332,22 +334,10 @@ private fun AuthContent(
                         modifier = modifier,
                     )
                 } else {
-                    Scaffold(
-                        modifier = modifier,
-                        topBar = { androidx.compose.material3.TopAppBar(title = { librarySelector() }) },
-                    ) { cloudPadding ->
-                        if (cloudApi == null) {
-                            Box(
-                                modifier = Modifier.fillMaxSize().padding(cloudPadding),
-                                contentAlignment = Alignment.Center,
-                            ) { CircularProgressIndicator() }
-                        } else {
-                            CloudPhotosScreen(
-                                api = cloudApi,
-                                thumbnailLoader = remoteThumbnailLoader,
-                                modifier = Modifier.fillMaxSize().padding(cloudPadding),
-                            )
-                        }
+                    if (cloudApi == null) {
+                        Box(modifier = modifier, contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                    } else {
+                        CloudPhotosScreen(api = cloudApi, thumbnailLoader = remoteThumbnailLoader, librarySelector = librarySelector, modifier = modifier)
                     }
                 }
             } else if(screen==AgentScreen.TRASH){
@@ -381,20 +371,20 @@ private fun LibrarySourceSelector(
     modifier: Modifier = Modifier,
 ) {
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-        LibrarySourceButton(stringResource(R.string.cloud_library), selected == LibrarySource.CLOUD) { onSelect(LibrarySource.CLOUD) }
-        LibrarySourceButton(stringResource(R.string.device_library), selected == LibrarySource.DEVICE) { onSelect(LibrarySource.DEVICE) }
+        LibrarySourceButton(stringResource(R.string.cloud_library), selected == LibrarySource.CLOUD, OrangeText) { onSelect(LibrarySource.CLOUD) }
+        LibrarySourceButton(stringResource(R.string.device_library), selected == LibrarySource.DEVICE, OrangePrimary) { onSelect(LibrarySource.DEVICE) }
     }
 }
 
 @Composable
-private fun LibrarySourceButton(text: String, selected: Boolean, onClick: () -> Unit) {
+private fun LibrarySourceButton(text: String, selected: Boolean, selectedContainerColor: Color, onClick: () -> Unit) {
     TextButton(
         onClick = onClick,
         modifier = Modifier.height(32.dp).defaultMinSize(minWidth = 0.dp, minHeight = 32.dp),
         shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.textButtonColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
-            contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+            containerColor = if (selected) selectedContainerColor else Color.Transparent,
+            contentColor = if (selected) Color.White else MaterialTheme.colorScheme.onSurface,
         ),
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
     ) { Text(text, style = MaterialTheme.typography.labelMedium, maxLines = 1) }
