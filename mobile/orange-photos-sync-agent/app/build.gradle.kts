@@ -42,14 +42,14 @@ android {
         applicationId = "com.orangefamily.photossync"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
+        versionCode = 7
         versionName = "1.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
-        create("release") {
+        create("release")4{
             if (keystoreFile.isNotEmpty()) {
                 storeFile = rootProject.file(keystoreFile)
             }
