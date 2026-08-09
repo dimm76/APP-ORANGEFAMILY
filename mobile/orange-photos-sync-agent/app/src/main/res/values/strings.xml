@@ -152,4 +152,6 @@
     <string name="cloud_no_albums">No hay álbumes disponibles</string>
     <string name="cloud_timeline_error">No se pudo cargar el timeline.</string>
     <string name="cloud_album_error">No se pudieron cargar los álbumes.</string>
+    <string name="cloud_library_title">Biblioteca</string>
+    <string name="cloud_albums_title">Álbumes</string>
 </resources>

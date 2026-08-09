@@ -47,4 +47,14 @@ data class CloudPhotoWindow(
     val newerCursor: String?, val olderCursor: String?,
 )
 
-data class CloudAlbum(val id: String, val title: String, val photoCount: Int, val coverThumbnailUrl: String?)
+data class CloudAlbum(
+    val id: String,
+    val title: String,
+    val photoCount: Int,
+    val coverThumbnailUrl: String?,
+    val dateMode: String?,
+    val dateStart: String?,
+    val dateEnd: String?,
+    val isOwner: Boolean,
+    val sharedByDisplayName: String?,
+)

@@ -2,13 +2,19 @@ package com.orangefamily.photossync.ui.cloud
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,10 +25,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.window.Dialog
 import com.orangefamily.photossync.R
 import com.orangefamily.photossync.cloud.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -34,6 +42,7 @@ private data class CloudPhotoDay(val key: String, val label: String, val photos:
 private data class CloudPhotoPeriod(val key: String, val label: String, val days: List<CloudPhotoDay>)
 private data class CloudJustifiedRow(val photos: List<CloudPhoto>, val height: Float)
 private data class WeightedTimelinePeriod(val item: CloudTimelineMonth, val start: Float, val end: Float, val center: Float)
+private enum class CloudView { LIBRARY, ALBUMS, ALBUM_DETAIL }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,6 +52,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     val listState = rememberLazyListState()
     var items by remember { mutableStateOf(emptyList<CloudPhoto>()) }
     var albums by remember { mutableStateOf(emptyList<CloudAlbum>()) }
+    var cloudView by remember { mutableStateOf(CloudView.LIBRARY) }
     var selectedAlbum by remember { mutableStateOf<CloudAlbum?>(null) }
     var timeline by remember { mutableStateOf(emptyList<CloudTimelineYear>()) }
     var loading by remember { mutableStateOf(true) }
@@ -55,35 +65,39 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     var activePeriod by remember { mutableStateOf<String?>(null) }
     var timelineJumping by remember { mutableStateOf(false) }
 
+    fun activeAlbumId(): String? = if (cloudView == CloudView.ALBUM_DETAIL) selectedAlbum?.id else null
     suspend fun reload() {
+        if (cloudView == CloudView.ALBUMS) { loading = false; return }
         loading = true; error = null
-        runCatching { api.photos(albumId = selectedAlbum?.id) to api.timeline(selectedAlbum?.id) }
+        runCatching { api.photos(albumId = activeAlbumId()) to api.timeline(activeAlbumId()) }
             .onSuccess { (photos, periods) -> items = photos.items; page = photos.page; hasMore = photos.hasMore; timeline = periods }
             .onFailure { error = it.message ?: "No se pudo cargar la biblioteca." }
         loading = false
     }
     LaunchedEffect(Unit) { albums = runCatching { api.albums() }.getOrDefault(emptyList()) }
-    LaunchedEffect(api, selectedAlbum?.id) { reload() }
+    LaunchedEffect(api, cloudView, selectedAlbum?.id) { reload() }
 
     val groups = groupCloudPhotos(items)
     LaunchedEffect(listState.firstVisibleItemIndex, groups) { activePeriod = groups.getOrNull(listState.firstVisibleItemIndex)?.key }
     suspend fun jumpToPeriod(period: CloudTimelineMonth) {
         if (period.cursor == null || timelineJumping) return
         timelineJumping = true
-        try { val result = api.aroundDate(period.cursor, selectedAlbum?.id); items = result.items; hasOlder = result.hasOlder; olderCursor = result.olderCursor; activePeriod = period.key; listState.scrollToItem(0) } finally { timelineJumping = false }
+        try { val result = api.aroundDate(period.cursor, activeAlbumId()); items = result.items; page = result.page; hasMore = result.hasMore; hasOlder = result.hasOlder; olderCursor = result.olderCursor; activePeriod = period.key; listState.scrollToItem(0) } finally { timelineJumping = false }
     }
 
     ModalNavigationDrawer(drawerState = drawerState, drawerContent = {
         ModalDrawerSheet {
             Spacer(Modifier.height(20.dp))
-            NavigationDrawerItem({ Text(stringResource(R.string.cloud_all_photos)) }, selectedAlbum == null, { selectedAlbum = null; scope.launch { drawerState.close() } })
+            NavigationDrawerItem({ Text(stringResource(R.string.cloud_all_photos)) }, cloudView == CloudView.LIBRARY, { selectedAlbum = null; cloudView = CloudView.LIBRARY; scope.launch { drawerState.close() } })
+            NavigationDrawerItem({ Text(stringResource(R.string.cloud_albums)) }, cloudView == CloudView.ALBUMS, { selectedAlbum = null; cloudView = CloudView.ALBUMS; scope.launch { drawerState.close() } })
             HorizontalDivider()
-            Text(stringResource(R.string.cloud_albums), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(16.dp))
-            albums.forEach { album -> NavigationDrawerItem({ Column { Text(album.title); Text(stringResource(R.string.cloud_album_items, album.photoCount), style = MaterialTheme.typography.labelSmall) } }, selectedAlbum?.id == album.id, { selectedAlbum = album; scope.launch { drawerState.close() } }) }
         }
     }) {
         Scaffold(modifier = modifier, topBar = { TopAppBar(title = { librarySelector() }, navigationIcon = { IconButton({ scope.launch { drawerState.open() } }) { Text("☰", style = MaterialTheme.typography.titleLarge) } }) }) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
+                if (cloudView == CloudView.ALBUMS) {
+                    CloudAlbumsView(albums, thumbnailLoader) { selectedAlbum = it; cloudView = CloudView.ALBUM_DETAIL }
+                } else {
                 if (selectedAlbum != null) Text(selectedAlbum!!.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(12.dp))
                 if (loading) CircularProgressIndicator(Modifier.align(Alignment.Center))
                 else if (error != null) Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) { Text(error!!); OutlinedButton({ scope.launch { reload() } }) { Text(stringResource(R.string.cloud_retry)) } }
@@ -91,10 +105,11 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
                     val rows = buildJustifiedRows(items, maxWidth.value - 28f)
                     LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(end = 28.dp), contentPadding = PaddingValues(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         rows.forEach { row -> item { Row(Modifier.fillMaxWidth().height(row.height.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) { row.photos.forEach { photo -> Box(Modifier.width((cloudAspectRatio(photo) * row.height).dp).fillMaxHeight().clickable { viewerPhoto = photo }) { RemoteBitmap(photo.gridUrl, thumbnailLoader, ContentScale.Crop, Modifier.fillMaxSize()); if (photo.mediaType == "video") Text(stringResource(R.string.cloud_video), color = Color.White, modifier = Modifier.align(Alignment.BottomStart).background(Color.Black.copy(alpha = .6f))) } } } } }
-                        if (hasMore) item { Button({ if (!loading) scope.launch { val result = api.photos(page + 1, albumId = selectedAlbum?.id); items = (items + result.items).distinctBy { it.id }; page = result.page; hasMore = result.hasMore } }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.cloud_load_more)) } }
-                        if (hasOlder && olderCursor != null) item { LaunchedEffect(olderCursor) { val result = api.aroundDate(olderCursor!!, selectedAlbum?.id, "older"); items = (items + result.items).distinctBy { it.id }; hasOlder = result.hasOlder; olderCursor = result.olderCursor } }
+                        if (hasMore) item { Button({ if (!loading) scope.launch { val result = api.photos(page + 1, albumId = activeAlbumId()); items = (items + result.items).distinctBy { it.id }; page = result.page; hasMore = result.hasMore } }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.cloud_load_more)) } }
+                        if (hasOlder && olderCursor != null) item { LaunchedEffect(olderCursor) { val result = api.aroundDate(olderCursor!!, activeAlbumId(), "older"); items = (items + result.items).distinctBy { it.id }; hasOlder = result.hasOlder; olderCursor = result.olderCursor } }
                     }
                     if (timeline.isNotEmpty()) CloudTimeline(timeline, activePeriod) { scope.launch { jumpToPeriod(it) } }
+                }
                 }
             }
         }
@@ -114,5 +129,64 @@ private fun groupCloudPhotos(items: List<CloudPhoto>): List<CloudPhotoPeriod> = 
 private val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale("es", "ES"))
 private val dayFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale("es", "ES"))
 
-@Composable private fun CloudTimeline(years: List<CloudTimelineYear>, activePeriod: String?, onSelected: (CloudTimelineMonth) -> Unit) { val periods = years.flatMap { it.months }; Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) { Column(Modifier.fillMaxHeight().width(28.dp).pointerInput(periods) { detectTapGestures { offset -> onSelected(periods[(offset.y / size.height * periods.size).toInt().coerceIn(periods.indices)]) } }.pointerInput(periods) { detectVerticalDragGestures { change, _ -> change.consume(); onSelected(periods[(change.position.y / size.height * periods.size).toInt().coerceIn(periods.indices)]) } }, horizontalAlignment = Alignment.CenterHorizontally) { periods.forEach { month -> Box(Modifier.size(if (month.key == activePeriod) 10.dp else 6.dp).background(if (month.key == activePeriod) MaterialTheme.colorScheme.primary else Color.Gray, MaterialTheme.shapes.small)) } } } }
+private fun weightedTimeline(years: List<CloudTimelineYear>): List<WeightedTimelinePeriod> { val periods = years.flatMap { it.months }; val total = periods.sumOf { maxOf(1, it.count) }.toFloat(); var accumulated = 0f; return periods.map { item -> val start = accumulated / total; accumulated += maxOf(1, item.count); val end = accumulated / total; WeightedTimelinePeriod(item, start, end, (start + end) / 2f) } }
+private fun timelineMonthLabel(item: CloudTimelineMonth): String {
+    val date = java.time.LocalDate.of(item.year, item.month, 1)
+    return date.format(DateTimeFormatter.ofPattern("MMM yyyy", Locale("es", "ES")))
+        .replace(".", "").replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+}
+
+@Composable
+private fun CloudTimeline(years: List<CloudTimelineYear>, activePeriod: String?, onSelected: (CloudTimelineMonth) -> Unit) {
+    val periods = remember(years) { weightedTimeline(years) }
+    if (periods.isEmpty()) return
+    val yearPositions = remember(periods) { periods.groupBy { it.item.year }.map { (year, entries) -> year to ((entries.first().start + entries.last().end) / 2f) } }
+    val active = periods.firstOrNull { it.item.key == activePeriod }
+    var dragging by remember { mutableStateOf(false) }
+    var scrubProgress by remember { mutableStateOf(active?.center ?: periods.first().center) }
+    var previewPeriod by remember { mutableStateOf(active ?: periods.first()) }
+    LaunchedEffect(activePeriod, periods, dragging) {
+        if (!dragging) periods.firstOrNull { it.item.key == activePeriod }?.let { scrubProgress = it.center; previewPeriod = it }
+    }
+    LaunchedEffect(dragging, previewPeriod.item.key) {
+        if (dragging) { delay(140); onSelected(previewPeriod.item) }
+    }
+    BoxWithConstraints(Modifier.fillMaxHeight().width(78.dp)) {
+        val trackHeight = maxHeight - 20.dp
+        fun update(y: Float) {
+            val progress = (y / constraints.maxHeight.toFloat()).coerceIn(0f, 1f)
+            periods.minByOrNull { abs(it.center - progress) }?.let { scrubProgress = progress; previewPeriod = it }
+        }
+        Box(Modifier.fillMaxSize().pointerInput(periods) { detectTapGestures { update(it.y); onSelected(previewPeriod.item) } }.pointerInput(periods) {
+            detectVerticalDragGestures(onDragStart = { dragging = true; update(it.y) }, onVerticalDrag = { change, _ -> change.consume(); update(change.position.y) }, onDragEnd = { onSelected(previewPeriod.item); dragging = false }, onDragCancel = { dragging = false })
+        }) {
+            Box(Modifier.align(Alignment.CenterEnd).padding(end = 14.dp).width(1.dp).fillMaxHeight().padding(vertical = 10.dp).background(MaterialTheme.colorScheme.outlineVariant))
+            periods.forEach { period -> val activeDot = period.item.key == activePeriod; Box(Modifier.align(Alignment.TopEnd).padding(end = if (activeDot) 11.dp else 12.dp).offset(y = trackHeight * period.center + 10.dp - if (activeDot) 3.dp else 2.dp).size(if (activeDot) 6.dp else 4.dp).background(if (activeDot) MaterialTheme.colorScheme.primary else Color(0x7A475569), CircleShape)) }
+            yearPositions.forEach { (year, progress) ->
+                val activeYear = activePeriod?.startsWith("$year-") == true
+                Text(year.toString(), style = MaterialTheme.typography.labelMedium, fontWeight = if (activeYear) FontWeight.Bold else FontWeight.Medium, color = if (activeYear) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.TopEnd).padding(end = 22.dp).offset(y = trackHeight * progress + 10.dp - 9.dp).background(if (activeYear) Color(0xF5FFF8F5) else Color.Transparent, RoundedCornerShape(999.dp)).padding(horizontal = 4.dp, vertical = 1.dp))
+            }
+            Box(Modifier.align(Alignment.TopEnd).offset(y = trackHeight * scrubProgress + 10.dp - 21.dp).padding(end = 1.dp).size(width = 28.dp, height = 42.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.CenterHorizontally) { repeat(3) { Box(Modifier.width(9.dp).height(2.dp).background(Color(0xFF64748B))) } }
+            }
+            if (dragging) Text(timelineMonthLabel(previewPeriod.item), style = MaterialTheme.typography.titleSmall, modifier = Modifier.align(Alignment.TopEnd).offset(x = (-52).dp, y = trackHeight * scrubProgress + 10.dp - 22.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(22.dp)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(22.dp)).padding(horizontal = 13.dp, vertical = 10.dp))
+        }
+    }
+}
+
+@Composable private fun CloudAlbumsView(albums: List<CloudAlbum>, thumbnailLoader: RemoteThumbnailLoader, onOpen: (CloudAlbum) -> Unit) {
+    Column(Modifier.fillMaxSize()) {
+        Text(stringResource(R.string.cloud_albums), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(16.dp))
+        if (albums.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.cloud_no_albums)) }
+        else LazyVerticalGrid(GridCells.Fixed(2), Modifier.fillMaxSize(), contentPadding = PaddingValues(10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(albums, key = { it.id }) { album ->
+            Column(Modifier.clickable { onOpen(album) }) {
+                Box(Modifier.fillMaxWidth().aspectRatio(1.35f).background(Color.LightGray)) { RemoteBitmap(album.coverThumbnailUrl, thumbnailLoader, ContentScale.Crop, Modifier.fillMaxSize()) }
+                Text(album.title, style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.cloud_album_items, album.photoCount), style = MaterialTheme.typography.labelSmall)
+                album.sharedByDisplayName?.let { Text("Compartido por $it", style = MaterialTheme.typography.labelSmall) }
+                album.dateStart?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
+            }
+        } }
+    }
+}
 @Composable private fun RemoteBitmap(url: String?, loader: RemoteThumbnailLoader, contentScale: ContentScale, modifier: Modifier = Modifier) { var bitmap by remember(url) { mutableStateOf<android.graphics.Bitmap?>(null) }; LaunchedEffect(url) { bitmap = url?.let { loader.load(it) } }; if (bitmap == null) Box(modifier.background(Color.LightGray)) else Image(bitmap!!.asImageBitmap(), null, modifier, contentScale = contentScale) }
