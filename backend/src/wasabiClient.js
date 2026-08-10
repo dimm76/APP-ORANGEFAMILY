@@ -104,7 +104,7 @@ async function uploadOrangePhotoToWasabi(buffer, { familyId, mimeType, extension
   if (!Buffer.isBuffer(buffer) || !buffer.length) throw new Error("El archivo está vacío.");
   const now = new Date();
   const ext = String(extension || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const foldersByVariant = { original: "originals", thumbnail: "thumbnails", preview: "previews", poster: "posters" };
+  const foldersByVariant = { original: "originals", thumbnail: "thumbnails", preview: "previews", poster: "posters", playback: "playbacks" };
   const normalizedVariant = String(variant || "original").trim().toLowerCase();
   const folder = foldersByVariant[normalizedVariant];
   if (!folder) throw new Error(`Variante de Orange Photos no soportada: ${normalizedVariant || "(vacía)"}.`);
