@@ -284,7 +284,11 @@ Características:
 * MP4;
 * H.264;
 * AAC;
-* máximo 1080p, sin ampliar vídeos menores;
+* caja máxima horizontal: 1920 × 1080;
+* caja máxima vertical: 1080 × 1920;
+* conservar la proporción;
+* no ampliar vídeos menores;
+* dimensiones finales pares;
 * máximo 30 fps;
 * CRF 23 y preset `veryfast`;
 * pixel format `yuv420p`;
@@ -333,7 +337,7 @@ orange-photos/
 ├── thumbnails/
 ├── previews/
 ├── posters/
-└── playback/
+└── playbacks/
 ```
 
 La estructura física puede incluir:

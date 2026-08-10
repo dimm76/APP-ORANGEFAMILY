@@ -15,7 +15,10 @@ const { createImageDerivative } = require("./orangePhotosImageProcessor");
 const execFileAsync = promisify(execFile);
 const QUERY_TIMEOUT = 15000;
 const VIDEO_THUMBNAIL_MAX_SIDE = 480;
-const VIDEO_PLAYBACK_MAX_SIDE = 1080;
+const VIDEO_PLAYBACK_LANDSCAPE_MAX_WIDTH = 1920;
+const VIDEO_PLAYBACK_LANDSCAPE_MAX_HEIGHT = 1080;
+const VIDEO_PLAYBACK_PORTRAIT_MAX_WIDTH = 1080;
+const VIDEO_PLAYBACK_PORTRAIT_MAX_HEIGHT = 1920;
 const VIDEO_PLAYBACK_MAX_FPS = 30;
 const validDateIso = value => { if (value == null || value === "") return null; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString(); };
 async function videoPhase(row, phase, failureMessage, work) {
@@ -72,7 +75,7 @@ async function createVideoPreview(inputPath, outputPath) {
 }
 
 async function createVideoPlayback(inputPath, outputPath) {
-  const scale = `scale=w='if(gt(iw,ih),trunc(min(${VIDEO_PLAYBACK_MAX_SIDE},iw)/2)*2,-2)':h='if(gt(iw,ih),-2,trunc(min(${VIDEO_PLAYBACK_MAX_SIDE},ih)/2)*2)'`;
+  const scale = `scale=` + `w='if(gte(iw,ih),min(${VIDEO_PLAYBACK_LANDSCAPE_MAX_WIDTH},iw),min(${VIDEO_PLAYBACK_PORTRAIT_MAX_WIDTH},iw))':` + `h='if(gte(iw,ih),min(${VIDEO_PLAYBACK_LANDSCAPE_MAX_HEIGHT},ih),min(${VIDEO_PLAYBACK_PORTRAIT_MAX_HEIGHT},ih))':` + `force_original_aspect_ratio=decrease:` + `force_divisible_by=2`;
   await runFfmpeg(["-y", "-i", inputPath, "-map", "0:v:0", "-map", "0:a:0?", "-vf", scale, "-fpsmax", String(VIDEO_PLAYBACK_MAX_FPS), "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", outputPath], 30 * 60 * 1000);
   const stat = await fs.stat(outputPath);
   if (!stat.size) throw new Error("ffmpeg generó un playback vacío.");
