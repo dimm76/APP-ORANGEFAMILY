@@ -601,6 +601,17 @@ La ausencia de un derivado no debe interpretarse como ausencia del elemento orig
 
 ---
 
+### Reconstrucción histórica de vídeo
+
+El reconciliador existente `backend/scripts/reconcile-orange-photos-videos.js`
+puede completar de forma idempotente metadatos, poster, thumbnail, preview y
+playback. Playback existente nunca se regenera; solo se crea cuando falta.
+
+El modo por defecto es dry-run mediante `ORANGE_PHOTOS_VIDEO_DRY_RUN` y admite
+`ORANGE_PHOTOS_VIDEO_LIMIT` y `ORANGE_PHOTOS_VIDEO_CONCURRENCY`, con concurrencia
+máxima 4. Un fallo individual no detiene el lote y se genera un informe JSON.
+La conversión física no se realiza mediante migración SQL.
+
 # Descargas
 
 Las descargas deben distinguir explícitamente entre calidad original y optimizada.
@@ -635,7 +646,15 @@ Para fotografías:
 preview
 ```
 
-Para vídeos se definirá cuando exista la variante completa optimizada de reproducción.
+Para vídeos:
+
+```text
+playback
+```
+
+`playback` es la copia optimizada; `original` sigue siendo la descarga en
+calidad original. La UI todavía no expone necesariamente ambas opciones; esta
+sección define el contrato de variante, no el estado de la UI.
 
 ---
 
@@ -678,9 +697,19 @@ Uso previsto:
 ```text
 timeline → thumbnail
 álbumes → thumbnail
-lightbox → preview
-descarga → original o preview según acción
+visor → preview
+descarga original → original
+
+Vídeos:
+
+timeline/grid → thumbnail
+estado inicial → poster
+preview corto → preview
+reproducción ordinaria → playback
+descarga original → original
 ```
+
+Android y web comparten `playback`; no existe playback específico para Android.
 
 El motor actual de archivos locales y sincronización Android permanece independiente.
 
@@ -714,7 +743,7 @@ Primera implantación:
 Fuera de esta primera implantación:
 
 * transcodificación completa histórica de todos los vídeos;
-* reconstrucciÃ³n histÃ³rica de `playback`;
+* ejecutar el backfill histÃ³rico en producciÃ³n;
 * exposiciÃ³n `video_playback_url` en API;
 * consumo web y Android;
 * streaming y visor Android;
