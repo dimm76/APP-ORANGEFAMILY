@@ -724,6 +724,35 @@ La introducción de derivados no debe modificar la lógica actual de:
 
 ---
 
+## Contrato API de variantes
+
+La API expone las variantes mediante URLs firmadas por el mismo mecanismo para
+web y Android.
+
+Imágenes:
+
+```text
+thumbnail_url
+preview_url
+original_url
+```
+
+Vídeos:
+
+```text
+thumbnail_url
+poster_url
+video_preview_url
+video_playback_url
+original_url
+```
+
+`video_preview_url` es el clip corto de 3 segundos. `video_playback_url` es el
+vídeo completo optimizado. Si no existe playback, `video_playback_url` es
+`null`, sin fallback automático a `original_url`; `original_url` sigue siendo
+el original. Playback está implementado para nuevas subidas y el reconciliador
+puede generarlo para históricos.
+
 # Alcance inicial
 
 Primera implantación:
@@ -743,8 +772,7 @@ Primera implantación:
 Fuera de esta primera implantación:
 
 * transcodificación completa histórica de todos los vídeos;
-* ejecutar el backfill histÃ³rico en producciÃ³n;
-* exposiciÃ³n `video_playback_url` en API;
+* ejecutar el backfill histórico en producción;
 * consumo web y Android;
 * streaming y visor Android;
 * rediseño completo de la web;
