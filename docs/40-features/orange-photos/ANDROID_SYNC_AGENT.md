@@ -2,6 +2,9 @@
 > El resumen consolidado de la implementación web, backend y Android se mantiene
 > en [`IMPLEMENTATION_STATUS.md`](./IMPLEMENTATION_STATUS.md).
 
+> Para publicar una nueva APK en producción:
+> [`ANDROID_RELEASE_RUNBOOK.md`](./ANDROID_RELEASE_RUNBOOK.md)
+
 ## Propósito
 
 El agente Android es una APK privada cuya función es detectar y subir automáticamente a OrangeFamily las fotos y los vídeos nuevos del dispositivo.
