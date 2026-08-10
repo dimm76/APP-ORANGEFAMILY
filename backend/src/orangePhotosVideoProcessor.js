@@ -1,6 +1,7 @@
 ﻿/* global require, module */
 const fs = require("node:fs/promises");
 const fsNative = require("node:fs");
+const { createHash } = require("node:crypto");
 const os = require("node:os");
 const path = require("node:path");
 const { pipeline } = require("node:stream/promises");
@@ -9,7 +10,7 @@ const { promisify } = require("node:util");
 const ffmpegPath = require("ffmpeg-static");
 const ffprobePath = require("ffprobe-static").path;
 const pool = require("../db");
-const { getOrangePhotoObjectStream, uploadOrangePhotoToWasabi } = require("./wasabiClient");
+const { getOrangePhotoObjectStream, uploadOrangePhotoToWasabi, uploadOrangePhotoFileToWasabi } = require("./wasabiClient");
 const { createImageDerivative } = require("./orangePhotosImageProcessor");
 
 const execFileAsync = promisify(execFile);
@@ -21,6 +22,7 @@ const VIDEO_PLAYBACK_PORTRAIT_MAX_WIDTH = 1080;
 const VIDEO_PLAYBACK_PORTRAIT_MAX_HEIGHT = 1920;
 const VIDEO_PLAYBACK_MAX_FPS = 30;
 const validDateIso = value => { if (value == null || value === "") return null; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString(); };
+async function sha256File(filePath) { const hash = createHash("sha256"); for await (const chunk of fsNative.createReadStream(filePath)) hash.update(chunk); return hash.digest("hex"); }
 async function videoPhase(row, phase, failureMessage, work) {
   const started = Date.now();
   try {
@@ -126,7 +128,9 @@ async function processStoredOrangePhotoVideo(photoId, options = {}) {
     const derivatives = [];
     try {
       for (const item of generated) {
-        const buffer = await fs.readFile(item.path), upload = item.variant==="poster"?await videoPhase(row,"upload_poster","No se pudo guardar la miniatura.",()=>uploadOrangePhotoToWasabi(buffer, { familyId:row.family_id,photoId:item.variant==="thumbnail"?row.id:undefined,mimeType:item.mime_type,extension:item.extension,originalFilename:`${row.original_filename || row.id}-${item.variant}.${item.extension}`,variant:item.variant })):await uploadOrangePhotoToWasabi(buffer, { familyId:row.family_id,photoId:item.variant==="thumbnail"?row.id:undefined,mimeType:item.mime_type,extension:item.extension,originalFilename:`${row.original_filename || row.id}-${item.variant}.${item.extension}`,variant:item.variant });
+        const upload = item.variant === "playback"
+          ? await uploadOrangePhotoFileToWasabi(item.path, { familyId:row.family_id, photoId:row.id, mimeType:item.mime_type, extension:item.extension, originalFilename:`${row.original_filename || row.id}-${item.variant}.${item.extension}`, sizeBytes:item.size, checksumSha256:await sha256File(item.path), variant:item.variant })
+          : await (async () => { const buffer = await fs.readFile(item.path); return item.variant==="poster"?await videoPhase(row,"upload_poster","No se pudo guardar la miniatura.",()=>uploadOrangePhotoToWasabi(buffer, { familyId:row.family_id,photoId:item.variant==="thumbnail"?row.id:undefined,mimeType:item.mime_type,extension:item.extension,originalFilename:`${row.original_filename || row.id}-${item.variant}.${item.extension}`,variant:item.variant })):await uploadOrangePhotoToWasabi(buffer, { familyId:row.family_id,photoId:item.variant==="thumbnail"?row.id:undefined,mimeType:item.mime_type,extension:item.extension,originalFilename:`${row.original_filename || row.id}-${item.variant}.${item.extension}`,variant:item.variant }); })();
         derivatives.push({ ...item, upload });
       }
       if (!replacePoster) await videoPhase(row,"replace_database_record",needsPoster&&!needsPreview?"No se pudo registrar la nueva miniatura.":"No se pudieron registrar los derivados del vÃ­deo.",()=>register(row,metadata,derivatives,shouldUpdateMetadata,possibleOrphans));

@@ -99,20 +99,24 @@ function assertWritableOrangePhotosStorageKey(storageKey, envPrefix) {
   return key;
 }
 
-async function uploadOrangePhotoToWasabi(buffer, { familyId, mimeType, extension, originalFilename, variant = "original", checksumSha256 = null, photoId = null } = {}) {
-  const { client, config } = getS3Client();
-  if (!Buffer.isBuffer(buffer) || !buffer.length) throw new Error("El archivo está vacío.");
-  const now = new Date();
-  const ext = String(extension || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const foldersByVariant = { original: "originals", thumbnail: "thumbnails", preview: "previews", poster: "posters", playback: "playbacks" };
+function buildOrangePhotoVariantObjectKey(config, { familyId, extension, variant = "original", photoId = null } = {}) {
   const normalizedVariant = String(variant || "original").trim().toLowerCase();
+  const foldersByVariant = { original: "originals", thumbnail: "thumbnails", preview: "previews", poster: "posters", playback: "playbacks" };
   const folder = foldersByVariant[normalizedVariant];
   if (!folder) throw new Error(`Variante de Orange Photos no soportada: ${normalizedVariant || "(vacía)"}.`);
+  const ext = String(extension || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const safePhotoId = ORANGE_PHOTO_UUID_RE.test(String(photoId || "")) ? String(photoId) : null;
   const objectFilename = normalizedVariant !== "original" && safePhotoId
     ? `${safePhotoId}_${normalizedVariant}_${randomUUID()}.${ext}`
     : `${randomUUID()}.${ext}`;
-  const key = assertWritableOrangePhotosStorageKey(`${config.orangePhotosPrefix}/${folder}/${familyId}/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}/${objectFilename}`, config.envPrefix);
+  const now = new Date();
+  return assertWritableOrangePhotosStorageKey(`${config.orangePhotosPrefix}/${folder}/${familyId}/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}/${objectFilename}`, config.envPrefix);
+}
+
+async function uploadOrangePhotoToWasabi(buffer, { familyId, mimeType, extension, originalFilename, variant = "original", checksumSha256 = null, photoId = null } = {}) {
+  const { client, config } = getS3Client();
+  if (!Buffer.isBuffer(buffer) || !buffer.length) throw new Error("El archivo está vacío.");
+  const key = buildOrangePhotoVariantObjectKey(config, { familyId, extension, variant, photoId });
   await client.send(new PutObjectCommand({ Bucket: config.bucket, Key: key, Body: buffer, ContentType: mimeType }));
   return { provider: "wasabi", bucket: config.bucket, object_key: key, mime_type: mimeType,
     original_filename: String(originalFilename || "archivo").slice(0, 500), size_bytes: buffer.length,
@@ -172,9 +176,9 @@ async function listOrangePhotoMultipartParts(upload) {
   return parts.sort((a, b) => a.part_number - b.part_number);
 }
 
-async function uploadOrangePhotoFileToWasabi(filePath, { familyId, mimeType, extension, originalFilename, sizeBytes, checksumSha256 } = {}) {
+async function uploadOrangePhotoFileToWasabi(filePath, { familyId, mimeType, extension, originalFilename, sizeBytes, checksumSha256, variant = "original", photoId = null } = {}) {
   const { client, config } = getS3Client();
-  const objectKey = buildOrangePhotoObjectKey(config, familyId, extension);
+  const objectKey = buildOrangePhotoVariantObjectKey(config, { familyId, extension, variant, photoId });
   const created = await client.send(new CreateMultipartUploadCommand({ Bucket:config.bucket, Key:objectKey, ContentType:mimeType }));
   if (!created.UploadId) throw new Error("Wasabi no devolvió un identificador multipart.");
   const record={bucket:config.bucket,object_key:objectKey,provider_upload_id:String(created.UploadId)};
