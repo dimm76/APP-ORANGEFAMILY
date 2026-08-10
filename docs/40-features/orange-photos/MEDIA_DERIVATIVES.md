@@ -275,24 +275,51 @@ No debe reproducirse automáticamente en todos los elementos del timeline móvil
 
 ## playback
 
-Variante futura para reproducción completa optimizada.
+Variante completa optimizada para reproducción ordinaria y streaming progresivo.
 
-No forma parte de la primera fase.
+Estado: implementado para nuevas subidas de vídeos.
 
-Objetivo previsto:
+Características:
 
 * MP4;
 * H.264;
 * AAC;
-* resolución controlada;
-* bitrate o calidad controlados;
-* orientación corregida;
+* máximo 1080p, sin ampliar vídeos menores;
+* máximo 30 fps;
+* CRF 23 y preset `veryfast`;
+* pixel format `yuv420p`;
+* audio AAC 128 kbps cuando exista;
+* duración completa;
 * `faststart`;
 * compatibilidad web y Android.
+
+Uso: reproducción ordinaria web y Android, streaming progresivo y evitar cargar
+el original para el visionado normal.
 
 El `original` seguirá conservándose independientemente de `playback`.
 
 ---
+
+### Pipeline de vídeo
+
+Vídeo nuevo: original → poster → thumbnail → preview → playback.
+
+El poster puede generarse durante la subida. Preview y playback se generan de
+forma diferida tras registrar el original; la respuesta no espera al playback.
+Un fallo de playback no invalida el original y los derivados ausentes pueden
+reconstruirse mediante reconciliación. `photo_id + variant` identifica cada
+derivado.
+
+### Estrategia de reproducción
+
+* timeline/grid: `thumbnail`;
+* estado inicial de vídeo: `poster`;
+* preview corto: `preview`;
+* reproducción normal: `playback`;
+* descarga original: `original`.
+
+Android y web consumirán la misma variante `playback`; no existe una variante
+específica para Android.
 
 # Estructura en Wasabi
 
@@ -306,7 +333,7 @@ orange-photos/
 ├── thumbnails/
 ├── previews/
 ├── posters/
-└── playback/        # futuro
+└── playback/
 ```
 
 La estructura física puede incluir:
@@ -687,7 +714,10 @@ Primera implantación:
 Fuera de esta primera implantación:
 
 * transcodificación completa histórica de todos los vídeos;
-* variante `playback`;
+* reconstrucciÃ³n histÃ³rica de `playback`;
+* exposiciÃ³n `video_playback_url` en API;
+* consumo web y Android;
+* streaming y visor Android;
 * rediseño completo de la web;
 * sincronización bidireccional;
 * mezcla del repositorio local Android y la biblioteca remota.
