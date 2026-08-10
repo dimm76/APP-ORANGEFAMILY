@@ -15,6 +15,8 @@ const { createImageDerivative } = require("./orangePhotosImageProcessor");
 const execFileAsync = promisify(execFile);
 const QUERY_TIMEOUT = 15000;
 const VIDEO_THUMBNAIL_MAX_SIDE = 480;
+const VIDEO_PLAYBACK_MAX_SIDE = 1080;
+const VIDEO_PLAYBACK_MAX_FPS = 30;
 const validDateIso = value => { if (value == null || value === "") return null; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString(); };
 async function videoPhase(row, phase, failureMessage, work) {
   const started = Date.now();
@@ -42,8 +44,8 @@ async function probeVideoFile(filePath) {
   return { duration:Number.isFinite(duration)&&duration>0?duration:null,width:Number.isInteger(width)&&width>0?width:null,height:Number.isInteger(height)&&height>0?height:null,rotation:Number.isFinite(rotation)?rotation:0,codec_name:stream.codec_name||null,format_name:parsed.format?.format_name||null,creation_time:validDateIso(stream.tags?.creation_time||parsed.format?.tags?.creation_time) };
 }
 
-async function runFfmpeg(args) {
-  return execFileAsync(ffmpegPath, args, { timeout: 180000, maxBuffer: 16 * 1024 * 1024, windowsHide: true });
+async function runFfmpeg(args, timeout = 180000) {
+  return execFileAsync(ffmpegPath, args, { timeout, maxBuffer: 16 * 1024 * 1024, windowsHide: true });
 }
 
 async function createVideoPoster(inputPath, outputPath) {
@@ -69,8 +71,16 @@ async function createVideoPreview(inputPath, outputPath) {
   return { size:stat.size, metadata:await probeVideoFile(outputPath) };
 }
 
+async function createVideoPlayback(inputPath, outputPath) {
+  const scale = `scale=w='if(gt(iw,ih),trunc(min(${VIDEO_PLAYBACK_MAX_SIDE},iw)/2)*2,-2)':h='if(gt(iw,ih),-2,trunc(min(${VIDEO_PLAYBACK_MAX_SIDE},ih)/2)*2)'`;
+  await runFfmpeg(["-y", "-i", inputPath, "-map", "0:v:0", "-map", "0:a:0?", "-vf", scale, "-fpsmax", String(VIDEO_PLAYBACK_MAX_FPS), "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", outputPath], 30 * 60 * 1000);
+  const stat = await fs.stat(outputPath);
+  if (!stat.size) throw new Error("ffmpeg generó un playback vacío.");
+  return { size: stat.size, metadata: await probeVideoFile(outputPath) };
+}
+
 async function loadPhoto(photoId) {
-  const row = (await query(`SELECT p.id,p.family_id,p.original_filename,p.mime_type,p.duration_seconds,p.width,p.height,p.orientation,p.captured_at,p.captured_at_source,original.bucket,original.object_key,original.mime_type AS original_mime_type,poster.object_key AS poster_key,poster.bucket AS poster_bucket,thumbnail.object_key AS thumbnail_key,preview.object_key AS preview_key FROM public.orange_photos p JOIN public.orange_photo_files original ON original.photo_id=p.id AND original.variant='original' LEFT JOIN public.orange_photo_files poster ON poster.photo_id=p.id AND poster.variant='poster' LEFT JOIN public.orange_photo_files thumbnail ON thumbnail.photo_id=p.id AND thumbnail.variant='thumbnail' LEFT JOIN public.orange_photo_files preview ON preview.photo_id=p.id AND preview.variant='preview' WHERE p.id=$1::uuid AND p.media_type='video'`, [photoId])).rows[0];
+  const row = (await query(`SELECT p.id,p.family_id,p.original_filename,p.mime_type,p.duration_seconds,p.width,p.height,p.orientation,p.captured_at,p.captured_at_source,original.bucket,original.object_key,original.mime_type AS original_mime_type,poster.object_key AS poster_key,poster.bucket AS poster_bucket,thumbnail.object_key AS thumbnail_key,preview.object_key AS preview_key,playback.object_key AS playback_key FROM public.orange_photos p JOIN public.orange_photo_files original ON original.photo_id=p.id AND original.variant='original' LEFT JOIN public.orange_photo_files poster ON poster.photo_id=p.id AND poster.variant='poster' LEFT JOIN public.orange_photo_files thumbnail ON thumbnail.photo_id=p.id AND thumbnail.variant='thumbnail' LEFT JOIN public.orange_photo_files preview ON preview.photo_id=p.id AND preview.variant='preview' LEFT JOIN public.orange_photo_files playback ON playback.photo_id=p.id AND playback.variant='playback' WHERE p.id=$1::uuid AND p.media_type='video'`, [photoId])).rows[0];
   if (!row) throw new Error("VÃ­deo registrado no encontrado o sin original.");
   return row;
 }
@@ -94,12 +104,12 @@ async function register(row, metadata, derivatives, updateMetadata, possibleOrph
 }
 
 async function processStoredOrangePhotoVideo(photoId, options = {}) {
-  const replacePoster = options.replacePoster === true, createPoster = options.createPoster !== false, createThumbnail = options.createThumbnail !== false && !replacePoster, createPreview = options.createPreview !== false, updateMetadata = options.updateMetadata !== false, dryRun = options.dryRun === true;
-  const row = await loadPhoto(photoId), needsPoster = createPoster && (replacePoster || (!row.poster_key && !row.thumbnail_key)), needsThumbnail = createThumbnail && !row.thumbnail_key && Boolean(row.poster_key || needsPoster), needsPreview = createPreview && !row.preview_key, shouldUpdateMetadata = updateMetadata && (!(Number(row.duration_seconds)>0)||!row.width||!row.height||["upload_date","file_mtime","unknown"].includes(row.captured_at_source)), needsOriginal = needsPoster || needsPreview || shouldUpdateMetadata;
-  const actions = { update_metadata:shouldUpdateMetadata,create_poster:needsPoster,create_thumbnail:needsThumbnail,create_preview:needsPreview };
+  const replacePoster = options.replacePoster === true, createPoster = options.createPoster !== false, createThumbnail = options.createThumbnail !== false && !replacePoster, createPreview = options.createPreview !== false, createPlayback = options.createPlayback === true, updateMetadata = options.updateMetadata !== false, dryRun = options.dryRun === true;
+  const row = await loadPhoto(photoId), needsPoster = createPoster && (replacePoster || (!row.poster_key && !row.thumbnail_key)), needsThumbnail = createThumbnail && !row.thumbnail_key && Boolean(row.poster_key || needsPoster), needsPreview = createPreview && !row.preview_key, needsPlayback = createPlayback && !row.playback_key, shouldUpdateMetadata = updateMetadata && (!(Number(row.duration_seconds)>0)||!row.width||!row.height||["upload_date","file_mtime","unknown"].includes(row.captured_at_source)), needsOriginal = needsPoster || needsPreview || needsPlayback || shouldUpdateMetadata;
+  const actions = { update_metadata:shouldUpdateMetadata,create_poster:needsPoster,create_thumbnail:needsThumbnail,create_preview:needsPreview,create_playback:needsPlayback };
   if (dryRun && !options.validateDerivatives) return { photo:row,actions,metadata:null,created:[],possible_orphans:[] };
   if (!needsOriginal && !needsThumbnail) return { photo:row,actions,metadata:null,created:[],possible_orphans:[] };
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "orange-photos-video-")), extension = path.extname(row.original_filename || row.object_key) || ".video", inputPath = path.join(tempDir, `original${extension}`), posterPath = path.join(tempDir, "poster.jpg"), thumbnailPath = path.join(tempDir, "thumbnail.jpg"), previewPath = path.join(tempDir, "preview.mp4"), possibleOrphans = [];
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "orange-photos-video-")), extension = path.extname(row.original_filename || row.object_key) || ".video", inputPath = path.join(tempDir, `original${extension}`), posterPath = path.join(tempDir, "poster.jpg"), thumbnailPath = path.join(tempDir, "thumbnail.jpg"), previewPath = path.join(tempDir, "preview.mp4"), playbackPath = path.join(tempDir, "playback.mp4"), possibleOrphans = [];
   try {
     let metadata = null;
     if (needsOriginal) await videoPhase(row,"download_original","No se pudo descargar el vÃ­deo original.",async()=>{const source=await getOrangePhotoObjectStream({bucket:row.bucket,object_key:row.object_key});await pipeline(source.Body,fsNative.createWriteStream(inputPath));});
@@ -108,6 +118,7 @@ async function processStoredOrangePhotoVideo(photoId, options = {}) {
     if (needsPoster) generated.push({ variant:"poster",path:posterPath,mime_type:"image/jpeg",extension:"jpg",...(await videoPhase(row,"generate_poster","ffmpeg no pudo generar la miniatura.",()=>createVideoPoster(inputPath,posterPath))) });
     if (needsThumbnail) { if (!needsPoster) await videoPhase(row,"download_poster","No se pudo descargar el poster del vÃ­deo.",async()=>{const source=await getOrangePhotoObjectStream({bucket:row.poster_bucket,object_key:row.poster_key});await pipeline(source.Body,fsNative.createWriteStream(posterPath));}); generated.push({ variant:"thumbnail",path:thumbnailPath,mime_type:"image/jpeg",extension:"jpg",...(await videoPhase(row,"generate_thumbnail","No se pudo generar el thumbnail del vÃ­deo.",()=>createVideoThumbnail(posterPath,thumbnailPath))) }); }
     if (needsPreview) generated.push({ variant:"preview",path:previewPath,mime_type:"video/mp4",extension:"mp4",...(await createVideoPreview(inputPath,previewPath)) });
+    if (needsPlayback) generated.push({ variant:"playback",path:playbackPath,mime_type:"video/mp4",extension:"mp4",...(await videoPhase(row,"generate_playback","No se pudo generar el playback del vídeo.",()=>createVideoPlayback(inputPath,playbackPath))) });
     if (dryRun) return { photo:row,actions,metadata,created:generated.map(item=>({variant:item.variant,size:item.size,width:item.metadata.width,height:item.metadata.height})),possible_orphans:[] };
     const derivatives = [];
     try {
@@ -125,4 +136,4 @@ async function processStoredOrangePhotoVideo(photoId, options = {}) {
   } finally { await fs.rm(tempDir,{recursive:true,force:true}); }
 }
 
-module.exports = { probeVideoFile, createVideoPoster, createVideoPreview, processStoredOrangePhotoVideo };
+module.exports = { probeVideoFile, createVideoPoster, createVideoPreview, createVideoPlayback, processStoredOrangePhotoVideo };

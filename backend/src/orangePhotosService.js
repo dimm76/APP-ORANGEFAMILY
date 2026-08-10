@@ -318,8 +318,8 @@ async function upload(req, file, fields = {}, posterFile = null) {
     if (result.ok && m.media_type === "video" && result.payload?.item?.id) {
       const photoId = result.payload.item.id;
       setImmediate(() => {
-        processStoredOrangePhotoVideo(photoId, { createPoster:false, createPreview:true, updateMetadata:false })
-          .catch(error => console.error("OrangePhotos delayed video preview", { photo_id:photoId, message:error.message, possible_orphans:error.possibleOrphans || [] }));
+        processStoredOrangePhotoVideo(photoId, { createPoster:false, createPreview:true, createPlayback:true, updateMetadata:false })
+          .catch(error => console.error("OrangePhotos delayed video derivatives", { photo_id:photoId, message:error.message, possible_orphans:error.possibleOrphans || [] }));
       });
     }
     if (result.ok && m.media_type === "image" && result.payload?.item?.id) {
@@ -379,7 +379,7 @@ async function uploadDirect(req) {
     let result;
     try{result=await insertPhoto(auth,metadata,stored,posterStored,[...new Set(warnings)].join(" · ")||null,forceDuplicate&&suppression?checksumSha256:null,clientContext(req),"direct_backend");}
     catch(error){console.error("OrangePhotos direct database registration",{object_key:stored.object_key,message:error.message,code:error.code,detail:error.detail,constraint:error.constraint,table:error.table,column:error.column});try{await deleteOrangePhotoObject(stored);if(posterStored)await deleteOrangePhotoObject(posterStored);}catch(cleanupError){console.error("OrangePhotos direct database cleanup",{object_key:stored.object_key,message:cleanupError.message});}return bad(500,"DATABASE_REGISTRATION_FAILED","El archivo se transfirió, pero no pudo registrarse en OrangePhotos.");}
-    if(result.ok&&result.payload?.item?.id){const photoId=result.payload.item.id;setImmediate(()=>processStoredOrangePhotoVideo(photoId,{createPoster:false,createPreview:true,updateMetadata:false}).catch(error=>console.error("OrangePhotos direct delayed video preview",{photo_id:photoId,message:error.message,possible_orphans:error.possibleOrphans||[]})));}
+    if(result.ok&&result.payload?.item?.id){const photoId=result.payload.item.id;setImmediate(()=>processStoredOrangePhotoVideo(photoId,{createPoster:false,createPreview:true,createPlayback:true,updateMetadata:false}).catch(error=>console.error("OrangePhotos direct delayed video derivatives",{photo_id:photoId,message:error.message,possible_orphans:error.possibleOrphans||[]})));}
     return result;
   } catch(error) {
     console.error("OrangePhotos direct internal",{message:error.message,object_key:stored?.object_key||null});
