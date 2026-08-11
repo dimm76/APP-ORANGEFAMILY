@@ -314,6 +314,13 @@ Un fallo de playback no invalida el original y los derivados ausentes pueden
 reconstruirse mediante reconciliación. `photo_id + variant` identifica cada
 derivado.
 
+Los originales y derivados temporales de vídeo se procesan en almacenamiento en
+disco, sin utilizar el tmpfs del sistema para vídeos completos. La ruta por
+defecto es `backend/tmp/orange-photos-video-work/` y puede sobrescribirse con
+`ORANGE_PHOTOS_VIDEO_WORK_DIR`. El mismo workspace se utiliza para nuevas
+subidas y reconciliación; el original continúa en Wasabi y se conserva
+inmutable. Los workspaces se eliminan al finalizar normalmente la operación.
+
 ### Estrategia de reproducción
 
 * timeline/grid: `thumbnail`;

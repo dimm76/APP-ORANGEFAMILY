@@ -3,7 +3,6 @@
 const pool = require("../db");
 const fs = require("node:fs/promises");
 const fsNative = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
 const { createHash, randomBytes } = require("node:crypto");
 const { Transform } = require("node:stream");
@@ -13,7 +12,7 @@ const { resolveAlbumAccess } = require("./orangePhotoAlbumAccessService");
 const { clientContext } = require("./orangePhotosClientContext");
 const { assertReadableOrangePhotosStorageKey, deleteOrangePhotoObject, getSignedOrangePhotoUrl, getOrangePhotoObjectStream, uploadOrangePhotoFileToWasabi, uploadOrangePhotoToWasabi } = require("./wasabiClient");
 const { getAttachmentsConfig } = require("./attachmentsConfig");
-const { probeVideoFile, createVideoPoster, processStoredOrangePhotoVideo } = require("./orangePhotosVideoProcessor");
+const { probeVideoFile, createVideoPoster, processStoredOrangePhotoVideo, createVideoWorkDir } = require("./orangePhotosVideoProcessor");
 const { processStoredOrangePhotoImage } = require("./orangePhotosImageProcessor");
 const exifr = require("exifr");
 
@@ -255,7 +254,7 @@ async function upload(req, file, fields = {}, posterFile = null) {
 
   try {
     if (m.media_type === "video") {
-      tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "orange-photos-upload-"));
+      tempDir = await createVideoWorkDir("orange-photos-upload-");
       const inputPath = path.join(tempDir, `original.${m.extension || "video"}`);
       const posterPath = path.join(tempDir, "poster.jpg");
       await fs.writeFile(inputPath, file.buffer);
@@ -356,7 +355,7 @@ async function uploadDirect(req) {
   let tempDir=null,stored=null,posterStored=null;
   const warnings=[];
   try{
-    tempDir=await fs.mkdtemp(path.join(os.tmpdir(),"orange-photos-direct-"));
+    tempDir=await createVideoWorkDir("orange-photos-direct-");
     const inputPath=path.join(tempDir,`original.${metadata.extension}`),posterPath=path.join(tempDir,"poster.jpg"),hash=createHash("sha256");
     let receivedBytes=0,requestAborted=false;
     req.once("aborted",()=>{requestAborted=true;});

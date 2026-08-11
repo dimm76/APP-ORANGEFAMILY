@@ -2,7 +2,6 @@
 const fs = require("node:fs/promises");
 const fsNative = require("node:fs");
 const { createHash } = require("node:crypto");
-const os = require("node:os");
 const path = require("node:path");
 const { pipeline } = require("node:stream/promises");
 const { execFile } = require("node:child_process");
@@ -21,7 +20,10 @@ const VIDEO_PLAYBACK_LANDSCAPE_MAX_HEIGHT = 1080;
 const VIDEO_PLAYBACK_PORTRAIT_MAX_WIDTH = 1080;
 const VIDEO_PLAYBACK_PORTRAIT_MAX_HEIGHT = 1920;
 const VIDEO_PLAYBACK_MAX_FPS = 30;
+const DEFAULT_VIDEO_WORK_ROOT = path.resolve(__dirname, "..", "tmp", "orange-photos-video-work");
+const VIDEO_WORK_ROOT = process.env.ORANGE_PHOTOS_VIDEO_WORK_DIR ? path.resolve(process.env.ORANGE_PHOTOS_VIDEO_WORK_DIR) : DEFAULT_VIDEO_WORK_ROOT;
 const validDateIso = value => { if (value == null || value === "") return null; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString(); };
+async function createVideoWorkDir(prefix = "orange-photos-video-") { await fs.mkdir(VIDEO_WORK_ROOT, { recursive:true }); return fs.mkdtemp(path.join(VIDEO_WORK_ROOT, prefix)); }
 async function sha256File(filePath) { const hash = createHash("sha256"); for await (const chunk of fsNative.createReadStream(filePath)) hash.update(chunk); return hash.digest("hex"); }
 async function videoPhase(row, phase, failureMessage, work) {
   const started = Date.now();
@@ -50,7 +52,7 @@ async function probeVideoFile(filePath) {
 }
 
 async function runFfmpeg(args, timeout = 180000) {
-  return execFileAsync(ffmpegPath, args, { timeout, maxBuffer: 16 * 1024 * 1024, windowsHide: true });
+  const options = { maxBuffer:16 * 1024 * 1024, windowsHide:true }; if (Number.isFinite(timeout) && timeout > 0) options.timeout = timeout; return execFileAsync(ffmpegPath, args, options);
 }
 
 async function createVideoPoster(inputPath, outputPath) {
@@ -78,7 +80,7 @@ async function createVideoPreview(inputPath, outputPath) {
 
 async function createVideoPlayback(inputPath, outputPath) {
   const scale = `scale=` + `w='if(gte(iw,ih),min(${VIDEO_PLAYBACK_LANDSCAPE_MAX_WIDTH},iw),min(${VIDEO_PLAYBACK_PORTRAIT_MAX_WIDTH},iw))':` + `h='if(gte(iw,ih),min(${VIDEO_PLAYBACK_LANDSCAPE_MAX_HEIGHT},ih),min(${VIDEO_PLAYBACK_PORTRAIT_MAX_HEIGHT},ih))':` + `force_original_aspect_ratio=decrease:` + `force_divisible_by=2`;
-  await runFfmpeg(["-y", "-i", inputPath, "-map", "0:v:0", "-map", "0:a:0?", "-vf", scale, "-fpsmax", String(VIDEO_PLAYBACK_MAX_FPS), "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", outputPath], 30 * 60 * 1000);
+  await runFfmpeg(["-y", "-i", inputPath, "-map", "0:v:0", "-map", "0:a:0?", "-vf", scale, "-fpsmax", String(VIDEO_PLAYBACK_MAX_FPS), "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", outputPath], 0);
   const stat = await fs.stat(outputPath);
   if (!stat.size) throw new Error("ffmpeg generó un playback vacío.");
   return { size: stat.size, metadata: await probeVideoFile(outputPath) };
@@ -114,7 +116,7 @@ async function processStoredOrangePhotoVideo(photoId, options = {}) {
   const actions = { update_metadata:shouldUpdateMetadata,create_poster:needsPoster,create_thumbnail:needsThumbnail,create_preview:needsPreview,create_playback:needsPlayback };
   if (dryRun && !options.validateDerivatives) return { photo:row,actions,metadata:null,created:[],possible_orphans:[] };
   if (!needsOriginal && !needsThumbnail) return { photo:row,actions,metadata:null,created:[],possible_orphans:[] };
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "orange-photos-video-")), extension = path.extname(row.original_filename || row.object_key) || ".video", inputPath = path.join(tempDir, `original${extension}`), posterPath = path.join(tempDir, "poster.jpg"), thumbnailPath = path.join(tempDir, "thumbnail.jpg"), previewPath = path.join(tempDir, "preview.mp4"), playbackPath = path.join(tempDir, "playback.mp4"), possibleOrphans = [];
+  const tempDir = await createVideoWorkDir(), extension = path.extname(row.original_filename || row.object_key) || ".video", inputPath = path.join(tempDir, `original${extension}`), posterPath = path.join(tempDir, "poster.jpg"), thumbnailPath = path.join(tempDir, "thumbnail.jpg"), previewPath = path.join(tempDir, "preview.mp4"), playbackPath = path.join(tempDir, "playback.mp4"), possibleOrphans = [];
   try {
     let metadata = null;
     if (needsOriginal) await videoPhase(row,"download_original","No se pudo descargar el vÃ­deo original.",async()=>{const source=await getOrangePhotoObjectStream({bucket:row.bucket,object_key:row.object_key});await pipeline(source.Body,fsNative.createWriteStream(inputPath));});
@@ -143,4 +145,4 @@ async function processStoredOrangePhotoVideo(photoId, options = {}) {
   } finally { await fs.rm(tempDir,{recursive:true,force:true}); }
 }
 
-module.exports = { probeVideoFile, createVideoPoster, createVideoPreview, createVideoPlayback, processStoredOrangePhotoVideo };
+module.exports = { probeVideoFile, createVideoPoster, createVideoPreview, createVideoPlayback, processStoredOrangePhotoVideo, createVideoWorkDir };
