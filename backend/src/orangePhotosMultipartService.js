@@ -12,7 +12,7 @@ const {
   headOrangePhotoObject,
   listOrangePhotoMultipartParts,
 } = require("./wasabiClient");
-const { processStoredOrangePhotoVideo } = require("./orangePhotosVideoProcessor");
+const { enqueueNewUploadVideoJob } = require("./orangePhotosVideoJobQueue");
 const { processStoredOrangePhotoImage } = require("./orangePhotosImageProcessor");
 
 const URL_EXPIRES_SECONDS = 900;
@@ -110,7 +110,7 @@ async function complete(req,id,body={}){
   let result;try{result=await photos.insertPhoto(found.payload.auth,metadata,{provider:upload.provider,bucket:upload.bucket,object_key:upload.object_key,mime_type:upload.mime_type,size_bytes:Number(upload.size_bytes),checksum_sha256:checksum,etag:head.etag},null,null,config.force_duplicate&&suppression?checksum:null,photos.clientContext(req),"multipart");}
   catch(error){log("multipart database registration",error,upload);try{await deleteOrangePhotoObject(upload);}catch(cleanupError){log("multipart database cleanup",cleanupError,upload);}await pool.query(`UPDATE public.orange_photo_uploads SET status='failed',error_code='DATABASE_REGISTRATION_FAILED',error_message=$2 WHERE id=$1::uuid`,[upload.id,"El archivo se transfirió, pero no pudo registrarse."]);return photos.bad(500,"DATABASE_REGISTRATION_FAILED","El archivo se transfirió, pero no pudo registrarse.");}
   await pool.query(`UPDATE public.orange_photo_uploads SET status='completed',completed_at=now(),error_code=NULL,error_message=NULL WHERE id=$1::uuid`,[upload.id]);
-  const photoId=result.payload.item.id;if(upload.media_type==="video")setImmediate(()=>processStoredOrangePhotoVideo(photoId,{createPoster:true,createPreview:true,createPlayback:true,updateMetadata:true}).catch(async error=>{log("video processing",error,{...upload,photo_id:photoId});try{await pool.query(`UPDATE public.orange_photo_uploads SET error_code='VIDEO_PROCESSING_FAILED',error_message=$2 WHERE id=$1::uuid`,[upload.id,"El vídeo se ha guardado, pero no se pudieron completar sus derivados."]);}catch(updateError){log("video processing status",updateError,{...upload,photo_id:photoId});}}));
+  const photoId=result.payload.item.id;if(upload.media_type==="video"){try{await enqueueNewUploadVideoJob(photoId,{createPoster:true,createPreview:true,createPlayback:true,updateMetadata:true});}catch(error){log("video queue",error,{...upload,photo_id:photoId});try{await pool.query(`UPDATE public.orange_photo_uploads SET error_code='VIDEO_PROCESSING_FAILED',error_message=$2 WHERE id=$1::uuid`,[upload.id,"El vídeo se ha guardado, pero no se pudieron programar sus derivados."]);}catch(updateError){log("video queue status",updateError,{...upload,photo_id:photoId});}}}
   if(upload.media_type==="image")setImmediate(()=>{processStoredOrangePhotoImage(photoId,{createThumbnail:true,createPreview:true}).catch(error=>{log("image derivatives",error,{...upload,photo_id:photoId});});});
   return photos.ok({item:result.payload.item,warning:null});
 }

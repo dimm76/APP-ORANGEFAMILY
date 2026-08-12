@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const express = require("express");
 const pool = require("./db");
+const { startVideoJobQueueWorker } = require("./src/orangePhotosVideoJobQueue");
 const {
   attachAuthToRequest,
   handleAuthLogin,
@@ -89,3 +90,5 @@ app.get("/api/health", async (_req, res) => {
 app.listen(port, () => {
   console.log(`OrangeFamily API listening on http://localhost:${port}`);
 });
+
+startVideoJobQueueWorker();

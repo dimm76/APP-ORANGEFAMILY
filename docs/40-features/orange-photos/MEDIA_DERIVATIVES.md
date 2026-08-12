@@ -332,6 +332,26 @@ inmutable. Los workspaces se eliminan al finalizar normalmente la operación.
 Android y web consumirán la misma variante `playback`; no existe una variante
 específica para Android.
 
+## Cola de procesamiento de vídeo
+
+La política de subida del usuario se aplica antes de la cola.
+
+Políticas Android: `WIFI_ONLY`, `MOBILE_UP_TO_800_MB` y `ANY_NETWORK`.
+Una vez aceptada la subida, el original se almacena y registra, el vídeo queda
+disponible independientemente del playback y los derivados pesados se encolan.
+
+La prioridad es 100 para vídeo nuevo y 10 para reconciliación histórica. La
+concurrencia de procesamiento pesado es 1 mediante advisory lock. El histórico
+no bloquea a los nuevos vídeos más allá del vídeo histórico que ya estuviera en
+proceso, y FFmpeg no se interrumpe a mitad de archivo.
+
+Las fotografías no utilizan esta cola. El workspace continúa siendo
+`backend/tmp/orange-photos-video-work/` y el original permanece inmutable en
+Wasabi. La tabla `orange_photo_video_jobs` es el estado operativo persistente y
+permite recuperar jobs tras reinicios. El backfill histórico es una operación
+extraordinaria; una vez completados los derivados históricos, el funcionamiento
+ordinario contendrá fundamentalmente vídeos nuevos.
+
 # Estructura en Wasabi
 
 Los objetos se almacenan bajo el prefijo propio de Orange Photos y separados por variante.
