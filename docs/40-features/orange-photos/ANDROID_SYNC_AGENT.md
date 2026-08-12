@@ -693,6 +693,8 @@ Visualización de fotos privadas de otros miembros.
 Ejecución automática en segundo plano.
 ## Release privada
 
+El procedimiento operativo y obligatorio para preparar, compilar, firmar, instalar y publicar una APK se mantiene en [ANDROID_RELEASE_WORKFLOW.md](./ANDROID_RELEASE_WORKFLOW.md). Este documento describe la arquitectura y configuración; el workflow de release prevalece para la ejecución del proceso.
+
 ## Gestión manual de archivos del dispositivo
 
 Tras autenticar, el listado de carpetas es la pantalla principal. El drawer abre
