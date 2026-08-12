@@ -16,7 +16,8 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
 
     suspend fun photos(page: Int = 1, perPage: Int = 100, albumId: String? = null): CloudPhotoPage = withContext(Dispatchers.IO) {
         val albumQuery = albumId?.takeIf { it.isNotBlank() }?.let { "&album_id=${encode(it)}" }.orEmpty()
-        request("${baseUrl}api/orange-photos?page=$page&per_page=$perPage$albumQuery", "No se pudo cargar la biblioteca.") { json ->
+        val accessQuery = ownedQuery(albumId)
+        request("${baseUrl}api/orange-photos?page=$page&per_page=$perPage$albumQuery$accessQuery", "No se pudo cargar la biblioteca.") { json ->
             val values = json.optJSONArray("items") ?: throw CloudApiException(200, "La respuesta no contiene elementos.")
             val items = buildList { for (index in 0 until values.length()) values.optJSONObject(index)?.let(::parsePhoto)?.let(::add) }
             CloudPhotoPage(items, json.optInt("page", page), json.optInt("per_page", perPage), json.optInt("total", items.size), json.optBoolean("has_more", false))
@@ -24,7 +25,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
     }
 
     suspend fun timeline(albumId: String? = null): List<CloudTimelineYear> = withContext(Dispatchers.IO) {
-        val query = albumId?.takeIf { it.isNotBlank() }?.let { "?album_id=${encode(it)}" }.orEmpty()
+        val query = if (albumId == null) "?access_sources=owned" else "?album_id=${encode(albumId)}"
         request("${baseUrl}api/orange-photos/timeline$query", "No se pudo cargar el timeline.") { json ->
             val years = json.optJSONArray("items") ?: return@request emptyList()
             buildList {
@@ -48,7 +49,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
     suspend fun aroundDate(date: String, albumId: String? = null, direction: String? = null, perPage: Int = 100): CloudPhotoWindow = withContext(Dispatchers.IO) {
         val query = buildString {
             append("date=${encode(date)}&per_page=$perPage")
-            albumId?.takeIf { it.isNotBlank() }?.let { append("&album_id=${encode(it)}") }
+            if (albumId == null) append("&access_sources=owned") else append("&album_id=${encode(albumId)}")
             direction?.takeIf { it == "newer" || it == "older" }?.let { append("&direction=$it") }
         }
         request("${baseUrl}api/orange-photos/around-date?$query", "No se pudo cargar el periodo.") { json ->
@@ -65,7 +66,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
                 for (i in 0 until values.length()) {
                     val item = values.optJSONObject(i) ?: continue
                     val id = item.optString("id").trim()
-                    if (id.isNotBlank()) add(CloudAlbum(id, item.optString("title").trim().ifBlank { "Álbum" }, item.optInt("photo_count"), item.optionalString("cover_thumbnail_url")))
+                    if (id.isNotBlank()) add(CloudAlbum(id, item.optString("title").trim().ifBlank { "Álbum" }, item.optInt("photo_count"), item.optionalString("cover_thumbnail_url"), item.optionalString("date_mode"), item.optionalString("date_start"), item.optionalString("date_end"), item.optBoolean("is_owner"), item.optionalString("shared_by_display_name")))
                 }
             }
         }
@@ -92,6 +93,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
     }
 
     private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
+    private fun ownedQuery(albumId: String?): String = if (albumId == null) "&access_sources=owned" else ""
     private fun JSONObject.optionalString(name: String): String? = if (isNull(name)) null else optString(name).trim().takeIf { it.isNotBlank() }
     private fun JSONObject.optionalInt(name: String): Int? = if (isNull(name) || !has(name)) null else optInt(name)
     private fun JSONObject.optionalDouble(name: String): Double? = if (isNull(name) || !has(name)) null else optDouble(name)
