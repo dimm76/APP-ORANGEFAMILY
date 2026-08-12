@@ -12,12 +12,15 @@ test("prioridades y encolado", async () => {
   assert.ok(queue.VIDEO_JOB_PRIORITY.NEW_UPLOAD > queue.VIDEO_JOB_PRIORITY.HISTORICAL_RECONCILIATION);
   const original = pool.query;
   const calls = [];
-  pool.query = async (_sql, values) => { calls.push(values); return { rowCount:1, rows:[{ source:values[1], priority:values[2] }] }; };
+  pool.query = async (sql, values) => { calls.push({ sql:String(sql), values }); return { rowCount:1, rows:[{ source:values[1], priority:values[2] }] }; };
   try {
     await queue.enqueueNewUploadVideoJob("photo", {});
     await queue.enqueueHistoricalVideoJob("photo", {});
-    assert.equal(calls[0][1], "new_upload"); assert.equal(calls[0][2], 100);
-    assert.equal(calls[1][1], "historical_reconciliation"); assert.equal(calls[1][2], 10);
+    assert.equal(calls[0].values[1], "new_upload"); assert.equal(calls[0].values[2], 100);
+    assert.equal(calls[1].values[1], "historical_reconciliation"); assert.equal(calls[1].values[2], 10);
+    assert.match(calls[0].sql, /source=CASE WHEN EXCLUDED\.priority >= public\.orange_photo_video_jobs\.priority/);
+    assert.match(calls[0].sql, /options_json=CASE WHEN EXCLUDED\.priority >= public\.orange_photo_video_jobs\.priority/);
+    assert.match(calls[0].sql, /priority=GREATEST\(public\.orange_photo_video_jobs\.priority,EXCLUDED\.priority\)/);
   } finally { pool.query = original; }
 });
 

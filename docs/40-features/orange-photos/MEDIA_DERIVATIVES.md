@@ -345,6 +345,14 @@ concurrencia de procesamiento pesado es 1 mediante advisory lock. El histórico
 no bloquea a los nuevos vídeos más allá del vídeo histórico que ya estuviera en
 proceso, y FFmpeg no se interrumpe a mitad de archivo.
 
+Si un mismo vídeo vuelve a encolarse, prevalecen el origen, la prioridad y las
+opciones del trabajo de mayor prioridad; una reconciliación histórica nunca
+degrada un trabajo de vídeo nuevo.
+
+La concurrencia 1 protege el pipeline automático de procesamiento de
+derivados/playback. Las operaciones manuales específicas de mantenimiento,
+como la sustitución explícita de un póster, mantienen su flujo existente.
+
 Las fotografías no utilizan esta cola. El workspace continúa siendo
 `backend/tmp/orange-photos-video-work/` y el original permanece inmutable en
 Wasabi. La tabla `orange_photo_video_jobs` es el estado operativo persistente y
