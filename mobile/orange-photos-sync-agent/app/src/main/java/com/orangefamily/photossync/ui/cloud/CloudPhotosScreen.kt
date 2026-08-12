@@ -19,7 +19,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import com.orangefamily.photossync.R
 import com.orangefamily.photossync.cloud.*
 import kotlinx.coroutines.launch
@@ -37,7 +36,7 @@ private data class WeightedTimelinePeriod(val item: CloudTimelineMonth, val star
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnailLoader, librarySelector: @Composable () -> Unit, modifier: Modifier) {
+fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnailLoader, librarySelector: @Composable () -> Unit, onOpen: (CloudPhoto) -> Unit, modifier: Modifier) {
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val listState = rememberLazyListState()
@@ -47,7 +46,6 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     var timeline by remember { mutableStateOf(emptyList<CloudTimelineYear>()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
-    var viewerPhoto by remember { mutableStateOf<CloudPhoto?>(null) }
     var page by remember { mutableStateOf(1) }
     var hasMore by remember { mutableStateOf(false) }
     var hasOlder by remember { mutableStateOf(false) }
@@ -90,7 +88,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
                 else BoxWithConstraints(Modifier.fillMaxSize().padding(top = if (selectedAlbum == null) 0.dp else 52.dp)) {
                     val rows = buildJustifiedRows(items, maxWidth.value - 28f)
                     LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(end = 28.dp), contentPadding = PaddingValues(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        rows.forEach { row -> item { Row(Modifier.fillMaxWidth().height(row.height.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) { row.photos.forEach { photo -> Box(Modifier.width((cloudAspectRatio(photo) * row.height).dp).fillMaxHeight().clickable { viewerPhoto = photo }) { RemoteBitmap(photo.gridUrl, thumbnailLoader, ContentScale.Crop, Modifier.fillMaxSize()); if (photo.mediaType == "video") Text(stringResource(R.string.cloud_video), color = Color.White, modifier = Modifier.align(Alignment.BottomStart).background(Color.Black.copy(alpha = .6f))) } } } } }
+                        rows.forEach { row -> item { Row(Modifier.fillMaxWidth().height(row.height.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) { row.photos.forEach { photo -> Box(Modifier.width((cloudAspectRatio(photo) * row.height).dp).fillMaxHeight().clickable { onOpen(photo) }) { RemoteBitmap(photo.gridUrl, thumbnailLoader, ContentScale.Crop, Modifier.fillMaxSize()); if (photo.mediaType == "video") Text(stringResource(R.string.cloud_video), color = Color.White, modifier = Modifier.align(Alignment.BottomStart).background(Color.Black.copy(alpha = .6f))) } } } } }
                         if (hasMore) item { Button({ if (!loading) scope.launch { val result = api.photos(page + 1, albumId = selectedAlbum?.id); items = (items + result.items).distinctBy { it.id }; page = result.page; hasMore = result.hasMore } }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.cloud_load_more)) } }
                         if (hasOlder && olderCursor != null) item { LaunchedEffect(olderCursor) { val result = api.aroundDate(olderCursor!!, selectedAlbum?.id, "older"); items = (items + result.items).distinctBy { it.id }; hasOlder = result.hasOlder; olderCursor = result.olderCursor } }
                     }
@@ -99,7 +97,6 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
             }
         }
     }
-    viewerPhoto?.let { photo -> Dialog({ viewerPhoto = null }) { Column(Modifier.fillMaxSize().background(Color.Black), horizontalAlignment = Alignment.CenterHorizontally) { RemoteBitmap(photo.viewerUrl ?: photo.gridUrl, thumbnailLoader, ContentScale.Fit, Modifier.weight(1f).fillMaxWidth()); if (photo.mediaType == "video") Text(stringResource(R.string.cloud_video_playback_pending), color = Color.White); Button({ viewerPhoto = null }) { Text(stringResource(R.string.cloud_close)) } } } }
 }
 
 private fun cloudAspectRatio(photo: CloudPhoto): Float = if ((photo.width ?: 0) > 0 && (photo.height ?: 0) > 0) ((photo.width!!.toFloat() / photo.height!!).coerceIn(.125f, 8f)) else if (photo.mediaType == "video") 16f / 9f else 1f

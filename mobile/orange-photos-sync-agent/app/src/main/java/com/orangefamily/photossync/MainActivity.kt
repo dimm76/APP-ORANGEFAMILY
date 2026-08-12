@@ -71,6 +71,7 @@ import com.orangefamily.photossync.sync.UploadNetworkPolicy
 import com.orangefamily.photossync.ui.device.DeviceMediaScreen
 import com.orangefamily.photossync.ui.device.DeviceTrashScreen
 import com.orangefamily.photossync.cloud.OrangePhotosCloudApi
+import com.orangefamily.photossync.cloud.CloudPhoto
 import com.orangefamily.photossync.cloud.RemoteThumbnailLoader
 import com.orangefamily.photossync.ui.cloud.CloudPhotosScreen
 import com.orangefamily.photossync.ui.theme.OrangePrimary
@@ -173,6 +174,7 @@ class MainActivity : ComponentActivity() {
                         deviceVerifier = deviceVerifier,
                         thumbnailLoader = thumbnailLoader,
                         onOpenMedia = ::openMedia,
+                        onOpenCloudMedia = ::openCloudMedia,
                         onUploadMedia = ::enqueueMedia,
                         onSyncNow = scheduler::scheduleImmediateSync,
                         onNetworkPolicyChanged = scheduler::rescheduleForPolicy,
@@ -187,12 +189,25 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun openMedia(item: LocalMediaItem) {
+    private fun openExternalMedia(uri: Uri, mimeType: String?) {
         try {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.contentUri)).setDataAndType(Uri.parse(item.contentUri), item.mimeType).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+            val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, mimeType)
+            if (uri.scheme == "content") intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(intent)
         } catch (_: ActivityNotFoundException) {
             Toast.makeText(this, "No hay una aplicación compatible.", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun openMedia(item: LocalMediaItem) { openExternalMedia(Uri.parse(item.contentUri), item.mimeType) }
+
+    private fun openCloudMedia(photo: CloudPhoto) {
+        val url = photo.viewerUrl
+        if (url.isNullOrBlank()) {
+            Toast.makeText(this, "No hay una versión disponible para visualizar.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        openExternalMedia(Uri.parse(url!!), photo.viewerMimeType)
     }
 
     private fun enqueueMedia(items: List<LocalMediaItem>, forceDuplicate: Boolean) {
@@ -256,6 +271,7 @@ private fun AuthContent(
     deviceVerifier: DeviceMediaVerifier,
     thumbnailLoader: DeviceMediaThumbnailLoader,
     onOpenMedia: (LocalMediaItem) -> Unit,
+    onOpenCloudMedia: (CloudPhoto) -> Unit,
     onUploadMedia: (List<LocalMediaItem>, Boolean) -> Unit,
     onSyncNow: (String) -> Unit,
     onNetworkPolicyChanged:(String,UploadNetworkPolicy)->Unit,
@@ -337,7 +353,7 @@ private fun AuthContent(
                     if (cloudApi == null) {
                         Box(modifier = modifier, contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                     } else {
-                        CloudPhotosScreen(api = cloudApi, thumbnailLoader = remoteThumbnailLoader, librarySelector = librarySelector, modifier = modifier)
+                        CloudPhotosScreen(api = cloudApi, thumbnailLoader = remoteThumbnailLoader, librarySelector = librarySelector, onOpen = onOpenCloudMedia, modifier = modifier)
                     }
                 }
             } else if(screen==AgentScreen.TRASH){

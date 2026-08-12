@@ -13,6 +13,7 @@ data class CloudPhoto(
     val previewUrl: String?,
     val posterUrl: String?,
     val videoPreviewUrl: String?,
+    val videoPlaybackUrl: String?,
     val originalUrl: String?,
 ) {
     val displayName: String
@@ -24,7 +25,14 @@ data class CloudPhoto(
         get() = if (mediaType == "video") thumbnailUrl ?: posterUrl else thumbnailUrl
 
     val viewerUrl: String?
-        get() = if (mediaType == "image") previewUrl ?: thumbnailUrl else null
+        get() = when (mediaType) {
+            "image" -> previewUrl ?: originalUrl ?: thumbnailUrl
+            "video" -> videoPlaybackUrl ?: originalUrl
+            else -> null
+        }
+
+    val viewerMimeType: String
+        get() = if (mediaType == "video") "video/*" else "image/*"
 }
 
 data class CloudPhotoPage(

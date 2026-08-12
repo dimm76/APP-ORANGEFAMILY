@@ -75,7 +75,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
         val id = item.optString("id").trim()
         val mediaType = item.optString("media_type").trim()
         if (id.isBlank() || mediaType !in setOf("image", "video")) return null
-        return CloudPhoto(id, mediaType, item.optionalString("title"), item.optionalString("original_filename"), item.optionalString("captured_at"), item.optionalInt("width"), item.optionalInt("height"), item.optionalDouble("duration_seconds"), item.optionalString("thumbnail_url"), item.optionalString("preview_url"), item.optionalString("poster_url"), item.optionalString("video_preview_url"), item.optionalString("original_url"))
+        return CloudPhoto(id, mediaType, item.optionalString("title"), item.optionalString("original_filename"), item.optionalString("captured_at"), item.optionalInt("width"), item.optionalInt("height"), item.optionalDouble("duration_seconds"), item.optionalString("thumbnail_url"), item.optionalString("preview_url"), item.optionalString("poster_url"), item.optionalString("video_preview_url"), item.optionalString("video_playback_url"), item.optionalString("original_url"))
     }
 
     private suspend fun <T> request(url: String, fallback: String, parse: (JSONObject) -> T): T {
