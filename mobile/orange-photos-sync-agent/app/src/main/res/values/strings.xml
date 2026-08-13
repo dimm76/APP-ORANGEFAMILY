@@ -126,6 +126,10 @@
         <item quantity="one">%d seleccionada</item>
         <item quantity="other">%d seleccionadas</item>
     </plurals>
+    <string name="selection_upload_cloud">Subir a la nube</string>
+    <string name="selection_delete_device">Eliminar del dispositivo</string>
+    <string name="selection_delete_total">Borrado total</string>
+    <string name="selection_share">Compartir</string>
     <string name="app_version_title">Versión de la aplicación</string>
     <string name="installed_version_label">Instalada</string>
     <string name="available_version_label">Disponible</string>
