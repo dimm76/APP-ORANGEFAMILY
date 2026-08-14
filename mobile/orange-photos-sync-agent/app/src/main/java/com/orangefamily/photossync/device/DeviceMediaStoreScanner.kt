@@ -61,6 +61,7 @@ class DeviceMediaStoreScanner(context: Context) {
 
     suspend fun scanBucketIds(accountUserId:String,bucketId:String)=scanBucket(accountUserId,bucketId,Int.MAX_VALUE,0,DeviceMediaSort.DATE_DESC).map(DeviceMediaRules::stableId)
     suspend fun exists(item:LocalMediaItem)=withContext(Dispatchers.IO){runCatching{resolver.openFileDescriptor(Uri.parse(item.contentUri),"r")?.use{true}?:false}.getOrDefault(false)}
+    suspend fun isActive(item:LocalMediaItem)=withContext(Dispatchers.IO){if(Build.VERSION.SDK_INT<Build.VERSION_CODES.R)exists(item) else runCatching{resolver.query(Uri.parse(item.contentUri),arrayOf(MediaStore.MediaColumns.IS_TRASHED),null,null,null)?.use{it.moveToFirst()&&it.getInt(0)==0}?:false}.getOrDefault(false)}
 
     suspend fun scanTrash(accountUserId:String):List<DeviceTrashItem> = withContext(Dispatchers.IO){
         if(Build.VERSION.SDK_INT<Build.VERSION_CODES.R)return@withContext emptyList()

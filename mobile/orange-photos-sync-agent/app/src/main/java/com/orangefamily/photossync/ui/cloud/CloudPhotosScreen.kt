@@ -80,6 +80,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     var activePeriod by remember { mutableStateOf<String?>(null) }
     var timelineRequestGeneration by remember { mutableIntStateOf(0) }
     var loadingWindowNewer by remember { mutableStateOf(false) }
+    var loadingMoreNormal by remember { mutableStateOf(false) }
     var pagingMode by remember { mutableStateOf(CloudPagingMode.NORMAL) }
     var timelineThumbVisible by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf(emptySet<String>()) }
@@ -105,7 +106,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     LaunchedEffect(Unit) { albums = runCatching { api.albums() }.getOrDefault(emptyList()) }
     LaunchedEffect(api, cloudView, selectedAlbum?.id) { reload() }
     LaunchedEffect(cloudView, selectedAlbum?.id){clearSelection()}
-    LaunchedEffect(items,mediaRefreshVersion){val ids=items.map{it.id}.distinct();localByRemoteId=if(ids.isEmpty())emptyMap()else withContext(Dispatchers.IO){repository.remoteLinkedItems(accountUserId,ids)}.mapNotNull{item->item.remotePhotoId?.trim()?.takeIf{it.isNotBlank()}?.let{it to item}}.filter{deviceScanner.exists(it.second)}.toMap()}
+    LaunchedEffect(items,mediaRefreshVersion){val ids=items.map{it.id}.distinct();localByRemoteId=if(ids.isEmpty())emptyMap()else withContext(Dispatchers.IO){repository.remoteLinkedItems(accountUserId,ids)}.mapNotNull{item->item.remotePhotoId?.trim()?.takeIf{it.isNotBlank()}?.let{it to item}}.filter{deviceScanner.isActive(it.second)}.toMap()}
     LaunchedEffect(listState.isScrollInProgress) { if (listState.isScrollInProgress) timelineThumbVisible = true else { delay(1500); timelineThumbVisible = false } }
 
     val groups = groupCloudPhotos(items)
@@ -154,7 +155,9 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
         hasOlder = result.hasOlder
         olderCursor = result.olderCursor
     }
+    suspend fun loadNextNormalPage(){if(pagingMode!=CloudPagingMode.NORMAL||!hasMore||loadingMoreNormal)return;loadingMoreNormal=true;try{val result=api.photos(page+1,albumId=activeAlbumId());items=(items+result.items).distinctBy{it.id};page=result.page;hasMore=result.hasMore}finally{loadingMoreNormal=false}}
     LaunchedEffect(listState, pagingMode, hasNewer, newerCursor) { snapshotFlow { Triple(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, listState.isScrollInProgress) }.distinctUntilChanged().collect { (index, offset, scrolling) -> if (scrolling && pagingMode == CloudPagingMode.WINDOW && hasNewer && index == 0 && offset < 300) loadWindowNewer() } }
+    LaunchedEffect(listState,pagingMode,hasMore){snapshotFlow{val info=listState.layoutInfo;Pair(info.visibleItemsInfo.lastOrNull()?.index?:0,info.totalItemsCount)}.distinctUntilChanged().collect{(last,total)->if(pagingMode==CloudPagingMode.NORMAL&&hasMore&&last>=total-2)loadNextNormalPage()}}
 
     ModalNavigationDrawer(drawerState = drawerState, drawerContent = {
         ModalDrawerSheet {
@@ -186,24 +189,6 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
                                     "×",
                                     style = MaterialTheme.typography.titleLarge,
                                 )
-                            }
-                        },
-                        actions = {
-                            TextButton(
-                                onClick = {
-                                    selected = items.map { it.id }.toSet()
-
-                                    selectedDays =
-                                        groupCloudPhotos(items)
-                                            .flatMap { it.days }
-                                            .map { it.key }
-                                            .toSet()
-
-                                    selectionAnchor =
-                                        items.lastOrNull()?.id
-                                },
-                            ) {
-                                Text("Todo")
                             }
                         },
                     )
@@ -266,7 +251,6 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
                                 }
                             }
                         }
-                        if (pagingMode == CloudPagingMode.NORMAL && hasMore) item { Button({ if (!loading) scope.launch { val result = api.photos(page + 1, albumId = activeAlbumId()); items = (items + result.items).distinctBy { it.id }; page = result.page; hasMore = result.hasMore } }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.cloud_load_more)) } }
                         if (pagingMode == CloudPagingMode.WINDOW && hasOlder && olderCursor != null) item(key = "window-load-older") { LaunchedEffect(olderCursor) { loadWindowOlder() } }
                     }
                     if (timeline.isNotEmpty()) Box(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(68.dp)) { CloudTimeline(timeline, activePeriod, timelineThumbVisible) { scope.launch { jumpToPeriod(it) } } }
