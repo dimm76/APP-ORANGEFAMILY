@@ -16,9 +16,9 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
         if (it.endsWith('/')) it else "$it/"
     }
 
-    suspend fun photos(page: Int = 1, perPage: Int = 100, albumId: String? = null): CloudPhotoPage = withContext(Dispatchers.IO) {
+    suspend fun photos(page: Int = 1, perPage: Int = 100, albumId: String? = null, trashed: Boolean = false): CloudPhotoPage = withContext(Dispatchers.IO) {
         val albumQuery = albumId?.takeIf { it.isNotBlank() }?.let { "&album_id=${encode(it)}" }.orEmpty()
-        val accessQuery = ownedQuery(albumId)
+        val accessQuery = if (trashed) "&trashed=true&library_scope=owned" else ownedQuery(albumId)
         request("${baseUrl}api/orange-photos?page=$page&per_page=$perPage$albumQuery$accessQuery", "No se pudo cargar la biblioteca.") { json ->
             val values = json.optJSONArray("items") ?: throw CloudApiException(200, "La respuesta no contiene elementos.")
             val items = buildList { for (index in 0 until values.length()) values.optJSONObject(index)?.let(::parsePhoto)?.let(::add) }
@@ -88,6 +88,8 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
     suspend fun setCapturedAt(photoId:String,isoValue:String)=patchPhoto(photoId,JSONObject().put("captured_at",isoValue))
     suspend fun setLocationName(photoId:String,value:String)=patchPhoto(photoId,JSONObject().put("location_name",value))
     suspend fun trashPhoto(photoId:String)=withContext(Dispatchers.IO){request("${baseUrl}api/orange-photos/${encode(photoId)}/trash","No se pudo mover la foto a la papelera.","POST") {}}
+    suspend fun restorePhoto(photoId: String) = withContext(Dispatchers.IO) { request("${baseUrl}api/orange-photos/${encode(photoId)}/restore", "No se pudo restaurar la foto.", "POST") {} }
+    suspend fun purgePhoto(photoId: String) = withContext(Dispatchers.IO) { request("${baseUrl}api/orange-photos/${encode(photoId)}", "No se pudo eliminar definitivamente la foto.", "DELETE") {} }
     private suspend fun patchPhoto(photoId:String,body:JSONObject)=withContext(Dispatchers.IO){request("${baseUrl}api/orange-photos/${encode(photoId)}","No se pudo actualizar la foto.","PATCH",body) {}}
     private suspend fun <T> request(url: String, fallback: String, method:String="GET", body:JSONObject?=null, parse: (JSONObject) -> T): T {
         val connection = URL(url).openConnection() as HttpURLConnection

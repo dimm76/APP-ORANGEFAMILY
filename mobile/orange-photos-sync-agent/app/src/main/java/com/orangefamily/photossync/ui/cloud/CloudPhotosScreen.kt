@@ -70,7 +70,7 @@ private data class CloudPhotoDay(val key: String, val label: String, val photos:
 private data class CloudPhotoPeriod(val key: String, val label: String, val days: List<CloudPhotoDay>)
 private data class CloudJustifiedRow(val photos: List<CloudPhoto>, val height: Float)
 private data class WeightedTimelinePeriod(val item: CloudTimelineMonth, val start: Float, val end: Float, val center: Float)
-private enum class CloudView { LIBRARY, ALBUMS, ALBUM_DETAIL }
+private enum class CloudView { LIBRARY, ALBUMS, ALBUM_DETAIL, TRASH }
 private enum class CloudPagingMode { NORMAL, WINDOW }
 private const val MAX_CLOUD_BULK_SELECTION=500
 private fun cloudActionIcon(name: String, draw: PathBuilder.() -> Unit): ImageVector = ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).apply { path(fill = SolidColor(Color.Transparent), stroke = SolidColor(Color.Black), strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) { draw() } }.build()
@@ -80,6 +80,7 @@ private val CloudFavoriteActionIcon = cloudActionIcon("CloudFavorite") { moveTo(
 private val CloudDateActionIcon = cloudActionIcon("CloudDate") { moveTo(4f, 6f); horizontalLineTo(20f); verticalLineTo(20f); horizontalLineTo(4f); close(); moveTo(7f, 3f); verticalLineTo(8f); moveTo(17f, 3f); verticalLineTo(8f); moveTo(7f, 12f); horizontalLineTo(17f) }
 private val CloudLocationActionIcon = cloudActionIcon("CloudLocation") { moveTo(12f, 21f); curveTo(6f, 14f, 5f, 12f, 5f, 9f); curveTo(5f, 5f, 8f, 3f, 12f, 3f); curveTo(16f, 3f, 19f, 5f, 19f, 9f); curveTo(19f, 12f, 18f, 14f, 12f, 21f); close(); moveTo(12f, 11f); curveTo(10f, 11f, 9f, 10f, 9f, 8f); curveTo(9f, 6f, 10f, 5f, 12f, 5f); curveTo(14f, 5f, 15f, 6f, 15f, 8f); curveTo(15f, 10f, 14f, 11f, 12f, 11f) }
 private val CloudDeviceActionIcon = cloudActionIcon("CloudDevice") { moveTo(8f, 2f); horizontalLineTo(16f); verticalLineTo(22f); horizontalLineTo(8f); close(); moveTo(10f, 19f); horizontalLineTo(14f) }
+private val CloudRestoreActionIcon = cloudActionIcon("CloudRestore") { moveTo(9f, 7f); lineTo(4f, 12f); lineTo(9f, 17f); moveTo(5f, 12f); horizontalLineTo(14f); curveTo(18f, 12f, 20f, 14f, 20f, 18f) }
 @Composable private fun CloudTrashActionIcon() { Box(Modifier.size(30.dp)) { Icon(OrangeFilledCloudIcon, null, Modifier.size(24.dp), tint = Color.Unspecified); Icon(OrangeDeleteIcon, null, Modifier.size(15.dp).align(Alignment.BottomEnd)) } }
 @Composable private fun LocalTrashActionIcon() { Box(Modifier.size(30.dp)) { Icon(CloudDeviceActionIcon, null, Modifier.size(23.dp).align(Alignment.TopStart)); Icon(OrangeDeleteIcon, null, Modifier.size(15.dp).align(Alignment.BottomEnd)) } }
 @Composable private fun BothTrashActionIcon() { Box(Modifier.size(32.dp)) { Icon(OrangeFilledCloudIcon, null, Modifier.size(20.dp).align(Alignment.TopStart), tint = Color.Unspecified); Icon(CloudDeviceActionIcon, null, Modifier.size(19.dp).align(Alignment.BottomStart)); Icon(OrangeDeleteIcon, null, Modifier.size(14.dp).align(Alignment.BottomEnd)) } }
@@ -116,12 +117,13 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     var members by remember { mutableStateOf(emptyList<CloudMember>()) }
     var bulkBusy by remember { mutableStateOf(false) }
     var bulkMessage by remember { mutableStateOf<String?>(null) }
-var albumDialogOpen by remember { mutableStateOf(false) }
-var targetAlbumId by remember { mutableStateOf<String?>(null) }
-var albumSearchQuery by remember { mutableStateOf("") }
-var createAlbumDialogOpen by remember { mutableStateOf(false) }
-var newAlbumTitle by remember { mutableStateOf("") }
-var albumCreating by remember { mutableStateOf(false) }
+    var albumDialogOpen by remember { mutableStateOf(false) }
+    var targetAlbumId by remember { mutableStateOf<String?>(null) }
+    var albumSearchQuery by remember { mutableStateOf("") }
+    var createAlbumDialogOpen by remember { mutableStateOf(false) }
+    var newAlbumTitle by remember { mutableStateOf("") }
+    var albumCreating by remember { mutableStateOf(false) }
+    var purgeDialogOpen by remember { mutableStateOf(false) }
     var shareDialogOpen by remember { mutableStateOf(false) }
     var shareVisibility by remember { mutableStateOf("private") }
     var shareUserIds by remember { mutableStateOf(emptySet<String>()) }
@@ -142,6 +144,13 @@ var albumCreating by remember { mutableStateOf(false) }
     suspend fun reload() {
         if (cloudView == CloudView.ALBUMS) { loading = false; return }
         loading = true; error = null
+        if (cloudView == CloudView.TRASH) {
+            runCatching { api.photos(trashed = true) }
+                .onSuccess { photos -> items = photos.items; page = photos.page; hasMore = photos.hasMore; hasNewer = false; newerCursor = null; hasOlder = false; olderCursor = null; pagingMode = CloudPagingMode.NORMAL; timeline = emptyList() }
+                .onFailure { error = it.message ?: "No se pudo cargar la papelera." }
+            loading = false
+            return
+        }
         runCatching { api.photos(albumId = activeAlbumId()) to api.timeline(activeAlbumId()) }
             .onSuccess { (photos, periods) -> items = photos.items; page = photos.page; hasMore = photos.hasMore; hasNewer = false; newerCursor = null; hasOlder = false; olderCursor = null; pagingMode = CloudPagingMode.NORMAL; timeline = periods }
             .onFailure { error = it.message ?: "No se pudo cargar la biblioteca." }
@@ -167,6 +176,8 @@ var albumCreating by remember { mutableStateOf(false) }
     val downloadAction=SelectionActionItem("download-device","Descargar",enabled=bulkSelectionAllowed&&android.os.Build.VERSION.SDK_INT>=android.os.Build.VERSION_CODES.Q&&downloadCandidates.isNotEmpty(),onClick={runBulk{val downloadedImageCount=downloadCandidates.count{it.mediaType=="image"};val downloadedVideoCount=downloadCandidates.count{it.mediaType=="video"};downloadCandidates.forEach{photo->val downloaded=downloader.download(photo);localByRemoteId=localByRemoteId+(photo.id to (localByRemoteId[photo.id].orEmpty()+downloaded).distinctBy{"${it.mediaCollection}:${it.mediaType}:${it.mediaStoreId}"})};val message=when{downloadedImageCount>0&&downloadedVideoCount==0->if(downloadedImageCount==1)"Imagen descargada en Imágenes/OrangeFamily." else "$downloadedImageCount imágenes descargadas en Imágenes/OrangeFamily.";downloadedVideoCount>0&&downloadedImageCount==0->if(downloadedVideoCount==1)"Vídeo descargado en Vídeos/OrangeFamily." else "$downloadedVideoCount vídeos descargados en Vídeos/OrangeFamily.";else->"${downloadedImageCount+downloadedVideoCount} elementos descargados en Imágenes/OrangeFamily y Vídeos/OrangeFamily."};Toast.makeText(context,message,Toast.LENGTH_LONG).show()}},icon={Icon(CloudDownloadActionIcon,null)})
     val deleteLocalAction=SelectionActionItem("delete-local","Eliminar local",enabled=bulkSelectionAllowed&&selectedLocalItems.isNotEmpty(),onClick={deleteLocalDialogOpen=true},icon={LocalTrashActionIcon()})
     val deleteBothAction=SelectionActionItem("delete-both","Eliminar de ambos",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={deleteBothDialogOpen=true},icon={BothTrashActionIcon()})
+    val restoreCloudAction=SelectionActionItem("restore-cloud","Restaurar",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={runBulk{selectedPhotos.forEach{api.restorePhoto(it.id)}}},icon={Icon(CloudRestoreActionIcon,null)})
+    val purgeCloudAction=SelectionActionItem("purge-cloud","Eliminar definitivamente",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={purgeDialogOpen=true},icon={Icon(OrangeDeleteIcon,null)})
     LaunchedEffect(items, selectedDays) {
         if (selectedDays.isEmpty()) {
             return@LaunchedEffect
@@ -212,7 +223,7 @@ var albumCreating by remember { mutableStateOf(false) }
         hasOlder = result.hasOlder
         olderCursor = result.olderCursor
     }
-    suspend fun loadNextNormalPage(){if(pagingMode!=CloudPagingMode.NORMAL||!hasMore||loadingMoreNormal)return;loadingMoreNormal=true;try{val result=api.photos(page+1,albumId=activeAlbumId());items=(items+result.items).distinctBy{it.id};page=result.page;hasMore=result.hasMore}finally{loadingMoreNormal=false}}
+    suspend fun loadNextNormalPage(){if(pagingMode!=CloudPagingMode.NORMAL||!hasMore||loadingMoreNormal)return;loadingMoreNormal=true;try{val result=api.photos(page+1,albumId=activeAlbumId(),trashed=cloudView==CloudView.TRASH);items=(items+result.items).distinctBy{it.id};page=result.page;hasMore=result.hasMore}finally{loadingMoreNormal=false}}
     LaunchedEffect(listState, pagingMode, hasNewer, newerCursor) { snapshotFlow { Triple(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, listState.isScrollInProgress) }.distinctUntilChanged().collect { (index, offset, scrolling) -> if (scrolling && pagingMode == CloudPagingMode.WINDOW && hasNewer && index == 0 && offset < 300) loadWindowNewer() } }
     LaunchedEffect(listState,pagingMode,hasMore){snapshotFlow{val info=listState.layoutInfo;Pair(info.visibleItemsInfo.lastOrNull()?.index?:0,info.totalItemsCount)}.distinctUntilChanged().collect{(last,total)->if(pagingMode==CloudPagingMode.NORMAL&&hasMore&&last>=total-2)loadNextNormalPage()}}
 
@@ -221,6 +232,7 @@ if(createAlbumDialogOpen)AlertDialog(onDismissRequest={if(!albumCreating)createA
     if(shareDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)shareDialogOpen=false},title={Text("Compartir")},text={Column{listOf("private" to "Solo yo","family" to "Toda la familia","selected" to "Miembros concretos").forEach{(v,l)->Row(verticalAlignment=Alignment.CenterVertically){RadioButton(selected=shareVisibility==v,onClick={shareVisibility=v});Text(l)}};if(shareVisibility=="selected")members.filter{it.id!=accountUserId}.forEach{member->Row(verticalAlignment=Alignment.CenterVertically){Checkbox(checked=member.id in shareUserIds,onCheckedChange={shareUserIds=if(it)shareUserIds+member.id else shareUserIds-member.id});Text(member.displayName)}}}},confirmButton={TextButton(enabled=!bulkBusy&&(shareVisibility!="selected"||shareUserIds.isNotEmpty()),onClick={runBulk{selectedPhotos.forEach{api.sharePhoto(it.id,shareVisibility,shareUserIds.toList())};shareDialogOpen=false}}){Text("Compartir")}},dismissButton={TextButton(onClick={if(!bulkBusy)shareDialogOpen=false}){Text("Cancelar")}})
     if(locationDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)locationDialogOpen=false},title={Text("Ubicación")},text={OutlinedTextField(value=locationValue,onValueChange={locationValue=it},label={Text("Ubicación")},singleLine=true)},confirmButton={TextButton(enabled=!bulkBusy&&locationValue.trim().isNotEmpty(),onClick={runBulk{val value=locationValue.trim();selectedPhotos.forEach{api.setLocationName(it.id,value)};locationDialogOpen=false}}){Text("Guardar")}},dismissButton={TextButton(onClick={if(!bulkBusy)locationDialogOpen=false}){Text("Cancelar")}})
     if(bulkMessage!=null)AlertDialog(onDismissRequest={bulkMessage=null},title={Text("Error")},text={Text(bulkMessage!!)},confirmButton={TextButton(onClick={bulkMessage=null}){Text("Aceptar")}})
+if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=false},title={Text("Eliminar definitivamente")},text={Text(if(selectedPhotos.size==1)"Se eliminará definitivamente 1 elemento de OrangeFamily. Esta acción no se puede deshacer. La copia del dispositivo no se modificará." else "Se eliminarán definitivamente ${selectedPhotos.size} elementos de OrangeFamily. Esta acción no se puede deshacer. Las copias del dispositivo no se modificarán.")},confirmButton={TextButton(enabled=!bulkBusy,onClick={runBulk{selectedPhotos.forEach{api.purgePhoto(it.id)};purgeDialogOpen=false}}){Text("Eliminar definitivamente")}},dismissButton={TextButton(onClick={purgeDialogOpen=false}){Text("Cancelar")}})
     if(trashDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)trashDialogOpen=false},title={Text("Papelera nube")},text={Text(if(selectedPhotos.size==1)"Se moverá 1 elemento de OrangeFamily a su papelera. La copia del dispositivo no se modificará." else "Se moverán ${selectedPhotos.size} elementos de OrangeFamily a su papelera. Las copias del dispositivo no se modificarán.")},confirmButton={TextButton(enabled=!bulkBusy,onClick={runBulk{selectedPhotos.forEach{api.trashPhoto(it.id)};trashDialogOpen=false}}){Text("Mover")}},dismissButton={TextButton(onClick={if(!bulkBusy)trashDialogOpen=false}){Text("Cancelar")}})
     if(deleteLocalDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)deleteLocalDialogOpen=false},title={Text("Eliminar copia local")},text={Text(if(android.os.Build.VERSION.SDK_INT>=android.os.Build.VERSION_CODES.R)if(selectedLocalItems.size==1)"Se moverá 1 copia del dispositivo a su papelera. OrangeFamily no se modificará." else "Se moverán ${selectedLocalItems.size} copias del dispositivo a su papelera. OrangeFamily no se modificará." else if(selectedLocalItems.size==1)"Se eliminará definitivamente 1 copia del dispositivo. OrangeFamily no se modificará." else "Se eliminarán definitivamente ${selectedLocalItems.size} copias del dispositivo. OrangeFamily no se modificará.")},confirmButton={TextButton(enabled=!bulkBusy,onClick={bulkBusy=true;onDeleteLocalCopies(selectedLocalItems){success,message->bulkBusy=false;deleteLocalDialogOpen=false;if(success)clearSelection() else if(!message.isNullOrBlank())bulkMessage=message}}){Text("Eliminar local")}},dismissButton={TextButton(onClick={if(!bulkBusy)deleteLocalDialogOpen=false}){Text("Cancelar")}})
     if(deleteBothDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)deleteBothDialogOpen=false},title={Text("Eliminar de ambos")},text={Text(if(android.os.Build.VERSION.SDK_INT>=android.os.Build.VERSION_CODES.R)if(selectedPhotos.size==1)"Se moverá 1 elemento de OrangeFamily a su papelera. Si existe una copia en el dispositivo, también se moverá a la papelera del dispositivo." else "Se moverán ${selectedPhotos.size} elementos de OrangeFamily a su papelera. Las copias existentes en el dispositivo también se moverán a la papelera del dispositivo." else if(selectedPhotos.size==1)"Se moverá 1 elemento de OrangeFamily a su papelera. Si existe una copia local, se eliminará definitivamente del dispositivo." else "Se moverán ${selectedPhotos.size} elementos de OrangeFamily a su papelera. Las copias locales existentes se eliminarán definitivamente del dispositivo.")},confirmButton={TextButton(enabled=!bulkBusy,onClick={bulkBusy=true;onDeleteCloudAndLocal(selectedPhotos.map{it.id}.distinct(),selectedLocalItems){success,message->bulkBusy=false;deleteBothDialogOpen=false;if(success)scope.launch{reload();clearSelection()} else if(!message.isNullOrBlank())bulkMessage=message}}){Text("Eliminar de ambos")}},dismissButton={TextButton(onClick={if(!bulkBusy)deleteBothDialogOpen=false}){Text("Cancelar")}})
@@ -229,6 +241,7 @@ if(createAlbumDialogOpen)AlertDialog(onDismissRequest={if(!albumCreating)createA
             Spacer(Modifier.height(20.dp))
             NavigationDrawerItem({ Text(stringResource(R.string.cloud_all_photos)) }, cloudView == CloudView.LIBRARY, { selectedAlbum = null; cloudView = CloudView.LIBRARY; scope.launch { drawerState.close() } })
             NavigationDrawerItem({ Text(stringResource(R.string.cloud_albums)) }, cloudView == CloudView.ALBUMS, { selectedAlbum = null; cloudView = CloudView.ALBUMS; scope.launch { drawerState.close() } })
+            NavigationDrawerItem({ Text("Papelera nube") }, cloudView == CloudView.TRASH, { selectedAlbum = null; cloudView = CloudView.TRASH; scope.launch { drawerState.close() } })
             HorizontalDivider()
         }
     }) {
@@ -279,16 +292,18 @@ if(createAlbumDialogOpen)AlertDialog(onDismissRequest={if(!albumCreating)createA
                     )
                 }
             },
-            bottomBar = { if(selectedPhotos.isNotEmpty()){Column{if(selected.size>MAX_CLOUD_BULK_SELECTION)Text("Puedes realizar acciones sobre un máximo de 500 elementos a la vez.",modifier=Modifier.padding(8.dp));SelectionActionTray(actions=listOf(selectionActions.first(),downloadAction,selectionActions[1],selectionActions[5],deleteLocalAction,deleteBothAction,selectionActions[2],selectionActions[3],selectionActions[4]),reopenKey=selected)}}},
+            bottomBar = { if(selectedPhotos.isNotEmpty()){Column{if(selected.size>MAX_CLOUD_BULK_SELECTION)Text("Puedes realizar acciones sobre un máximo de 500 elementos a la vez.",modifier=Modifier.padding(8.dp));SelectionActionTray(actions=if(cloudView==CloudView.TRASH)listOf(restoreCloudAction,purgeCloudAction) else listOf(selectionActions.first(),downloadAction,selectionActions[1],selectionActions[5],deleteLocalAction,deleteBothAction,selectionActions[2],selectionActions[3],selectionActions[4]),reopenKey=selected)}}},
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
                 if (cloudView == CloudView.ALBUMS) {
                     CloudAlbumsView(albums, thumbnailLoader) { selectedAlbum = it; cloudView = CloudView.ALBUM_DETAIL }
                 } else {
                 if (selectedAlbum != null) Text(selectedAlbum!!.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(12.dp))
+                if (cloudView == CloudView.TRASH) Text("Papelera nube", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(12.dp))
                 if (loading) CircularProgressIndicator(Modifier.align(Alignment.Center))
                 else if (error != null) Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) { Text(error!!); OutlinedButton({ scope.launch { reload() } }) { Text(stringResource(R.string.cloud_retry)) } }
-                else BoxWithConstraints(Modifier.fillMaxSize().padding(top = if (selectedAlbum == null) 0.dp else 52.dp)) {
+                else if (cloudView == CloudView.TRASH && items.isEmpty()) Text("La papelera nube está vacía.", modifier = Modifier.align(Alignment.Center))
+                else BoxWithConstraints(Modifier.fillMaxSize().padding(top = if (selectedAlbum != null || cloudView == CloudView.TRASH) 52.dp else 0.dp)) {
                     val availableWidth = maxWidth.value
                     val groups = groupCloudPhotos(items)
                     LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -319,7 +334,7 @@ if(createAlbumDialogOpen)AlertDialog(onDismissRequest={if(!albumCreating)createA
                         }
                         if (pagingMode == CloudPagingMode.WINDOW && hasOlder && olderCursor != null) item(key = "window-load-older") { LaunchedEffect(olderCursor) { loadWindowOlder() } }
                     }
-                    if (timeline.isNotEmpty()) Box(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(68.dp)) { CloudTimeline(timeline, activePeriod, timelineThumbVisible) { scope.launch { jumpToPeriod(it) } } }
+                if (cloudView != CloudView.TRASH && timeline.isNotEmpty()) Box(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(68.dp)) { CloudTimeline(timeline, activePeriod, timelineThumbVisible) { scope.launch { jumpToPeriod(it) } } }
                 }
                 }
             }
