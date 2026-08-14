@@ -20,6 +20,16 @@ class OrangePhotosSyncApi(apiBaseUrl: String, private val sessionToken: String, 
 
     fun currentUser() = authApi.currentUser(sessionToken)
 
+    fun trashPhoto(photoId: String) {
+        require(photoId.isNotBlank())
+        requestJson(
+            path = "api/orange-photos/${Uri.encode(photoId)}/trash",
+            method = "POST",
+            contentType = "application/json; charset=utf-8",
+            fixedBody = "{}".toByteArray(Charsets.UTF_8),
+        )
+    }
+
     fun checkUpload(item: LocalMediaItem, checksum: String, forceDuplicate: Boolean = false): UploadCheck {
         val body = JSONObject()
             .put("original_filename", item.displayName)

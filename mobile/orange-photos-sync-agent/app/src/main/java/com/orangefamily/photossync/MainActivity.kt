@@ -85,7 +85,7 @@ import kotlinx.coroutines.withContext
 internal enum class AgentScreen { FOLDERS, SETTINGS, TRASH }
 internal enum class LibrarySource { CLOUD, DEVICE }
 internal fun initialAuthenticatedScreen() = AgentScreen.FOLDERS
-private enum class MediaOperation { TRASH, RESTORE, DELETE }
+private enum class MediaOperation { TRASH, RESTORE, DELETE, TOTAL_TRASH }
 
 class MainActivity : ComponentActivity() {
     private lateinit var authController: AuthController
@@ -107,9 +107,10 @@ class MainActivity : ComponentActivity() {
     }
     private val notificationPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
     private val deleteMediaLauncher=registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()){result->
-        val requested=pendingDeleteItems;pendingDeleteItems=emptyList()
+        val requested=pendingDeleteItems;val operation=pendingMediaOperation;pendingDeleteItems=emptyList()
         if(result.resultCode==Activity.RESULT_OK){
-            if(pendingMediaOperation==MediaOperation.DELETE)reconcileDeletedMedia(requested)
+            if(operation==MediaOperation.DELETE)reconcileDeletedMedia(requested)
+            if(operation==MediaOperation.TOTAL_TRASH)lifecycleScope.launch(Dispatchers.IO){runCatching{trashRemoteCopies(requested)}.onFailure{withContext(Dispatchers.Main){Toast.makeText(this@MainActivity,"Se eliminó del dispositivo, pero no se pudo mover la copia de OrangeFamily a la papelera.",Toast.LENGTH_LONG).show()}}}
             mediaRefreshVersion+=1
         }
         pendingMediaOperation=null
@@ -179,6 +180,7 @@ class MainActivity : ComponentActivity() {
                         onSyncNow = scheduler::scheduleImmediateSync,
                         onNetworkPolicyChanged = scheduler::rescheduleForPolicy,
                         onDeleteMedia = ::deleteMedia,
+                        onDeleteTotalMedia = ::deleteTotalMedia,
                         onRestoreMedia = ::restoreMedia,
                         onDeleteForever = ::deleteForever,
                         mediaRefreshVersion = mediaRefreshVersion,
@@ -218,13 +220,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun requestMediaTrash(items:List<LocalMediaItem>,operation:MediaOperation){if(items.isEmpty())return;pendingDeleteItems=items;pendingMediaOperation=operation;deleteMediaLauncher.launch(IntentSenderRequest.Builder(MediaStore.createTrashRequest(contentResolver,items.map{Uri.parse(it.contentUri)},true).intentSender).build())}
+
+    private suspend fun trashRemoteCopies(items:List<LocalMediaItem>){val cloudItems=items.filter{it.cloudStatus==LocalMediaItem.CLOUD_BACKED_UP};if(cloudItems.isEmpty())error("La selección no contiene copias de OrangeFamily.");if(cloudItems.any{it.remotePhotoId.isNullOrBlank()})error("No se pudo identificar una de las copias de OrangeFamily.");val token=sessionStore.load(BuildConfig.API_BASE_URL)?:error("La sesión de OrangeFamily no está disponible.");val api=OrangePhotosSyncApi(BuildConfig.API_BASE_URL,token,InstallationIdStore(applicationContext).getOrCreate());cloudItems.mapNotNull{it.remotePhotoId?.trim()}.filter{it.isNotBlank()}.distinct().forEach{api.trashPhoto(it)}}
+
+    private fun deleteTotalMedia(items:List<LocalMediaItem>){if(items.isEmpty())return;val cloudItems=items.filter{it.cloudStatus==LocalMediaItem.CLOUD_BACKED_UP};if(cloudItems.isEmpty())return;if(cloudItems.any{it.remotePhotoId.isNullOrBlank()}){Toast.makeText(this,"No se pudo identificar la copia de OrangeFamily.",Toast.LENGTH_SHORT).show();return};if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.R){requestMediaTrash(items,MediaOperation.TOTAL_TRASH);return};lifecycleScope.launch(Dispatchers.IO){try{trashRemoteCopies(items);withContext(Dispatchers.Main){deleteMedia(items)}}catch(error:Exception){withContext(Dispatchers.Main){Toast.makeText(this@MainActivity,error.message?:"No se pudo completar el borrado total.",Toast.LENGTH_LONG).show()}}}}
+
     private fun deleteMedia(items: List<LocalMediaItem>) {
         if (items.isEmpty()) return
         val uris=items.map { Uri.parse(it.contentUri) }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            pendingDeleteItems=items
-            pendingMediaOperation=MediaOperation.TRASH
-            deleteMediaLauncher.launch(IntentSenderRequest.Builder(MediaStore.createTrashRequest(contentResolver,uris,true).intentSender).build())
+            requestMediaTrash(items,MediaOperation.TRASH)
         } else lifecycleScope.launch(Dispatchers.IO) {
             items.filter{item->runCatching{contentResolver.delete(Uri.parse(item.contentUri),null,null)>0}.getOrDefault(false)}.forEach{repository.removeLocalItem(it)}
             kotlinx.coroutines.withContext(Dispatchers.Main){mediaRefreshVersion+=1}
@@ -276,6 +282,7 @@ private fun AuthContent(
     onSyncNow: (String) -> Unit,
     onNetworkPolicyChanged:(String,UploadNetworkPolicy)->Unit,
     onDeleteMedia: (List<LocalMediaItem>) -> Unit,
+    onDeleteTotalMedia: (List<LocalMediaItem>) -> Unit,
     onRestoreMedia: (List<LocalMediaItem>) -> Unit,
     onDeleteForever: (List<LocalMediaItem>) -> Unit,
     mediaRefreshVersion: Int,
@@ -345,6 +352,7 @@ private fun AuthContent(
                         onUpload = onUploadMedia,
                         onSyncNow = { onSyncNow(state.user.id) },
                         onDelete = onDeleteMedia,
+                        onDeleteTotal = onDeleteTotalMedia,
                         refreshVersion = mediaRefreshVersion,
                         librarySelector = librarySelector,
                         modifier = modifier,
