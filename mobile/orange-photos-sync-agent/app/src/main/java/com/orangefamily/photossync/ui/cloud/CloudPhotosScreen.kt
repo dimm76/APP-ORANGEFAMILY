@@ -1,6 +1,7 @@
 package com.orangefamily.photossync.ui.cloud
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +21,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
@@ -107,6 +109,23 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     LaunchedEffect(listState.isScrollInProgress) { if (listState.isScrollInProgress) timelineThumbVisible = true else { delay(1500); timelineThumbVisible = false } }
 
     val groups = groupCloudPhotos(items)
+    LaunchedEffect(items, selectedDays) {
+        if (selectedDays.isEmpty()) {
+            return@LaunchedEffect
+        }
+
+        val next = selected.toMutableSet()
+
+        groupCloudPhotos(items)
+            .flatMap { it.days }
+            .filter { it.key in selectedDays }
+            .flatMap { it.photos }
+            .forEach { next += it.id }
+
+        if (next != selected) {
+            selected = next
+        }
+    }
     LaunchedEffect(listState.firstVisibleItemIndex, groups) { activePeriod = groups.getOrNull(listState.firstVisibleItemIndex)?.key }
     suspend fun jumpToPeriod(period: CloudTimelineMonth) {
         val cursor = period.cursor ?: return
@@ -145,7 +164,72 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
             HorizontalDivider()
         }
     }) {
-        Scaffold(modifier = modifier, containerColor = OrangeBorder, topBar = { TopAppBar(title = { librarySelector() }, navigationIcon = { IconButton({ scope.launch { drawerState.open() } }) { Text("☰", style = MaterialTheme.typography.titleLarge) } }) }) { padding ->
+        Scaffold(
+            modifier = modifier,
+            containerColor = OrangeBorder,
+            topBar = {
+                if (selected.isNotEmpty()) {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                "${selected.size} seleccionados",
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        },
+                        navigationIcon = {
+                            IconButton(
+                                onClick = {
+                                    clearSelection()
+                                },
+                            ) {
+                                Text(
+                                    "×",
+                                    style = MaterialTheme.typography.titleLarge,
+                                )
+                            }
+                        },
+                        actions = {
+                            TextButton(
+                                onClick = {
+                                    selected = items.map { it.id }.toSet()
+
+                                    selectedDays =
+                                        groupCloudPhotos(items)
+                                            .flatMap { it.days }
+                                            .map { it.key }
+                                            .toSet()
+
+                                    selectionAnchor =
+                                        items.lastOrNull()?.id
+                                },
+                            ) {
+                                Text("Todo")
+                            }
+                        },
+                    )
+                } else {
+                    TopAppBar(
+                        title = {
+                            librarySelector()
+                        },
+                        navigationIcon = {
+                            IconButton(
+                                onClick = {
+                                    scope.launch {
+                                        drawerState.open()
+                                    }
+                                },
+                            ) {
+                                Text(
+                                    "☰",
+                                    style = MaterialTheme.typography.titleLarge,
+                                )
+                            }
+                        },
+                    )
+                }
+            },
+        ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
                 if (cloudView == CloudView.ALBUMS) {
                     CloudAlbumsView(albums, thumbnailLoader) { selectedAlbum = it; cloudView = CloudView.ALBUM_DETAIL }
@@ -193,6 +277,95 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     }
 }
 
+@Composable
+private fun CloudSharedBadge(
+    owned: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val badgeColor =
+        if (owned) {
+            OrangePrimary
+        } else {
+            Color(0xFF1D4ED8)
+        }
+
+    Box(
+        modifier = modifier
+            .size(23.dp)
+            .background(
+                Color.White.copy(alpha = 0.88f),
+                CircleShape,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .offset(x = (-4).dp, y = (-3).dp)
+                .size(7.dp)
+                .background(badgeColor, CircleShape),
+        )
+
+        Box(
+            Modifier
+                .offset(x = 4.dp, y = (-3).dp)
+                .size(7.dp)
+                .background(badgeColor, CircleShape),
+        )
+
+        Box(
+            Modifier
+                .offset(y = 5.dp)
+                .width(15.dp)
+                .height(6.dp)
+                .background(
+                    badgeColor,
+                    RoundedCornerShape(
+                        topStart = 6.dp,
+                        topEnd = 6.dp,
+                    ),
+                ),
+        )
+    }
+}
+
+@Composable
+private fun CloudLocalCopyBadge(
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .size(24.dp)
+            .background(
+                Color.Black.copy(alpha = 0.68f),
+                RoundedCornerShape(6.dp),
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .width(10.dp)
+                .height(15.dp)
+                .border(
+                    1.5.dp,
+                    Color.White,
+                    RoundedCornerShape(2.dp),
+                ),
+        )
+
+        Text(
+            text = "✓",
+            color = Color.White,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(
+                    end = 2.dp,
+                    bottom = 1.dp,
+                ),
+        )
+    }
+}
 private fun cloudAspectRatio(photo: CloudPhoto): Float = if ((photo.width ?: 0) > 0 && (photo.height ?: 0) > 0) ((photo.width!!.toFloat() / photo.height!!).coerceIn(.125f, 8f)) else if (photo.mediaType == "video") 16f / 9f else 1f
 private fun buildJustifiedRows(photos: List<CloudPhoto>, availableWidth: Float): List<CloudJustifiedRow> {
     val target = 170f; val minimum = 140f; val gap = 2f; val result = mutableListOf<CloudJustifiedRow>(); var current = mutableListOf<CloudPhoto>()
