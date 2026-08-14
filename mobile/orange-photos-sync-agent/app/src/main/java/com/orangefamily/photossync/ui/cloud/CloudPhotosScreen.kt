@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -23,11 +22,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.PathBuilder
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
@@ -39,6 +45,9 @@ import com.orangefamily.photossync.device.DeviceMediaStoreScanner
 import com.orangefamily.photossync.ui.theme.OrangePrimary
 import com.orangefamily.photossync.ui.SelectionActionItem
 import com.orangefamily.photossync.ui.SelectionActionTray
+import com.orangefamily.photossync.ui.device.OrangeDeleteIcon
+import com.orangefamily.photossync.ui.device.OrangeFilledCloudIcon
+import com.orangefamily.photossync.ui.device.OrangeShareIcon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.orangefamily.photossync.ui.theme.OrangeBorder
@@ -63,6 +72,16 @@ private data class WeightedTimelinePeriod(val item: CloudTimelineMonth, val star
 private enum class CloudView { LIBRARY, ALBUMS, ALBUM_DETAIL }
 private enum class CloudPagingMode { NORMAL, WINDOW }
 private const val MAX_CLOUD_BULK_SELECTION=500
+private fun cloudActionIcon(name: String, draw: PathBuilder.() -> Unit): ImageVector = ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).apply { path(fill = SolidColor(Color.Transparent), stroke = SolidColor(Color.Black), strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) { draw() } }.build()
+private val CloudAlbumActionIcon = cloudActionIcon("CloudAlbum") { moveTo(3f, 6f); horizontalLineTo(10f); lineTo(12f, 8f); horizontalLineTo(21f); verticalLineTo(19f); horizontalLineTo(3f); close() }
+private val CloudDownloadActionIcon = cloudActionIcon("CloudDownload") { moveTo(12f, 3f); verticalLineTo(15f); moveTo(7f, 10f); lineTo(12f, 15f); lineTo(17f, 10f); moveTo(4f, 19f); horizontalLineTo(20f) }
+private val CloudFavoriteActionIcon = cloudActionIcon("CloudFavorite") { moveTo(12f, 20f); lineTo(4f, 12f); curveTo(1f, 9f, 3f, 4f, 7f, 4f); curveTo(10f, 4f, 12f, 7f, 12f, 7f); curveTo(12f, 7f, 14f, 4f, 17f, 4f); curveTo(21f, 4f, 23f, 9f, 20f, 12f); close() }
+private val CloudDateActionIcon = cloudActionIcon("CloudDate") { moveTo(4f, 6f); horizontalLineTo(20f); verticalLineTo(20f); horizontalLineTo(4f); close(); moveTo(7f, 3f); verticalLineTo(8f); moveTo(17f, 3f); verticalLineTo(8f); moveTo(7f, 12f); horizontalLineTo(17f) }
+private val CloudLocationActionIcon = cloudActionIcon("CloudLocation") { moveTo(12f, 21f); curveTo(6f, 14f, 5f, 12f, 5f, 9f); curveTo(5f, 5f, 8f, 3f, 12f, 3f); curveTo(16f, 3f, 19f, 5f, 19f, 9f); curveTo(19f, 12f, 18f, 14f, 12f, 21f); close(); moveTo(12f, 11f); curveTo(10f, 11f, 9f, 10f, 9f, 8f); curveTo(9f, 6f, 10f, 5f, 12f, 5f); curveTo(14f, 5f, 15f, 6f, 15f, 8f); curveTo(15f, 10f, 14f, 11f, 12f, 11f) }
+private val CloudDeviceActionIcon = cloudActionIcon("CloudDevice") { moveTo(8f, 2f); horizontalLineTo(16f); verticalLineTo(22f); horizontalLineTo(8f); close(); moveTo(10f, 19f); horizontalLineTo(14f) }
+@Composable private fun CloudTrashActionIcon() { Box(Modifier.size(30.dp)) { Icon(OrangeFilledCloudIcon, null, Modifier.size(24.dp), tint = Color.Unspecified); Icon(OrangeDeleteIcon, null, Modifier.size(15.dp).align(Alignment.BottomEnd)) } }
+@Composable private fun LocalTrashActionIcon() { Box(Modifier.size(30.dp)) { Icon(CloudDeviceActionIcon, null, Modifier.size(23.dp).align(Alignment.TopStart)); Icon(OrangeDeleteIcon, null, Modifier.size(15.dp).align(Alignment.BottomEnd)) } }
+@Composable private fun BothTrashActionIcon() { Box(Modifier.size(32.dp)) { Icon(OrangeFilledCloudIcon, null, Modifier.size(20.dp).align(Alignment.TopStart), tint = Color.Unspecified); Icon(CloudDeviceActionIcon, null, Modifier.size(19.dp).align(Alignment.BottomStart)); Icon(OrangeDeleteIcon, null, Modifier.size(14.dp).align(Alignment.BottomEnd)) } }
 
 @OptIn(ExperimentalMaterial3Api::class,ExperimentalFoundationApi::class)
 @Composable
@@ -139,10 +158,10 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     val allFavorite=selectedPhotos.isNotEmpty()&&selectedPhotos.all{it.isFavorite}
     val bulkSelectionAllowed=selectedPhotos.isNotEmpty()&&selectedPhotos.size<=MAX_CLOUD_BULK_SELECTION
     fun runBulk(block:suspend()->Unit){if(bulkBusy)return;if(selectedPhotos.size>MAX_CLOUD_BULK_SELECTION){bulkMessage="Puedes realizar acciones sobre un máximo de 500 elementos a la vez.";return};scope.launch{bulkBusy=true;runCatching{block()}.onFailure{bulkMessage=it.message;reload()}.onSuccess{reload();clearSelection()};bulkBusy=false}}
-    val selectionActions=remember(selected,allSelectedOwned,allFavorite,bulkSelectionAllowed){listOf(SelectionActionItem("album","Álbum",enabled=bulkSelectionAllowed,onClick={albumDialogOpen=true},icon={Text("▣")}),SelectionActionItem("share","Compartir",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={shareDialogOpen=true},icon={Text("↗")}),SelectionActionItem("favorite",if(allFavorite)"Quitar favorita" else "Favorita",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={runBulk{selectedPhotos.forEach{api.setFavorite(it.id,!allFavorite)}}},icon={Text("☆")}),SelectionActionItem("date","Fecha y hora",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={val initial=selectedPhotos.firstOrNull()?.capturedAt?.let{runCatching{Instant.parse(it).atZone(ZoneId.systemDefault())}.getOrNull()}?:ZonedDateTime.now();android.app.DatePickerDialog(context,{_,y,m,d->android.app.TimePickerDialog(context,{_,h,min->val iso=ZonedDateTime.of(LocalDateTime.of(y,m+1,d,h,min),ZoneId.systemDefault()).toInstant().toString();runBulk{selectedPhotos.forEach{api.setCapturedAt(it.id,iso)}}},initial.hour,initial.minute,true).show()},initial.year,initial.monthValue-1,initial.dayOfMonth).show()},icon={Text("◷")}),SelectionActionItem("location","Ubicación",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={locationValue="";locationDialogOpen=true},icon={Text("⌖")}),SelectionActionItem("trash","Papelera nube",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={trashDialogOpen=true},icon={Text("⌫")}))}
-    val downloadAction=SelectionActionItem("download-device","Descargar",enabled=bulkSelectionAllowed&&android.os.Build.VERSION.SDK_INT>=android.os.Build.VERSION_CODES.Q&&downloadCandidates.isNotEmpty(),onClick={runBulk{downloadCandidates.forEach{photo->val downloaded=downloader.download(photo);localByRemoteId=localByRemoteId+(photo.id to (localByRemoteId[photo.id].orEmpty()+downloaded).distinctBy{"${it.mediaCollection}:${it.mediaType}:${it.mediaStoreId}"})}}},icon={Text("↓")})
-    val deleteLocalAction=SelectionActionItem("delete-local","Eliminar local",enabled=bulkSelectionAllowed&&selectedLocalItems.isNotEmpty(),onClick={deleteLocalDialogOpen=true},icon={Text("⌫")})
-    val deleteBothAction=SelectionActionItem("delete-both","Eliminar de ambos",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={deleteBothDialogOpen=true},icon={Text("⌫")})
+    val selectionActions=remember(selected,allSelectedOwned,allFavorite,bulkSelectionAllowed){listOf(SelectionActionItem("album","Álbum",enabled=bulkSelectionAllowed,onClick={albumDialogOpen=true},icon={Icon(CloudAlbumActionIcon,null)}),SelectionActionItem("share","Compartir",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={shareDialogOpen=true},icon={Icon(OrangeShareIcon,null)}),SelectionActionItem("favorite",if(allFavorite)"Quitar favorita" else "Favorita",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={runBulk{selectedPhotos.forEach{api.setFavorite(it.id,!allFavorite)}}},icon={Icon(CloudFavoriteActionIcon,null)}),SelectionActionItem("date","Fecha y hora",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={val initial=selectedPhotos.firstOrNull()?.capturedAt?.let{runCatching{Instant.parse(it).atZone(ZoneId.systemDefault())}.getOrNull()}?:ZonedDateTime.now();android.app.DatePickerDialog(context,{_,y,m,d->android.app.TimePickerDialog(context,{_,h,min->val iso=ZonedDateTime.of(LocalDateTime.of(y,m+1,d,h,min),ZoneId.systemDefault()).toInstant().toString();runBulk{selectedPhotos.forEach{api.setCapturedAt(it.id,iso)}}},initial.hour,initial.minute,true).show()},initial.year,initial.monthValue-1,initial.dayOfMonth).show()},icon={Icon(CloudDateActionIcon,null)}),SelectionActionItem("location","Ubicación",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={locationValue="";locationDialogOpen=true},icon={Icon(CloudLocationActionIcon,null)}),SelectionActionItem("trash","Papelera nube",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={trashDialogOpen=true},icon={CloudTrashActionIcon()}))}
+    val downloadAction=SelectionActionItem("download-device","Descargar",enabled=bulkSelectionAllowed&&android.os.Build.VERSION.SDK_INT>=android.os.Build.VERSION_CODES.Q&&downloadCandidates.isNotEmpty(),onClick={runBulk{val downloadedImageCount=downloadCandidates.count{it.mediaType=="image"};val downloadedVideoCount=downloadCandidates.count{it.mediaType=="video"};downloadCandidates.forEach{photo->val downloaded=downloader.download(photo);localByRemoteId=localByRemoteId+(photo.id to (localByRemoteId[photo.id].orEmpty()+downloaded).distinctBy{"${it.mediaCollection}:${it.mediaType}:${it.mediaStoreId}"})};val message=when{downloadedImageCount>0&&downloadedVideoCount==0->if(downloadedImageCount==1)"Imagen descargada en Imágenes/OrangeFamily." else "$downloadedImageCount imágenes descargadas en Imágenes/OrangeFamily.";downloadedVideoCount>0&&downloadedImageCount==0->if(downloadedVideoCount==1)"Vídeo descargado en Vídeos/OrangeFamily." else "$downloadedVideoCount vídeos descargados en Vídeos/OrangeFamily.";else->"${downloadedImageCount+downloadedVideoCount} elementos descargados en Imágenes/OrangeFamily y Vídeos/OrangeFamily."};Toast.makeText(context,message,Toast.LENGTH_LONG).show()}},icon={Icon(CloudDownloadActionIcon,null)})
+    val deleteLocalAction=SelectionActionItem("delete-local","Eliminar local",enabled=bulkSelectionAllowed&&selectedLocalItems.isNotEmpty(),onClick={deleteLocalDialogOpen=true},icon={LocalTrashActionIcon()})
+    val deleteBothAction=SelectionActionItem("delete-both","Eliminar de ambos",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={deleteBothDialogOpen=true},icon={BothTrashActionIcon()})
     LaunchedEffect(items, selectedDays) {
         if (selectedDays.isEmpty()) {
             return@LaunchedEffect
@@ -430,7 +449,7 @@ private fun weightedTimelineYears(periods: List<WeightedTimelinePeriod>): List<W
 }
 private fun timelineMonthLabel(item: CloudTimelineMonth): String {
     val date = java.time.LocalDate.of(item.year, item.month, 1)
-    return date.format(DateTimeFormatter.ofPattern("MMM yyyy", Locale("es", "ES")))
+    return date.format(DateTimeFormatter.ofPattern("MMM yyyy", spanishLocale))
         .replace(".", "").replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
 }
 
@@ -454,13 +473,12 @@ private fun CloudTimeline(years: List<CloudTimelineYear>, activePeriod: String?,
     }
     BoxWithConstraints(Modifier.fillMaxHeight().width(68.dp)) {
         val trackHeight = maxHeight - 20.dp
+        val maxHeightPx = constraints.maxHeight.toFloat()
         fun update(y: Float) {
             val progress = (y / constraints.maxHeight.toFloat()).coerceIn(0f, 1f)
             periods.minByOrNull { abs(it.center - progress) }?.let { scrubProgress = progress; previewPeriod = it }
         }
-        Box(Modifier.fillMaxSize().pointerInput(periods) { detectTapGestures { update(it.y); onSelected(previewPeriod.item) } }.pointerInput(periods) {
-            detectVerticalDragGestures(onDragStart = { dragging = true; update(it.y); onSelected(previewPeriod.item) }, onVerticalDrag = { change, _ -> change.consume(); update(change.position.y); scrubRequestVersion += 1 }, onDragEnd = { val selected = previewPeriod.item; onSelected(selected); dragging = false }, onDragCancel = { dragging = false })
-        }) {
+        Box(Modifier.fillMaxSize()) {
             if (dragging) {
             Box(Modifier.align(Alignment.CenterEnd).padding(end = 14.dp).width(1.dp).fillMaxHeight().padding(vertical = 10.dp).background(MaterialTheme.colorScheme.outlineVariant))
             periods.forEach { period -> val activeDot = period.item.key == activePeriod; Box(Modifier.align(Alignment.TopEnd).padding(end = if (activeDot) 11.dp else 12.dp).offset(y = trackHeight * period.center + 10.dp - if (activeDot) 3.dp else 2.dp).size(if (activeDot) 6.dp else 4.dp).background(if (activeDot) MaterialTheme.colorScheme.primary else Color(0x7A475569), CircleShape)) }
@@ -469,7 +487,7 @@ private fun CloudTimeline(years: List<CloudTimelineYear>, activePeriod: String?,
                 Text(yearItem.year.toString(), fontSize = 11.sp, lineHeight = 12.sp, style = MaterialTheme.typography.labelMedium, fontWeight = if (activeYear) FontWeight.Bold else FontWeight.SemiBold, color = if (activeYear) MaterialTheme.colorScheme.primary else Color(0xFF334155), modifier = Modifier.align(Alignment.TopEnd).padding(end = 30.dp).offset(y = trackHeight * yearItem.center + 10.dp - 7.dp).background(Color.White.copy(alpha = .96f), RoundedCornerShape(9.dp)).border(1.dp, Color(0xFFDCE3F5), RoundedCornerShape(9.dp)).padding(horizontal = 4.dp, vertical = 1.dp))
             }
             }
-            if (thumbVisible || dragging) Box(Modifier.align(Alignment.TopEnd).offset(y = trackHeight * scrubProgress + 10.dp - 32.dp).size(width = 44.dp, height = 64.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp, topEnd = 0.dp, bottomEnd = 0.dp)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp, topEnd = 0.dp, bottomEnd = 0.dp)), contentAlignment = Alignment.CenterStart) { Column(Modifier.padding(start = 13.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { repeat(3) { Box(Modifier.width(12.dp).height(2.dp).background(Color(0xFF64748B))) } } }
+            if (thumbVisible || dragging) Box(Modifier.align(Alignment.TopEnd).offset(y = trackHeight * scrubProgress + 10.dp - 32.dp).size(width = 44.dp, height = 64.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp, topEnd = 0.dp, bottomEnd = 0.dp)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp, topEnd = 0.dp, bottomEnd = 0.dp)).pointerInput(periods) { detectVerticalDragGestures(onDragStart = { dragging = true }, onVerticalDrag = { change, dragAmount -> change.consume(); val nextProgress = (scrubProgress + dragAmount / maxHeightPx).coerceIn(0f, 1f); periods.minByOrNull { abs(it.center - nextProgress) }?.let { scrubProgress = nextProgress; previewPeriod = it }; scrubRequestVersion += 1 }, onDragEnd = { onSelected(previewPeriod.item); dragging = false }, onDragCancel = { dragging = false }) }, contentAlignment = Alignment.CenterStart) { Column(Modifier.padding(start = 13.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { repeat(3) { Box(Modifier.width(12.dp).height(2.dp).background(Color(0xFF64748B))) } } }
             if (dragging) Text(timelineMonthLabel(previewPeriod.item), style = MaterialTheme.typography.titleSmall, modifier = Modifier.align(Alignment.TopEnd).offset(x = (-52).dp, y = trackHeight * scrubProgress + 10.dp - 22.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(22.dp)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(22.dp)).padding(horizontal = 13.dp, vertical = 10.dp))
         }
     }
