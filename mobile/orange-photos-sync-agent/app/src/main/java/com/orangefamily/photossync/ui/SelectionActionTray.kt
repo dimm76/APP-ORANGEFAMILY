@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -42,8 +43,17 @@ data class SelectionActionItem(
 )
 
 @Composable
-fun SelectionActionTray(actions: List<SelectionActionItem>, modifier: Modifier = Modifier) {
+fun SelectionActionTray(
+    actions: List<SelectionActionItem>,
+    modifier: Modifier = Modifier,
+    reopenKey: Any? = null,
+) {
     var expanded by remember { mutableStateOf(true) }
+    LaunchedEffect(reopenKey) {
+        if (reopenKey != null) {
+            expanded = true
+        }
+    }
     var accumulatedDrag by remember { mutableFloatStateOf(0f) }
     val dragThresholdPx = with(LocalDensity.current) { 32.dp.toPx() }
 
@@ -92,7 +102,7 @@ fun SelectionActionTray(actions: List<SelectionActionItem>, modifier: Modifier =
             if (expanded) {
                 LazyRow(
                     modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = 10.dp),
+                    contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     items(items = actions, key = { it.key }) { action ->
