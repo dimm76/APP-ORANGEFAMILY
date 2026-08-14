@@ -71,4 +71,7 @@ data class CloudAlbum(
     val dateEnd: String?,
     val isOwner: Boolean,
     val sharedByDisplayName: String?,
+    val canContribute: Boolean = false,
 )
+
+data class CloudMember(val id:String,val displayName:String,val role:String?)

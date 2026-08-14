@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
@@ -36,6 +37,8 @@ import com.orangefamily.photossync.data.CameraBackupRepository
 import com.orangefamily.photossync.data.LocalMediaItem
 import com.orangefamily.photossync.device.DeviceMediaStoreScanner
 import com.orangefamily.photossync.ui.theme.OrangePrimary
+import com.orangefamily.photossync.ui.SelectionActionItem
+import com.orangefamily.photossync.ui.SelectionActionTray
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.orangefamily.photossync.ui.theme.OrangeBorder
@@ -46,6 +49,8 @@ import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import java.time.Instant
 import java.time.ZoneId
+import java.time.LocalDateTime
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
@@ -57,6 +62,7 @@ private data class CloudJustifiedRow(val photos: List<CloudPhoto>, val height: F
 private data class WeightedTimelinePeriod(val item: CloudTimelineMonth, val start: Float, val end: Float, val center: Float)
 private enum class CloudView { LIBRARY, ALBUMS, ALBUM_DETAIL }
 private enum class CloudPagingMode { NORMAL, WINDOW }
+private const val MAX_CLOUD_BULK_SELECTION=500
 
 @OptIn(ExperimentalMaterial3Api::class,ExperimentalFoundationApi::class)
 @Composable
@@ -87,6 +93,17 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     var selectedDays by remember { mutableStateOf(emptySet<String>()) }
     var selectionAnchor by remember { mutableStateOf<String?>(null) }
     var localByRemoteId by remember { mutableStateOf<Map<String,LocalMediaItem>>(emptyMap()) }
+    var members by remember { mutableStateOf(emptyList<CloudMember>()) }
+    var bulkBusy by remember { mutableStateOf(false) }
+    var bulkMessage by remember { mutableStateOf<String?>(null) }
+    var albumDialogOpen by remember { mutableStateOf(false) }
+    var targetAlbumId by remember { mutableStateOf<String?>(null) }
+    var shareDialogOpen by remember { mutableStateOf(false) }
+    var shareVisibility by remember { mutableStateOf("private") }
+    var shareUserIds by remember { mutableStateOf(emptySet<String>()) }
+    var locationDialogOpen by remember { mutableStateOf(false) }
+    var locationValue by remember { mutableStateOf("") }
+    val context=LocalContext.current
 
     fun clearSelection(){selected=emptySet();selectedDays=emptySet();selectionAnchor=null}
     fun toggleSelection(photo:CloudPhoto){val next=selected.toMutableSet();if(!next.add(photo.id))next.remove(photo.id);selected=next;selectionAnchor=photo.id}
@@ -104,12 +121,18 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
         loading = false
     }
     LaunchedEffect(Unit) { albums = runCatching { api.albums() }.getOrDefault(emptyList()) }
+    LaunchedEffect(Unit) { members = runCatching { api.members() }.getOrDefault(emptyList()) }
     LaunchedEffect(api, cloudView, selectedAlbum?.id) { reload() }
     LaunchedEffect(cloudView, selectedAlbum?.id){clearSelection()}
     LaunchedEffect(items,mediaRefreshVersion){val ids=items.map{it.id}.distinct();localByRemoteId=if(ids.isEmpty())emptyMap()else withContext(Dispatchers.IO){repository.remoteLinkedItems(accountUserId,ids)}.mapNotNull{item->item.remotePhotoId?.trim()?.takeIf{it.isNotBlank()}?.let{it to item}}.filter{deviceScanner.isActive(it.second)}.toMap()}
     LaunchedEffect(listState.isScrollInProgress) { if (listState.isScrollInProgress) timelineThumbVisible = true else { delay(1500); timelineThumbVisible = false } }
 
     val groups = groupCloudPhotos(items)
+    val selectedPhotos=items.filter{it.id in selected}
+    val allSelectedOwned=selectedPhotos.isNotEmpty()&&selectedPhotos.all{it.isOwner}
+    val allFavorite=selectedPhotos.isNotEmpty()&&selectedPhotos.all{it.isFavorite}
+    fun runBulk(block:suspend()->Unit){if(bulkBusy)return;scope.launch{bulkBusy=true;runCatching{block()}.onFailure{bulkMessage=it.message;reload()}.onSuccess{reload();clearSelection()};bulkBusy=false}}
+    val selectionActions=remember(selected,allSelectedOwned,allFavorite){listOf(SelectionActionItem("album","Álbum",onClick={albumDialogOpen=true},icon={Text("▣")}),SelectionActionItem("share","Compartir",enabled=allSelectedOwned,onClick={shareDialogOpen=true},icon={Text("↗")}),SelectionActionItem("favorite",if(allFavorite)"Quitar favorita" else "Favorita",enabled=allSelectedOwned,onClick={runBulk{selectedPhotos.forEach{api.setFavorite(it.id,!allFavorite)}}},icon={Text("☆")}),SelectionActionItem("date","Fecha y hora",enabled=allSelectedOwned,onClick={val now=ZonedDateTime.now();android.app.DatePickerDialog(context,{_,y,m,d->android.app.TimePickerDialog(context,{_,h,min->val iso=ZonedDateTime.of(LocalDateTime.of(y,m+1,d,h,min),ZoneId.systemDefault()).toInstant().toString();runBulk{selectedPhotos.forEach{api.setCapturedAt(it.id,iso)}}},now.hour,now.minute,true).show()},now.year,now.monthValue-1,now.dayOfMonth).show()},icon={Text("◷")}),SelectionActionItem("location","Ubicación",enabled=allSelectedOwned,onClick={locationValue="";locationDialogOpen=true},icon={Text("⌖")}),SelectionActionItem("trash","Papelera nube",enabled=allSelectedOwned,onClick={runBulk{selectedPhotos.forEach{api.trashPhoto(it.id)}}},icon={Text("⌫")}))}
     LaunchedEffect(items, selectedDays) {
         if (selectedDays.isEmpty()) {
             return@LaunchedEffect
@@ -159,6 +182,10 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     LaunchedEffect(listState, pagingMode, hasNewer, newerCursor) { snapshotFlow { Triple(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, listState.isScrollInProgress) }.distinctUntilChanged().collect { (index, offset, scrolling) -> if (scrolling && pagingMode == CloudPagingMode.WINDOW && hasNewer && index == 0 && offset < 300) loadWindowNewer() } }
     LaunchedEffect(listState,pagingMode,hasMore){snapshotFlow{val info=listState.layoutInfo;Pair(info.visibleItemsInfo.lastOrNull()?.index?:0,info.totalItemsCount)}.distinctUntilChanged().collect{(last,total)->if(pagingMode==CloudPagingMode.NORMAL&&hasMore&&last>=total-2)loadNextNormalPage()}}
 
+    if(albumDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)albumDialogOpen=false},title={Text("Añadir a álbum")},text={Column{albums.filter{(it.isOwner||it.canContribute)&&(cloudView!=CloudView.ALBUM_DETAIL||it.id!=selectedAlbum?.id)}.forEach{album->Row(verticalAlignment=Alignment.CenterVertically){RadioButton(selected=targetAlbumId==album.id,onClick={targetAlbumId=album.id});Text(album.title)}}}},confirmButton={TextButton(enabled=!bulkBusy&&!targetAlbumId.isNullOrBlank()&&selected.size<=MAX_CLOUD_BULK_SELECTION,onClick={runBulk{val id=targetAlbumId!!;selectedPhotos.forEach{api.addPhotoToAlbum(id,it.id)};albums=api.albums();albumDialogOpen=false}}){Text("Añadir")}},dismissButton={TextButton(onClick={if(!bulkBusy)albumDialogOpen=false}){Text("Cancelar")}})
+    if(shareDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)shareDialogOpen=false},title={Text("Compartir")},text={Column{listOf("private" to "Solo yo","family" to "Toda la familia","selected" to "Miembros concretos").forEach{(v,l)->Row(verticalAlignment=Alignment.CenterVertically){RadioButton(selected=shareVisibility==v,onClick={shareVisibility=v});Text(l)}};if(shareVisibility=="selected")members.filter{it.id!=accountUserId}.forEach{member->Row(verticalAlignment=Alignment.CenterVertically){Checkbox(checked=member.id in shareUserIds,onCheckedChange={shareUserIds=if(it)shareUserIds+member.id else shareUserIds-member.id});Text(member.displayName)}}}},confirmButton={TextButton(enabled=!bulkBusy&&(shareVisibility!="selected"||shareUserIds.isNotEmpty()),onClick={runBulk{selectedPhotos.forEach{api.sharePhoto(it.id,shareVisibility,shareUserIds.toList())};shareDialogOpen=false}}){Text("Compartir")}},dismissButton={TextButton(onClick={if(!bulkBusy)shareDialogOpen=false}){Text("Cancelar")}})
+    if(locationDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)locationDialogOpen=false},title={Text("Ubicación")},text={OutlinedTextField(value=locationValue,onValueChange={locationValue=it},label={Text("Ubicación")},singleLine=true)},confirmButton={TextButton(enabled=!bulkBusy&&locationValue.trim().isNotEmpty(),onClick={runBulk{val value=locationValue.trim();selectedPhotos.forEach{api.setLocationName(it.id,value)};locationDialogOpen=false}}){Text("Guardar")}},dismissButton={TextButton(onClick={if(!bulkBusy)locationDialogOpen=false}){Text("Cancelar")}})
+    if(bulkMessage!=null)AlertDialog(onDismissRequest={bulkMessage=null},title={Text("Error")},text={Text(bulkMessage!!)},confirmButton={TextButton(onClick={bulkMessage=null}){Text("Aceptar")}})
     ModalNavigationDrawer(drawerState = drawerState, drawerContent = {
         ModalDrawerSheet {
             Spacer(Modifier.height(20.dp))
@@ -214,6 +241,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
                     )
                 }
             },
+            bottomBar = { if(selectedPhotos.isNotEmpty()){Column{if(selected.size>MAX_CLOUD_BULK_SELECTION)Text("Puedes realizar acciones sobre un máximo de 500 elementos a la vez.",modifier=Modifier.padding(8.dp));SelectionActionTray(actions=selectionActions,reopenKey=selected)}}},
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
                 if (cloudView == CloudView.ALBUMS) {

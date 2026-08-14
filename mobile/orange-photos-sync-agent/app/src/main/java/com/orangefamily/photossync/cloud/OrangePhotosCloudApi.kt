@@ -3,6 +3,7 @@ package com.orangefamily.photossync.cloud
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import org.json.JSONArray
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -66,7 +67,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
                 for (i in 0 until values.length()) {
                     val item = values.optJSONObject(i) ?: continue
                     val id = item.optString("id").trim()
-                    if (id.isNotBlank()) add(CloudAlbum(id, item.optString("title").trim().ifBlank { "Álbum" }, item.optInt("photo_count"), item.optionalString("cover_thumbnail_url"), item.optionalString("date_mode"), item.optionalString("date_start"), item.optionalString("date_end"), item.optBoolean("is_owner"), item.optionalString("shared_by_display_name")))
+                    if (id.isNotBlank()) add(CloudAlbum(id, item.optString("title").trim().ifBlank { "Álbum" }, item.optInt("photo_count"), item.optionalString("cover_thumbnail_url"), item.optionalString("date_mode"), item.optionalString("date_start"), item.optionalString("date_end"), item.optBoolean("is_owner"), item.optionalString("shared_by_display_name"), item.optBoolean("can_contribute")))
                 }
             }
         }
@@ -79,11 +80,20 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
         return CloudPhoto(id=id,mediaType=mediaType,title=item.optionalString("title"),originalFilename=item.optionalString("original_filename"),capturedAt=item.optionalString("captured_at"),width=item.optionalInt("width"),height=item.optionalInt("height"),durationSeconds=item.optionalDouble("duration_seconds"),thumbnailUrl=item.optionalString("thumbnail_url"),previewUrl=item.optionalString("preview_url"),posterUrl=item.optionalString("poster_url"),videoPreviewUrl=item.optionalString("video_preview_url"),videoPlaybackUrl=item.optionalString("video_playback_url"),originalUrl=item.optionalString("original_url"),ownerUserId=item.optionalString("owner_user_id"),isOwner=item.optBoolean("is_owner",false),visibility=item.optionalString("visibility")?:"private",isSharedEffectively=item.optBoolean("is_shared_effectively",false),sharedByDisplayName=item.optionalString("shared_by_display_name"),isFavorite=item.optBoolean("is_favorite",false))
     }
 
-    private suspend fun <T> request(url: String, fallback: String, parse: (JSONObject) -> T): T {
+    suspend fun members(): List<CloudMember> = withContext(Dispatchers.IO) { request<List<CloudMember>>("${baseUrl}api/orange-photo-members", "No se pudieron cargar los miembros.") { json -> buildList { val values=json.optJSONArray("items")?:return@request emptyList<CloudMember>(); for(i in 0 until values.length()){val item=values.optJSONObject(i)?:continue;val id=item.optString("id").trim();if(id.isNotBlank())add(CloudMember(id,item.optString("display_name"),item.optionalString("role")))}} } }
+    suspend fun addPhotoToAlbum(albumId:String,photoId:String)=withContext(Dispatchers.IO){request("${baseUrl}api/orange-photo-albums/${encode(albumId)}/photos","No se pudo añadir la foto.","POST",JSONObject().put("photo_id",photoId)) {}}
+    suspend fun sharePhoto(photoId:String,visibility:String,userIds:List<String>)=withContext(Dispatchers.IO){require(visibility in setOf("private","family","selected"));request("${baseUrl}api/orange-photos/${encode(photoId)}/share","No se pudo compartir la foto.","POST",JSONObject().put("visibility",visibility).put("user_ids",JSONArray(userIds))) {}}
+    suspend fun setFavorite(photoId:String,value:Boolean)=patchPhoto(photoId,JSONObject().put("is_favorite",value))
+    suspend fun setCapturedAt(photoId:String,isoValue:String)=patchPhoto(photoId,JSONObject().put("captured_at",isoValue))
+    suspend fun setLocationName(photoId:String,value:String)=patchPhoto(photoId,JSONObject().put("location_name",value))
+    suspend fun trashPhoto(photoId:String)=withContext(Dispatchers.IO){request("${baseUrl}api/orange-photos/${encode(photoId)}/trash","No se pudo mover la foto a la papelera.","POST") {}}
+    private suspend fun patchPhoto(photoId:String,body:JSONObject)=withContext(Dispatchers.IO){request("${baseUrl}api/orange-photos/${encode(photoId)}","No se pudo actualizar la foto.","PATCH",body) {}}
+    private suspend fun <T> request(url: String, fallback: String, method:String="GET", body:JSONObject?=null, parse: (JSONObject) -> T): T {
         val connection = URL(url).openConnection() as HttpURLConnection
         try {
-            connection.requestMethod = "GET"; connection.connectTimeout = 15_000; connection.readTimeout = 30_000
+            connection.requestMethod = method; connection.connectTimeout = 15_000; connection.readTimeout = 30_000
             connection.setRequestProperty("Accept", "application/json"); connection.setRequestProperty("Cookie", "of_session=$sessionToken")
+            if(body!=null){connection.doOutput=true;connection.setRequestProperty("Content-Type","application/json");connection.outputStream.use{it.write(body.toString().toByteArray(Charsets.UTF_8))}}
             val status = connection.responseCode
             val body = (if (status in 200..299) connection.inputStream else connection.errorStream)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
             val json = runCatching { JSONObject(body) }.getOrElse { throw CloudApiException(status, "Respuesta no válida del servidor.") }
@@ -91,6 +101,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
             return parse(json)
         } catch (error: CloudApiException) { throw error } catch (error: IOException) { throw CloudApiException(0, "No se pudo conectar con OrangeFamily.", error) } finally { connection.disconnect() }
     }
+    private suspend fun <T> request(url:String,fallback:String,parse:(JSONObject)->T):T=request(url,fallback,"GET",null,parse)
 
     private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
     private fun ownedQuery(albumId: String?): String = if (albumId == null) "&access_sources=owned" else ""
