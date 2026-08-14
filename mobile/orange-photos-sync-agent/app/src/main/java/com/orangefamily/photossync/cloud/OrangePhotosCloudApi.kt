@@ -102,6 +102,25 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
             return parse(json)
         } catch (error: CloudApiException) { throw error } catch (error: IOException) { throw CloudApiException(0, "No se pudo conectar con OrangeFamily.", error) } finally { connection.disconnect() }
     }
+
+    suspend fun createAlbum(title: String): String = withContext(Dispatchers.IO) {
+        val normalizedTitle = title.trim()
+        if (normalizedTitle.isBlank()) {
+            throw IllegalArgumentException("El nombre del álbum es obligatorio.")
+        }
+        request(
+            "${baseUrl}api/orange-photo-albums",
+            "No se pudo crear el álbum.",
+            "POST",
+            JSONObject().put("title", normalizedTitle).put("visibility", "private"),
+        ) { json ->
+            val item = json.optJSONObject("item")
+                ?: throw CloudApiException(200, "La respuesta no contiene el álbum creado.")
+            val id = item.optString("id").trim()
+            if (id.isBlank()) throw CloudApiException(200, "La respuesta no contiene el álbum creado.")
+            id
+        }
+    }
     private suspend fun <T> request(url:String,fallback:String,parse:(JSONObject)->T):T=request(url,fallback,"GET",null,parse)
 
     private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
