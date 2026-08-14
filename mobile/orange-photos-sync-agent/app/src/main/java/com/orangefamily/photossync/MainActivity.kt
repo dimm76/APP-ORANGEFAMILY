@@ -361,7 +361,7 @@ private fun AuthContent(
                     if (cloudApi == null) {
                         Box(modifier = modifier, contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                     } else {
-                        CloudPhotosScreen(api = cloudApi, thumbnailLoader = remoteThumbnailLoader, librarySelector = librarySelector, onOpen = onOpenCloudMedia, modifier = modifier)
+                        CloudPhotosScreen(api = cloudApi, thumbnailLoader = remoteThumbnailLoader, accountUserId = state.user.id, repository = repository, deviceScanner = deviceScanner, mediaRefreshVersion = mediaRefreshVersion, librarySelector = librarySelector, onOpen = onOpenCloudMedia, modifier = modifier)
                     }
                 }
             } else if(screen==AgentScreen.TRASH){

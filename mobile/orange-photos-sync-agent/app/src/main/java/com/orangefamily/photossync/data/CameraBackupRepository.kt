@@ -7,6 +7,8 @@ class CameraBackupRepository(
 ) {
     private val dao = database.cameraBackupDao()
 
+    suspend fun remoteLinkedItems(accountUserId:String,remotePhotoIds:List<String>)=dao.getRemoteLinkedItems(accountUserId,remotePhotoIds)
+
     suspend fun activate(accountUserId: String, baseline: BaselineSnapshot, now: Long) {
         database.withTransaction {
             val image = baseline.maximum(LocalMediaItem.TYPE_IMAGE)
