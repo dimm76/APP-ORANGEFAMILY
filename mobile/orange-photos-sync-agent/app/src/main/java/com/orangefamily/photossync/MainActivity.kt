@@ -228,23 +228,122 @@ class MainActivity : ComponentActivity() {
 
     private fun requestMediaTrash(items:List<LocalMediaItem>,operation:MediaOperation,completion:((Boolean,String?)->Unit)?=null,remotePhotoIds:List<String> = emptyList()){if(items.isEmpty()){completion?.invoke(true,null);return};pendingDeleteItems=items;pendingMediaOperation=operation;pendingMediaCompletion=completion;pendingRemotePhotoIds=remotePhotoIds;deleteMediaLauncher.launch(IntentSenderRequest.Builder(MediaStore.createTrashRequest(contentResolver,items.map{Uri.parse(it.contentUri)},true).intentSender).build())}
     private suspend fun trashRemotePhotoIds(remotePhotoIds:List<String>){val ids=remotePhotoIds.map{it.trim()}.filter{it.isNotBlank()}.distinct();if(ids.isEmpty())error("No se pudo identificar el contenido de OrangeFamily.");val token=sessionStore.load(BuildConfig.API_BASE_URL)?:error("La sesión de OrangeFamily no está disponible.");val api=OrangePhotosSyncApi(BuildConfig.API_BASE_URL,token,InstallationIdStore(applicationContext).getOrCreate());ids.forEach{api.trashPhoto(it)}}
-    private fun deleteCloudAndLocal(remotePhotoIds:List<String>,localItems:List<LocalMediaItem>,completion:(Boolean,String?)->Unit){val ids=remotePhotoIds.map{it.trim()}.filter{it.isNotBlank()}.distinct();if(ids.isEmpty()){completion(false,"No se pudo identificar el contenido de OrangeFamily.");return};if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.R&&localItems.isNotEmpty()){requestMediaTrash(localItems,MediaOperation.CLOUD_TOTAL_TRASH,completion,ids);return};lifecycleScope.launch(Dispatchers.IO){try{trashRemotePhotoIds(ids)}catch(error:Exception){withContext(Dispatchers.Main){completion(false,error.message?:"No se pudo mover el contenido de OrangeFamily a la papelera.")};return@launch};var failed=0;localItems.forEach{item->if(runCatching{contentResolver.delete(Uri.parse(item.contentUri),null,null)>0}.getOrDefault(false))runCatching{repository.removeLocalItem(item)}.onFailure{failed++}else failed++};withContext(Dispatchers.Main){mediaRefreshVersion+=1;if(failed==0){completion(true,null)}else{completion(false,"El contenido de OrangeFamily se movió a la papelera, pero no se pudieron eliminar todas las copias locales.")}}}}
-    private fun deleteCloudLocalCopies(items:List<LocalMediaItem>,completion:(Boolean,String?)->Unit){if(items.isEmpty()){completion(true,null);return};if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.R)requestMediaTrash(items,MediaOperation.TRASH,completion) else lifecycleScope.launch(Dispatchers.IO){var failed=0;items.forEach{item->val deleted=runCatching{contentResolver.delete(Uri.parse(item.contentUri),null,null)>0}.getOrDefault(false);if(deleted)runCatching{repository.removeLocalItem(item)}.onFailure{failed++}else failed++};withContext(Dispatchers.Main){mediaRefreshVersion+=1;completion(failed==0,if(failed==0)null else "No se pudieron eliminar todas las copias locales.")}}}
+    private fun deleteCloudAndLocal(
+        remotePhotoIds: List<String>,
+        localItems: List<LocalMediaItem>,
+        completion: (Boolean, String?) -> Unit,
+    ) {
+        val ids =
+            remotePhotoIds
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .distinct()
+
+        if (ids.isEmpty()) {
+            completion(false, "No se pudo identificar el contenido de OrangeFamily.")
+            return
+        }
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R && localItems.isNotEmpty()) {
+            completion(
+                false,
+                "La eliminación segura de copias locales requiere Android 11 o superior.",
+            )
+            return
+        }
+
+        if (localItems.isNotEmpty()) {
+            requestMediaTrash(
+                localItems,
+                MediaOperation.CLOUD_TOTAL_TRASH,
+                completion,
+                ids,
+            )
+            return
+        }
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                trashRemotePhotoIds(ids)
+                withContext(Dispatchers.Main) {
+                    mediaRefreshVersion += 1
+                    completion(true, null)
+                }
+            } catch (error: Exception) {
+                withContext(Dispatchers.Main) {
+                    completion(
+                        false,
+                        error.message
+                            ?: "No se pudo mover el contenido de OrangeFamily a la papelera.",
+                    )
+                }
+            }
+        }
+    }
+
+    private fun deleteCloudLocalCopies(
+        items: List<LocalMediaItem>,
+        completion: (Boolean, String?) -> Unit,
+    ) {
+        if (items.isEmpty()) {
+            completion(true, null)
+            return
+        }
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            completion(false, "La papelera del dispositivo requiere Android 11 o superior.")
+            return
+        }
+
+        requestMediaTrash(items, MediaOperation.TRASH, completion)
+    }
 
     private suspend fun trashRemoteCopies(items:List<LocalMediaItem>){val cloudItems=items.filter{it.cloudStatus==LocalMediaItem.CLOUD_BACKED_UP};if(cloudItems.isEmpty())error("La selección no contiene copias de OrangeFamily.");if(cloudItems.any{it.remotePhotoId.isNullOrBlank()})error("No se pudo identificar una de las copias de OrangeFamily.");val remotePhotoIds=cloudItems.mapNotNull{it.remotePhotoId?.trim()}.filter{it.isNotBlank()}.distinct();trashRemotePhotoIds(remotePhotoIds)}
 
-    private fun deleteTotalMedia(items:List<LocalMediaItem>){if(items.isEmpty())return;val cloudItems=items.filter{it.cloudStatus==LocalMediaItem.CLOUD_BACKED_UP};if(cloudItems.isEmpty())return;if(cloudItems.any{it.remotePhotoId.isNullOrBlank()}){Toast.makeText(this,"No se pudo identificar la copia de OrangeFamily.",Toast.LENGTH_SHORT).show();return};if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.R){requestMediaTrash(items,MediaOperation.TOTAL_TRASH);return};lifecycleScope.launch(Dispatchers.IO){try{trashRemoteCopies(items);withContext(Dispatchers.Main){deleteMedia(items)}}catch(error:Exception){withContext(Dispatchers.Main){Toast.makeText(this@MainActivity,error.message?:"No se pudo completar el borrado total.",Toast.LENGTH_LONG).show()}}}}
+    private fun deleteTotalMedia(items: List<LocalMediaItem>) {
+        if (items.isEmpty()) return
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            Toast.makeText(
+                this,
+                "La eliminación segura del dispositivo requiere Android 11 o superior.",
+                Toast.LENGTH_LONG,
+            ).show()
+            return
+        }
+
+        val cloudItems =
+            items.filter {
+                it.cloudStatus == LocalMediaItem.CLOUD_BACKED_UP
+            }
+
+        if (cloudItems.isEmpty()) return
+
+        if (cloudItems.any { it.remotePhotoId.isNullOrBlank() }) {
+            Toast.makeText(
+                this,
+                "No se pudo identificar la copia de OrangeFamily.",
+                Toast.LENGTH_SHORT,
+            ).show()
+            return
+        }
+
+        requestMediaTrash(items, MediaOperation.TOTAL_TRASH)
+    }
 
     private fun deleteMedia(items: List<LocalMediaItem>) {
         if (items.isEmpty()) return
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) { Toast.makeText(this, "La papelera del dispositivo requiere Android 11 o superior.", Toast.LENGTH_LONG).show(); return }
-        val uris=items.map { Uri.parse(it.contentUri) }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            requestMediaTrash(items,MediaOperation.TRASH)
-        } else lifecycleScope.launch(Dispatchers.IO) {
-            items.filter{item->runCatching{contentResolver.delete(Uri.parse(item.contentUri),null,null)>0}.getOrDefault(false)}.forEach{repository.removeLocalItem(it)}
-            kotlinx.coroutines.withContext(Dispatchers.Main){mediaRefreshVersion+=1}
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            Toast.makeText(
+                this,
+                "La papelera del dispositivo requiere Android 11 o superior.",
+                Toast.LENGTH_LONG,
+            ).show()
+            return
         }
+
+        requestMediaTrash(items, MediaOperation.TRASH)
     }
 
     private fun restoreMedia(items:List<LocalMediaItem>){if(Build.VERSION.SDK_INT<Build.VERSION_CODES.R||items.isEmpty())return;pendingDeleteItems=items;pendingMediaOperation=MediaOperation.RESTORE;deleteMediaLauncher.launch(IntentSenderRequest.Builder(MediaStore.createTrashRequest(contentResolver,items.map{Uri.parse(it.contentUri)},false).intentSender).build())}

@@ -431,11 +431,17 @@ No se realizará una copia de seguridad tradicional de la base local.
 Eliminación de archivos del móvil
 
 El agente permite gestionar archivos locales desde «Archivos del dispositivo».
-En Android 11 o superior, la eliminación normal mueve el contenido a la papelera
-recuperable de MediaStore. Desde la pantalla Papelera puede restaurarse o
-eliminarse definitivamente con confirmación adicional del sistema. En Android
-8, 9 y 10 no existe una papelera MediaStore equivalente y la eliminación local
-es definitiva tras advertencia.
+En Android 11 o superior, la eliminación desde una biblioteca mueve el contenido
+a la papelera recuperable de MediaStore. Desde la pantalla Papelera puede
+restaurarse o eliminarse definitivamente mediante una acción explícita del usuario
+y la confirmación adicional del sistema.
+
+En Android 8, 9 y 10, OrangeFamily no permite eliminar archivos locales desde una
+biblioteca porque no existe la papelera MediaStore utilizada por la aplicación.
+
+Invariante de seguridad: desde una biblioteca Android, OrangeFamily nunca elimina
+definitivamente un archivo local. La eliminación definitiva local solo puede
+realizarse desde una papelera compatible.
 
 En el futuro, si una foto ya está confirmada en OrangeFamily y se elimina del móvil:
 
