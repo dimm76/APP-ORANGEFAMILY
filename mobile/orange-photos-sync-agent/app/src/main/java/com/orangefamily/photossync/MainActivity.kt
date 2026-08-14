@@ -98,6 +98,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var sessionStore: SecureSessionStore
     private var pendingDeleteItems: List<LocalMediaItem> = emptyList()
     private var pendingMediaOperation: MediaOperation? = null
+    private var pendingMediaCompletion: ((Boolean, String?) -> Unit)? = null
     private var mediaRefreshVersion by mutableStateOf(0)
     private var mediaPermissionAccess by mutableStateOf(MediaPermissionAccess.NOT_REQUESTED)
     private val mediaPermissionLauncher = registerForActivityResult(
@@ -107,13 +108,14 @@ class MainActivity : ComponentActivity() {
     }
     private val notificationPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
     private val deleteMediaLauncher=registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()){result->
-        val requested=pendingDeleteItems;val operation=pendingMediaOperation;pendingDeleteItems=emptyList()
+        val requested=pendingDeleteItems;val operation=pendingMediaOperation;val completion=pendingMediaCompletion;pendingDeleteItems=emptyList();pendingMediaOperation=null;pendingMediaCompletion=null
+        if(result.resultCode!=Activity.RESULT_OK){completion?.invoke(false,null);return@registerForActivityResult}
         if(result.resultCode==Activity.RESULT_OK){
             if(operation==MediaOperation.DELETE)reconcileDeletedMedia(requested)
             if(operation==MediaOperation.TOTAL_TRASH)lifecycleScope.launch(Dispatchers.IO){runCatching{trashRemoteCopies(requested)}.onFailure{withContext(Dispatchers.Main){Toast.makeText(this@MainActivity,"Se eliminó del dispositivo, pero no se pudo mover la copia de OrangeFamily a la papelera.",Toast.LENGTH_LONG).show()}}}
             mediaRefreshVersion+=1
+            completion?.invoke(true,null)
         }
-        pendingMediaOperation=null
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -183,6 +185,7 @@ class MainActivity : ComponentActivity() {
                         onDeleteTotalMedia = ::deleteTotalMedia,
                         onRestoreMedia = ::restoreMedia,
                         onDeleteForever = ::deleteForever,
+                        onDeleteCloudLocalCopies = ::deleteCloudLocalCopies,
                         mediaRefreshVersion = mediaRefreshVersion,
                         modifier = Modifier
                             .fillMaxSize(),
@@ -220,7 +223,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestMediaTrash(items:List<LocalMediaItem>,operation:MediaOperation){if(items.isEmpty())return;pendingDeleteItems=items;pendingMediaOperation=operation;deleteMediaLauncher.launch(IntentSenderRequest.Builder(MediaStore.createTrashRequest(contentResolver,items.map{Uri.parse(it.contentUri)},true).intentSender).build())}
+    private fun requestMediaTrash(items:List<LocalMediaItem>,operation:MediaOperation,completion:((Boolean,String?)->Unit)?=null){if(items.isEmpty()){completion?.invoke(true,null);return};pendingDeleteItems=items;pendingMediaOperation=operation;pendingMediaCompletion=completion;deleteMediaLauncher.launch(IntentSenderRequest.Builder(MediaStore.createTrashRequest(contentResolver,items.map{Uri.parse(it.contentUri)},true).intentSender).build())}
+    private fun deleteCloudLocalCopies(items:List<LocalMediaItem>,completion:(Boolean,String?)->Unit){if(items.isEmpty()){completion(true,null);return};if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.R)requestMediaTrash(items,MediaOperation.TRASH,completion) else lifecycleScope.launch(Dispatchers.IO){var failed=0;items.forEach{item->val deleted=runCatching{contentResolver.delete(Uri.parse(item.contentUri),null,null)>0}.getOrDefault(false);if(deleted)runCatching{repository.removeLocalItem(item)}.onFailure{failed++}else failed++};withContext(Dispatchers.Main){mediaRefreshVersion+=1;completion(failed==0,if(failed==0)null else "No se pudieron eliminar todas las copias locales.")}}}
 
     private suspend fun trashRemoteCopies(items:List<LocalMediaItem>){val cloudItems=items.filter{it.cloudStatus==LocalMediaItem.CLOUD_BACKED_UP};if(cloudItems.isEmpty())error("La selección no contiene copias de OrangeFamily.");if(cloudItems.any{it.remotePhotoId.isNullOrBlank()})error("No se pudo identificar una de las copias de OrangeFamily.");val token=sessionStore.load(BuildConfig.API_BASE_URL)?:error("La sesión de OrangeFamily no está disponible.");val api=OrangePhotosSyncApi(BuildConfig.API_BASE_URL,token,InstallationIdStore(applicationContext).getOrCreate());cloudItems.mapNotNull{it.remotePhotoId?.trim()}.filter{it.isNotBlank()}.distinct().forEach{api.trashPhoto(it)}}
 
@@ -285,6 +289,7 @@ private fun AuthContent(
     onDeleteTotalMedia: (List<LocalMediaItem>) -> Unit,
     onRestoreMedia: (List<LocalMediaItem>) -> Unit,
     onDeleteForever: (List<LocalMediaItem>) -> Unit,
+    onDeleteCloudLocalCopies: (List<LocalMediaItem>, (Boolean, String?) -> Unit) -> Unit,
     mediaRefreshVersion: Int,
     modifier: Modifier = Modifier,
 ) {
@@ -361,7 +366,7 @@ private fun AuthContent(
                     if (cloudApi == null) {
                         Box(modifier = modifier, contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                     } else {
-                        CloudPhotosScreen(api = cloudApi, thumbnailLoader = remoteThumbnailLoader, accountUserId = state.user.id, repository = repository, deviceScanner = deviceScanner, mediaRefreshVersion = mediaRefreshVersion, librarySelector = librarySelector, onOpen = onOpenCloudMedia, modifier = modifier)
+                        CloudPhotosScreen(api = cloudApi, thumbnailLoader = remoteThumbnailLoader, accountUserId = state.user.id, repository = repository, deviceScanner = deviceScanner, mediaRefreshVersion = mediaRefreshVersion, librarySelector = librarySelector, onOpen = onOpenCloudMedia, modifier = modifier, onDeleteLocalCopies = onDeleteCloudLocalCopies)
                     }
                 }
             } else if(screen==AgentScreen.TRASH){
