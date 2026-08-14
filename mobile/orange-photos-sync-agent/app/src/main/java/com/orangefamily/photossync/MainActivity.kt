@@ -237,6 +237,7 @@ class MainActivity : ComponentActivity() {
 
     private fun deleteMedia(items: List<LocalMediaItem>) {
         if (items.isEmpty()) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) { Toast.makeText(this, "La papelera del dispositivo requiere Android 11 o superior.", Toast.LENGTH_LONG).show(); return }
         val uris=items.map { Uri.parse(it.contentUri) }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             requestMediaTrash(items,MediaOperation.TRASH)
