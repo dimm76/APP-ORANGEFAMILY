@@ -677,10 +677,15 @@ el registro PostgreSQL;
 el original de Wasabi;
 sus derivados remotos.
 
-En Android 11 o superior se utiliza la papelera de MediaStore.
+En Android 11 o superior, la eliminación local desde una biblioteca mueve el
+contenido a la papelera recuperable de MediaStore.
 
-En versiones anteriores, la eliminación local es definitiva después de la
-confirmación correspondiente.
+En Android 8, 9 y 10, OrangeFamily no permite eliminar archivos locales desde
+una biblioteca porque no existe la papelera MediaStore utilizada por la
+aplicación.
+
+La eliminación definitiva local solo puede realizarse desde una papelera
+compatible y mediante una acción explícita del usuario.
 
 Activación del backup
 
