@@ -92,7 +92,7 @@ val OrangeShareIcon:ImageVector by lazy{ImageVector.Builder("OrangeShare",24.dp,
     val filteredFolders=remember(folders,query){DeviceMediaRules.filterFolders(folders,query)}
     val displayedMedia=remember(media,mediaFilter){when(mediaFilter){MediaFilter.ALL->media;MediaFilter.PENDING->media.filter(DeviceMediaRules::isQueued);MediaFilter.FAILED->media.filter(DeviceMediaRules::isFailed);MediaFilter.UPLOADING->media.filter(DeviceMediaRules::isUploading)}}
     val selectedItems=remember(media,selected){media.filter{item->DeviceMediaRules.stableId(item) in selected}}
-    val selectionHasCloudCopy=remember(selectedItems){selectedItems.any(DeviceMediaRules::isBackedUp)}
+    val selectionHasCloudCopy=remember(selectedItems){selectedItems.any{it.cloudStatus==LocalMediaItem.CLOUD_BACKED_UP}}
     LaunchedEffect(gridState,folder?.stableId,mediaView){snapshotFlow{Triple(gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index?:0,displayedMedia.size,hasMore)}.map{(last,size,more)->mediaView==DeviceMediaView.GRID&&more&&last>=size-20}.distinctUntilChanged().collect{nearEnd->val current=folder;if(nearEnd&&current!=null)loadNextPage(current)}}
     LaunchedEffect(listState,folder?.stableId,mediaView){snapshotFlow{Triple(listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index?:0,displayedMedia.size,hasMore)}.map{(last,size,more)->mediaView==DeviceMediaView.LIST&&more&&last>=size-20}.distinctUntilChanged().collect{nearEnd->val current=folder;if(nearEnd&&current!=null)loadNextPage(current)}}
     fun toggleSelection(item:LocalMediaItem){val id=DeviceMediaRules.stableId(item);selected=if(id in selected)selected-id else selected+id;anchorId=id}
