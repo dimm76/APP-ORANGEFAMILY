@@ -21,6 +21,7 @@ data class CloudPhoto(
     val isSharedEffectively: Boolean = false,
     val sharedByDisplayName: String? = null,
     val isFavorite: Boolean = false,
+    val mimeType: String? = null,
 ) {
     val displayName: String
         get() = title?.takeIf { it.isNotBlank() }

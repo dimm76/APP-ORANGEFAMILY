@@ -66,7 +66,7 @@ private const val MAX_CLOUD_BULK_SELECTION=500
 
 @OptIn(ExperimentalMaterial3Api::class,ExperimentalFoundationApi::class)
 @Composable
-fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnailLoader, accountUserId:String, repository:CameraBackupRepository, deviceScanner:DeviceMediaStoreScanner, mediaRefreshVersion:Int, librarySelector: @Composable () -> Unit, onOpen: (CloudPhoto) -> Unit, modifier: Modifier) {
+fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnailLoader, accountUserId:String, repository:CameraBackupRepository, deviceScanner:DeviceMediaStoreScanner, mediaRefreshVersion:Int, librarySelector: @Composable () -> Unit, onOpen: (CloudPhoto) -> Unit, modifier: Modifier, onDeleteLocalCopies:(List<LocalMediaItem>,(Boolean,String?)->Unit)->Unit={_,completion->completion(false,null)}, onDeleteCloudAndLocal:(List<String>,List<LocalMediaItem>,(Boolean,String?)->Unit)->Unit={_,_,completion->completion(false,null)}) {
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val listState = rememberLazyListState()
@@ -92,7 +92,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     var selected by remember { mutableStateOf(emptySet<String>()) }
     var selectedDays by remember { mutableStateOf(emptySet<String>()) }
     var selectionAnchor by remember { mutableStateOf<String?>(null) }
-    var localByRemoteId by remember { mutableStateOf<Map<String,LocalMediaItem>>(emptyMap()) }
+    var localByRemoteId by remember { mutableStateOf<Map<String,List<LocalMediaItem>>>(emptyMap()) }
     var members by remember { mutableStateOf(emptyList<CloudMember>()) }
     var bulkBusy by remember { mutableStateOf(false) }
     var bulkMessage by remember { mutableStateOf<String?>(null) }
@@ -125,11 +125,14 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     LaunchedEffect(Unit) { members = runCatching { api.members() }.getOrDefault(emptyList()) }
     LaunchedEffect(api, cloudView, selectedAlbum?.id) { reload() }
     LaunchedEffect(cloudView, selectedAlbum?.id){clearSelection()}
-    LaunchedEffect(items,mediaRefreshVersion){val ids=items.map{it.id}.distinct();localByRemoteId=if(ids.isEmpty())emptyMap()else withContext(Dispatchers.IO){repository.remoteLinkedItems(accountUserId,ids)}.mapNotNull{item->item.remotePhotoId?.trim()?.takeIf{it.isNotBlank()}?.let{it to item}}.filter{deviceScanner.isActive(it.second)}.toMap()}
+    LaunchedEffect(items,mediaRefreshVersion){val ids=items.map{it.id}.distinct();localByRemoteId=if(ids.isEmpty())emptyMap()else withContext(Dispatchers.IO){repository.remoteLinkedItems(accountUserId,ids)}.filter{deviceScanner.isActive(it)}.mapNotNull{item->item.remotePhotoId?.trim()?.takeIf{it.isNotBlank()}?.let{it to item}}.groupBy({it.first},{it.second})}
     LaunchedEffect(listState.isScrollInProgress) { if (listState.isScrollInProgress) timelineThumbVisible = true else { delay(1500); timelineThumbVisible = false } }
 
     val groups = groupCloudPhotos(items)
     val selectedPhotos=items.filter{it.id in selected}
+    val selectedLocalItems=selectedPhotos.flatMap{localByRemoteId[it.id].orEmpty()}.distinctBy{"${it.mediaCollection}:${it.mediaType}:${it.mediaStoreId}"}
+    val downloadCandidates=selectedPhotos.filter{localByRemoteId[it.id].isNullOrEmpty()}
+    val downloader=remember(api,repository,accountUserId){CloudMediaDownloader(context.applicationContext,repository,api,accountUserId)}
     val allSelectedOwned=selectedPhotos.isNotEmpty()&&selectedPhotos.all{it.isOwner}
     val allFavorite=selectedPhotos.isNotEmpty()&&selectedPhotos.all{it.isFavorite}
     val bulkSelectionAllowed=selectedPhotos.isNotEmpty()&&selectedPhotos.size<=MAX_CLOUD_BULK_SELECTION
