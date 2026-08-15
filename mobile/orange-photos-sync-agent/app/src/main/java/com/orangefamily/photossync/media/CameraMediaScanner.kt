@@ -13,6 +13,7 @@ import com.orangefamily.photossync.data.LocalMediaItem
 import com.orangefamily.photossync.data.MediaBaseline
 import com.orangefamily.photossync.data.MediaScanResult
 import com.orangefamily.photossync.data.MediaWatermark
+import com.orangefamily.photossync.device.DeviceMediaRules
 
 class CameraMediaScanner(context: Context) {
     private val contentResolver = context.contentResolver
@@ -129,14 +130,17 @@ class CameraMediaScanner(context: Context) {
                 val dateAdded = cursor.long(MediaStore.MediaColumns.DATE_ADDED)
                 val watermark = MediaWatermark(dateAdded, mediaStoreId)
                 if (compareWatermarks(watermark, maximum) > 0) maximum = watermark
+                val displayName = cursor.string(MediaStore.MediaColumns.DISPLAY_NAME).orEmpty()
+                val mimeType = cursor.string(MediaStore.MediaColumns.MIME_TYPE)
+                if (DeviceMediaRules.shouldIgnoreLocalMedia(displayName, mimeType)) continue
                 items += LocalMediaItem(
                     accountUserId = accountUserId,
                     mediaStoreId = mediaStoreId,
                     mediaCollection = collection,
                     mediaType = mediaType,
                     contentUri = ContentUris.withAppendedId(uri, mediaStoreId).toString(),
-                    displayName = cursor.string(MediaStore.MediaColumns.DISPLAY_NAME).orEmpty(),
-                    mimeType = cursor.string(MediaStore.MediaColumns.MIME_TYPE),
+                    displayName = displayName,
+                    mimeType = mimeType,
                     sizeBytes = cursor.long(MediaStore.MediaColumns.SIZE),
                     dateAdded = dateAdded,
                     dateTaken = cursor.nullableLong(MediaStore.Images.ImageColumns.DATE_TAKEN),

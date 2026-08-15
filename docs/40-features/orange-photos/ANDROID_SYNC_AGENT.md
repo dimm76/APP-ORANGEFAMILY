@@ -192,6 +192,24 @@ duración para vídeos;
 fecha de detección;
 estado local.
 
+### Exclusión temporal de DNG
+
+Los archivos DNG se ignoran temporalmente tanto en la biblioteca local
+del agente como en el escaneo automático de Cámara.
+
+La exclusión:
+
+- no elimina ni modifica el archivo en el dispositivo;
+- no modifica MediaStore;
+- evita que nuevas fotografías DNG entren en la cola automática de subida;
+- evita presentar DNG como elementos tratables por OrangeFamily.
+
+Los registros locales históricos que pudieran existir en Room no se
+eliminan mediante esta regla.
+
+El soporte DNG queda fuera del alcance de esta fase y deberá tratarse
+como una funcionalidad específica si se incorpora en el futuro.
+
 Estados locales implementados:
 
 - `discovered`;

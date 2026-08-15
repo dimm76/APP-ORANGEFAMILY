@@ -88,10 +88,13 @@ class DeviceMediaStoreScanner(context: Context) {
                     fun nullableLong(name: String) = cursor.getColumnIndex(name).takeIf { it >= 0 && !cursor.isNull(it) }?.let(cursor::getLong)
                     fun nullableString(name: String) = cursor.getColumnIndex(name).takeIf { it >= 0 && !cursor.isNull(it) }?.let(cursor::getString)
                     val id=long(MediaStore.MediaColumns._ID)
+                    val displayName=nullableString(MediaStore.MediaColumns.DISPLAY_NAME).orEmpty()
+                    val mimeType=nullableString(MediaStore.MediaColumns.MIME_TYPE)
+                    if(DeviceMediaRules.shouldIgnoreLocalMedia(displayName,mimeType))continue
                     add(LocalMediaItem(
                         accountUserId=accountUserId, mediaStoreId=id, mediaCollection=volume, mediaType=type,
-                        contentUri=ContentUris.withAppendedId(base,id).toString(), displayName=nullableString(MediaStore.MediaColumns.DISPLAY_NAME).orEmpty(),
-                        mimeType=nullableString(MediaStore.MediaColumns.MIME_TYPE), sizeBytes=long(MediaStore.MediaColumns.SIZE),
+                        contentUri=ContentUris.withAppendedId(base,id).toString(), displayName=displayName,
+                        mimeType=mimeType, sizeBytes=long(MediaStore.MediaColumns.SIZE),
                         dateAdded=long(MediaStore.MediaColumns.DATE_ADDED), dateModified=long(MediaStore.MediaColumns.DATE_MODIFIED),
                         dateTaken=nullableLong(MediaStore.MediaColumns.DATE_TAKEN), relativePath=nullableString(MediaStore.MediaColumns.RELATIVE_PATH),
                         width=nullableLong(MediaStore.MediaColumns.WIDTH)?.toInt(), height=nullableLong(MediaStore.MediaColumns.HEIGHT)?.toInt(),

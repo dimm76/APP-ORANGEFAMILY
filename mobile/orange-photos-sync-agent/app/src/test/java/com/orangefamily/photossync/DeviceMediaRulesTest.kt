@@ -43,4 +43,11 @@ class DeviceMediaRulesTest {
     }
     @Test fun uploadPercentageIsBounded(){assertEquals(0,uploadPercent(1,0));assertEquals(42,uploadPercent(42,100));assertEquals(100,uploadPercent(120,100))}
     @Test fun uploadBytesAreReadable(){assertEquals("0 B",formatUploadBytes(0));assertEquals("1.0 KB",formatUploadBytes(1024));assertEquals("1.0 MB",formatUploadBytes(1024L*1024L))}
+    @Test fun dngMediaIsTemporarilyIgnored() {
+        assertTrue(DeviceMediaRules.shouldIgnoreLocalMedia("IMG_0001.DNG", "image/x-adobe-dng"))
+        assertTrue(DeviceMediaRules.shouldIgnoreLocalMedia("IMG_0001", "image/x-adobe-dng"))
+        assertTrue(DeviceMediaRules.shouldIgnoreLocalMedia("raw-photo.dng", null))
+        assertFalse(DeviceMediaRules.shouldIgnoreLocalMedia("IMG_0001.jpg", "image/jpeg"))
+        assertFalse(DeviceMediaRules.shouldIgnoreLocalMedia("VID_0001.mp4", "video/mp4"))
+    }
 }
