@@ -48,6 +48,7 @@ import com.orangefamily.photossync.ui.SelectionActionItem
 import com.orangefamily.photossync.ui.SelectionActionTray
 import com.orangefamily.photossync.ui.device.OrangeDeleteIcon
 import com.orangefamily.photossync.ui.device.OrangeFilledCloudIcon
+import com.orangefamily.photossync.ui.device.OrangeCloudShapeIcon
 import com.orangefamily.photossync.ui.device.OrangeShareIcon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -81,9 +82,28 @@ private val CloudDateActionIcon = cloudActionIcon("CloudDate") { moveTo(4f, 6f);
 private val CloudLocationActionIcon = cloudActionIcon("CloudLocation") { moveTo(12f, 21f); curveTo(6f, 14f, 5f, 12f, 5f, 9f); curveTo(5f, 5f, 8f, 3f, 12f, 3f); curveTo(16f, 3f, 19f, 5f, 19f, 9f); curveTo(19f, 12f, 18f, 14f, 12f, 21f); close(); moveTo(12f, 11f); curveTo(10f, 11f, 9f, 10f, 9f, 8f); curveTo(9f, 6f, 10f, 5f, 12f, 5f); curveTo(14f, 5f, 15f, 6f, 15f, 8f); curveTo(15f, 10f, 14f, 11f, 12f, 11f) }
 private val CloudDeviceActionIcon = cloudActionIcon("CloudDevice") { moveTo(8f, 2f); horizontalLineTo(16f); verticalLineTo(22f); horizontalLineTo(8f); close(); moveTo(10f, 19f); horizontalLineTo(14f) }
 private val CloudRestoreActionIcon = cloudActionIcon("CloudRestore") { moveTo(9f, 7f); lineTo(4f, 12f); lineTo(9f, 17f); moveTo(5f, 12f); horizontalLineTo(14f); curveTo(18f, 12f, 20f, 14f, 20f, 18f) }
-@Composable private fun CloudTrashActionIcon() { Box(Modifier.size(30.dp)) { Icon(OrangeFilledCloudIcon, null, Modifier.size(24.dp), tint = Color.Unspecified); Icon(OrangeDeleteIcon, null, Modifier.size(15.dp).align(Alignment.BottomEnd)) } }
-@Composable private fun LocalTrashActionIcon() { Box(Modifier.size(30.dp)) { Icon(CloudDeviceActionIcon, null, Modifier.size(23.dp).align(Alignment.TopStart)); Icon(OrangeDeleteIcon, null, Modifier.size(15.dp).align(Alignment.BottomEnd)) } }
-@Composable private fun BothTrashActionIcon() { Box(Modifier.size(32.dp)) { Icon(OrangeFilledCloudIcon, null, Modifier.size(20.dp).align(Alignment.TopStart), tint = Color.Unspecified); Icon(CloudDeviceActionIcon, null, Modifier.size(19.dp).align(Alignment.BottomStart)); Icon(OrangeDeleteIcon, null, Modifier.size(14.dp).align(Alignment.BottomEnd)) } }
+@Composable
+private fun CloudTrashActionIcon() {
+    Box(Modifier.size(30.dp)) {
+        Icon(OrangeDeleteIcon, null, Modifier.size(24.dp).align(Alignment.BottomStart), tint = Color.Unspecified)
+        Icon(OrangeCloudShapeIcon, null, Modifier.size(14.dp).align(Alignment.TopEnd), tint = Color.Unspecified)
+    }
+}
+@Composable
+private fun LocalTrashActionIcon() {
+    Box(Modifier.size(30.dp)) {
+        Icon(OrangeDeleteIcon, null, Modifier.size(24.dp).align(Alignment.BottomStart), tint = Color.Unspecified)
+        Icon(CloudDeviceActionIcon, null, Modifier.size(14.dp).align(Alignment.TopEnd), tint = Color.Unspecified)
+    }
+}
+@Composable
+private fun BothTrashActionIcon() {
+    Box(Modifier.size(32.dp)) {
+        Icon(OrangeDeleteIcon, null, Modifier.size(24.dp).align(Alignment.BottomCenter), tint = Color.Unspecified)
+        Icon(OrangeCloudShapeIcon, null, Modifier.size(12.dp).align(Alignment.TopStart), tint = Color.Unspecified)
+        Icon(CloudDeviceActionIcon, null, Modifier.size(12.dp).align(Alignment.TopEnd), tint = Color.Unspecified)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class,ExperimentalFoundationApi::class)
 @Composable
@@ -172,6 +192,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     val allFavorite=selectedPhotos.isNotEmpty()&&selectedPhotos.all{it.isFavorite}
     val bulkSelectionAllowed=selectedPhotos.isNotEmpty()&&selectedPhotos.size<=MAX_CLOUD_BULK_SELECTION
     fun runBulk(block:suspend()->Unit){if(bulkBusy)return;if(selectedPhotos.size>MAX_CLOUD_BULK_SELECTION){bulkMessage="Puedes realizar acciones sobre un máximo de 500 elementos a la vez.";return};scope.launch{bulkBusy=true;runCatching{block()}.onFailure{bulkMessage=it.message;reload()}.onSuccess{reload();clearSelection()};bulkBusy=false}}
+    fun selectAllTrash(){if(cloudView!=CloudView.TRASH||bulkBusy)return;scope.launch{bulkBusy=true;try{var currentPage=api.photos(page=1,perPage=100,trashed=true);if(currentPage.total>MAX_CLOUD_BULK_SELECTION){bulkMessage="Puedes realizar acciones sobre un máximo de 500 elementos a la vez.";return@launch};val allItems=currentPage.items.toMutableList();while(currentPage.hasMore){currentPage=api.photos(page=currentPage.page+1,perPage=100,trashed=true);allItems+=currentPage.items};val loadedItems=allItems.distinctBy{it.id};if(loadedItems.size>MAX_CLOUD_BULK_SELECTION){bulkMessage="Puedes realizar acciones sobre un máximo de 500 elementos a la vez.";return@launch};items=loadedItems;page=currentPage.page;hasMore=false;hasNewer=false;newerCursor=null;hasOlder=false;olderCursor=null;pagingMode=CloudPagingMode.NORMAL;timeline=emptyList();selected=loadedItems.map{it.id}.toSet();selectedDays=emptySet();selectionAnchor=loadedItems.lastOrNull()?.id}catch(error:Exception){bulkMessage=error.message?:"No se pudo seleccionar toda la papelera."}finally{bulkBusy=false}}}
     val selectionActions=remember(selected,allSelectedOwned,allFavorite,bulkSelectionAllowed){listOf(SelectionActionItem("album","Álbum",enabled=bulkSelectionAllowed,onClick={albumSearchQuery="";targetAlbumId=null;albumDialogOpen=true},icon={Icon(CloudAlbumActionIcon,null)}),SelectionActionItem("share","Compartir",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={shareDialogOpen=true},icon={Icon(OrangeShareIcon,null)}),SelectionActionItem("favorite",if(allFavorite)"Quitar favorita" else "Favorita",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={runBulk{selectedPhotos.forEach{api.setFavorite(it.id,!allFavorite)}}},icon={Icon(CloudFavoriteActionIcon,null)}),SelectionActionItem("date","Fecha y hora",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={val initial=selectedPhotos.firstOrNull()?.capturedAt?.let{runCatching{Instant.parse(it).atZone(ZoneId.systemDefault())}.getOrNull()}?:ZonedDateTime.now();android.app.DatePickerDialog(context,{_,y,m,d->android.app.TimePickerDialog(context,{_,h,min->val iso=ZonedDateTime.of(LocalDateTime.of(y,m+1,d,h,min),ZoneId.systemDefault()).toInstant().toString();runBulk{selectedPhotos.forEach{api.setCapturedAt(it.id,iso)}}},initial.hour,initial.minute,true).show()},initial.year,initial.monthValue-1,initial.dayOfMonth).show()},icon={Icon(CloudDateActionIcon,null)}),SelectionActionItem("location","Ubicación",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={locationValue="";locationDialogOpen=true},icon={Icon(CloudLocationActionIcon,null)}),SelectionActionItem("trash","Papelera nube",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={trashDialogOpen=true},icon={CloudTrashActionIcon()}))}
     val downloadAction=SelectionActionItem("download-device","Descargar",enabled=bulkSelectionAllowed&&android.os.Build.VERSION.SDK_INT>=android.os.Build.VERSION_CODES.Q&&downloadCandidates.isNotEmpty(),onClick={runBulk{val downloadedImageCount=downloadCandidates.count{it.mediaType=="image"};val downloadedVideoCount=downloadCandidates.count{it.mediaType=="video"};downloadCandidates.forEach{photo->val downloaded=downloader.download(photo);localByRemoteId=localByRemoteId+(photo.id to (localByRemoteId[photo.id].orEmpty()+downloaded).distinctBy{"${it.mediaCollection}:${it.mediaType}:${it.mediaStoreId}"})};val message=when{downloadedImageCount>0&&downloadedVideoCount==0->if(downloadedImageCount==1)"Imagen descargada en Imágenes/OrangeFamily." else "$downloadedImageCount imágenes descargadas en Imágenes/OrangeFamily.";downloadedVideoCount>0&&downloadedImageCount==0->if(downloadedVideoCount==1)"Vídeo descargado en Vídeos/OrangeFamily." else "$downloadedVideoCount vídeos descargados en Vídeos/OrangeFamily.";else->"${downloadedImageCount+downloadedVideoCount} elementos descargados en Imágenes/OrangeFamily y Vídeos/OrangeFamily."};Toast.makeText(context,message,Toast.LENGTH_LONG).show()}},icon={Icon(CloudDownloadActionIcon,null)})
     val deleteLocalAction=SelectionActionItem("delete-local","Eliminar local",enabled=bulkSelectionAllowed&&android.os.Build.VERSION.SDK_INT>=android.os.Build.VERSION_CODES.R&&selectedLocalItems.isNotEmpty(),onClick={deleteLocalDialogOpen=true},icon={LocalTrashActionIcon()})
@@ -299,7 +320,7 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                     CloudAlbumsView(albums, thumbnailLoader) { selectedAlbum = it; cloudView = CloudView.ALBUM_DETAIL }
                 } else {
                 if (selectedAlbum != null) Text(selectedAlbum!!.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(12.dp))
-                if (cloudView == CloudView.TRASH) Text("Papelera nube", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(12.dp))
+           if (cloudView == CloudView.TRASH) Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal=12.dp),verticalAlignment=Alignment.CenterVertically) { Text("Papelera nube",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f));TextButton(enabled=!bulkBusy&&items.isNotEmpty()&&(hasMore||selected.size!=items.size),onClick={selectAllTrash()}){Text("Seleccionar todo")} }
                 if (loading) CircularProgressIndicator(Modifier.align(Alignment.Center))
                 else if (error != null) Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) { Text(error!!); OutlinedButton({ scope.launch { reload() } }) { Text(stringResource(R.string.cloud_retry)) } }
                 else if (cloudView == CloudView.TRASH && items.isEmpty()) Text("La papelera nube está vacía.", modifier = Modifier.align(Alignment.Center))

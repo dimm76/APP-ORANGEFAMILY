@@ -84,7 +84,38 @@ val OrangeShareIcon:ImageVector by lazy{ImageVector.Builder("OrangeShare",24.dp,
     val uploadProgress by OrangePhotosUploadProgress.state.collectAsState()
     val uploadCounts by repository.observeUploadHeaderCounts(accountUserId).collectAsState(initial=UploadHeaderCounts(0,0,0))
     fun loadFolders(){scope.launch{folders=withContext(Dispatchers.IO){scanner.scanFolders(accountUserId)}}}
-    fun loadFirstPage(current:DeviceMediaFolder){scope.launch{loadedCount=0;media=emptyList();visibleIds=emptySet();visibleOrder=emptyList();selected=emptySet();anchorId=null;hasMore=false;loadingMore=true;gridState.scrollToItem(0);listState.scrollToItem(0);try{val page=scanner.scanBucket(accountUserId,current.stableId,PAGE_SIZE,0,mediaSort);val pageIds=page.map(DeviceMediaRules::stableId);visibleOrder=pageIds;visibleIds=pageIds.toSet();loadedCount=page.size;hasMore=page.isNotEmpty()&&loadedCount<current.itemCount;val importedPage=verifier.importBucket(page);loadingMore=false;launch{verifier.verifyItems(importedPage)}}finally{loadingMore=false}}}
+fun loadFirstPage(current: DeviceMediaFolder) {
+    scope.launch {
+        loadedCount = 0
+        media = emptyList()
+        visibleIds = emptySet()
+        visibleOrder = emptyList()
+        selected = emptySet()
+        anchorId = null
+        hasMore = false
+        loadingMore = true
+        try {
+            val page = scanner.scanBucket(accountUserId, current.stableId, PAGE_SIZE, 0, mediaSort)
+            val pageIds = page.map(DeviceMediaRules::stableId)
+            visibleOrder = pageIds
+            visibleIds = pageIds.toSet()
+            loadedCount = page.size
+            hasMore = page.isNotEmpty() && loadedCount < current.itemCount
+            val importedPage = verifier.importBucket(page)
+            launch {
+                if (mediaView == DeviceMediaView.GRID) {
+                    gridState.scrollToItem(0)
+                } else {
+                    listState.scrollToItem(0)
+                }
+            }
+            loadingMore = false
+            launch { verifier.verifyItems(importedPage) }
+        } finally {
+            loadingMore = false
+        }
+    }
+}
     fun loadNextPage(current:DeviceMediaFolder){if(!hasMore||loadingMore)return;scope.launch{loadingMore=true;try{val page=scanner.scanBucket(accountUserId,current.stableId,PAGE_SIZE,loadedCount,mediaSort);if(page.isEmpty()){hasMore=false;return@launch};val pageIds=page.map(DeviceMediaRules::stableId);visibleOrder=(visibleOrder+pageIds).distinct();visibleIds=visibleOrder.toSet();loadedCount+=page.size;hasMore=loadedCount<current.itemCount;val importedPage=verifier.importBucket(page);loadingMore=false;launch{verifier.verifyItems(importedPage)}}finally{loadingMore=false}}}
     LaunchedEffect(accountUserId,refreshVersion){loadFolders()}
     LaunchedEffect(uploadCounts){if(folder==null)loadFolders()}
