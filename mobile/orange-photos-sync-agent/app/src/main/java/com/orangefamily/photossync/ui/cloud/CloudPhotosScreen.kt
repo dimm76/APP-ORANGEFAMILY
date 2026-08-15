@@ -112,7 +112,7 @@ private fun BothTrashActionIcon() {
 fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnailLoader, accountUserId:String, repository:CameraBackupRepository, deviceScanner:DeviceMediaStoreScanner, mediaRefreshVersion:Int, librarySelector: @Composable () -> Unit, onOpen: (CloudPhoto) -> Unit, modifier: Modifier, onDeleteLocalCopies:(List<LocalMediaItem>,(Boolean,String?)->Unit)->Unit={_,completion->completion(false,null)}, onDeleteCloudAndLocal:(List<String>,List<LocalMediaItem>,(Boolean,String?)->Unit)->Unit={_,_,completion->completion(false,null)}) {
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
-val listState = rememberLazyListState()
+    val listState = rememberLazyListState()
     val listIsDragged by listState.interactionSource.collectIsDraggedAsState()
     var items by remember { mutableStateOf(emptyList<CloudPhoto>()) }
     var albums by remember { mutableStateOf(emptyList<CloudAlbum>()) }
@@ -327,7 +327,7 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                 else BoxWithConstraints(Modifier.fillMaxSize().padding(top = if (selectedAlbum != null || cloudView == CloudView.TRASH) 52.dp else 0.dp)) {
                     val availableWidth = maxWidth.value
                     val justifiedRowsByDay = remember(groups, availableWidth) { buildMap { groups.forEach { period -> period.days.forEach { day -> put("${period.key}:${day.key}", buildJustifiedRows(day.photos, availableWidth)) } } } }
-                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 2.dp)) {
                         groups.forEachIndexed { periodIndex, period ->
                             item(key = "period:${period.key}", contentType = "period-header") { Text(period.label, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = if (periodIndex == 0) 10.dp else 20.dp, bottom = 6.dp)) }
                             period.days.forEach { day ->
