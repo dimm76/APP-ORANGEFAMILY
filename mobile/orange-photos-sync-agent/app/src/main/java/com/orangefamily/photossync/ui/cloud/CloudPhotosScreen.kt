@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -55,7 +56,6 @@ import kotlinx.coroutines.withContext
 import com.orangefamily.photossync.ui.theme.OrangeBorder
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.yield
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import java.time.Instant
@@ -70,9 +70,11 @@ import kotlin.math.max
 private data class CloudPhotoDay(val key: String, val label: String, val photos: List<CloudPhoto>)
 private data class CloudPhotoPeriod(val key: String, val label: String, val days: List<CloudPhotoDay>)
 private data class CloudJustifiedRow(val photos: List<CloudPhoto>, val height: Float)
+private data class CloudWindowScrollProbe(val index: Int, val offset: Int, val dragged: Boolean, val scrollingBackward: Boolean)
 private data class WeightedTimelinePeriod(val item: CloudTimelineMonth, val start: Float, val end: Float, val center: Float)
 private enum class CloudView { LIBRARY, ALBUMS, ALBUM_DETAIL, TRASH }
 private enum class CloudPagingMode { NORMAL, WINDOW }
+private fun cloudPeriodKeyFromLazyItemKey(key: Any?): String? { val value=key as? String ?: return null; val payload=when { value.startsWith("period:")->value.removePrefix("period:");value.startsWith("day:")->value.removePrefix("day:");value.startsWith("row:")->value.removePrefix("row:");else->return null };val periodKey=payload.substringBefore(":");return periodKey.takeIf{it.length==7&&it.getOrNull(4)=='-'} }
 private const val MAX_CLOUD_BULK_SELECTION=500
 private fun cloudActionIcon(name: String, draw: PathBuilder.() -> Unit): ImageVector = ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).apply { path(fill = SolidColor(Color.Transparent), stroke = SolidColor(Color.Black), strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) { draw() } }.build()
 private val CloudAlbumActionIcon = cloudActionIcon("CloudAlbum") { moveTo(3f, 6f); horizontalLineTo(10f); lineTo(12f, 8f); horizontalLineTo(21f); verticalLineTo(19f); horizontalLineTo(3f); close() }
@@ -110,7 +112,8 @@ private fun BothTrashActionIcon() {
 fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnailLoader, accountUserId:String, repository:CameraBackupRepository, deviceScanner:DeviceMediaStoreScanner, mediaRefreshVersion:Int, librarySelector: @Composable () -> Unit, onOpen: (CloudPhoto) -> Unit, modifier: Modifier, onDeleteLocalCopies:(List<LocalMediaItem>,(Boolean,String?)->Unit)->Unit={_,completion->completion(false,null)}, onDeleteCloudAndLocal:(List<String>,List<LocalMediaItem>,(Boolean,String?)->Unit)->Unit={_,_,completion->completion(false,null)}) {
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
-    val listState = rememberLazyListState()
+val listState = rememberLazyListState()
+    val listIsDragged by listState.interactionSource.collectIsDraggedAsState()
     var items by remember { mutableStateOf(emptyList<CloudPhoto>()) }
     var albums by remember { mutableStateOf(emptyList<CloudAlbum>()) }
     var cloudView by remember { mutableStateOf(CloudView.LIBRARY) }
@@ -183,7 +186,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     LaunchedEffect(items,mediaRefreshVersion){val ids=items.map{it.id}.distinct();localByRemoteId=if(ids.isEmpty())emptyMap()else withContext(Dispatchers.IO){repository.remoteLinkedItems(accountUserId,ids)}.filter{deviceScanner.isActive(it)}.mapNotNull{item->item.remotePhotoId?.trim()?.takeIf{it.isNotBlank()}?.let{it to item}}.groupBy({it.first},{it.second})}
     LaunchedEffect(listState.isScrollInProgress) { if (listState.isScrollInProgress) timelineThumbVisible = true else { delay(1500); timelineThumbVisible = false } }
 
-    val groups = groupCloudPhotos(items)
+    val groups = remember(items) { groupCloudPhotos(items) }
     val selectedPhotos=items.filter{it.id in selected}
     val selectedLocalItems=selectedPhotos.flatMap{localByRemoteId[it.id].orEmpty()}.distinctBy{"${it.mediaCollection}:${it.mediaType}:${it.mediaStoreId}"}
     val downloadCandidates=selectedPhotos.filter{localByRemoteId[it.id].isNullOrEmpty()}
@@ -199,14 +202,14 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     val deleteBothAction=SelectionActionItem("delete-both","Eliminar de ambos",enabled=bulkSelectionAllowed&&allSelectedOwned&&(android.os.Build.VERSION.SDK_INT>=android.os.Build.VERSION_CODES.R||selectedLocalItems.isEmpty()),onClick={deleteBothDialogOpen=true},icon={BothTrashActionIcon()})
     val restoreCloudAction=SelectionActionItem("restore-cloud","Restaurar",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={runBulk{selectedPhotos.forEach{api.restorePhoto(it.id)}}},icon={Icon(CloudRestoreActionIcon,null)})
     val purgeCloudAction=SelectionActionItem("purge-cloud","Eliminar definitivamente",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={purgeDialogOpen=true},icon={Icon(OrangeDeleteIcon,null)})
-    LaunchedEffect(items, selectedDays) {
+    LaunchedEffect(groups, selectedDays) {
         if (selectedDays.isEmpty()) {
             return@LaunchedEffect
         }
 
         val next = selected.toMutableSet()
 
-        groupCloudPhotos(items)
+        groups
             .flatMap { it.days }
             .filter { it.key in selectedDays }
             .flatMap { it.photos }
@@ -216,7 +219,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
             selected = next
         }
     }
-    LaunchedEffect(listState.firstVisibleItemIndex, groups) { activePeriod = groups.getOrNull(listState.firstVisibleItemIndex)?.key }
+    LaunchedEffect(listState) { snapshotFlow { listState.layoutInfo.visibleItemsInfo.firstOrNull()?.key }.distinctUntilChanged().collect { key -> cloudPeriodKeyFromLazyItemKey(key)?.let { activePeriod = it } } }
     suspend fun jumpToPeriod(period: CloudTimelineMonth) {
         val cursor = period.cursor ?: return
         val generation = timelineRequestGeneration + 1
@@ -230,10 +233,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
         if (pagingMode != CloudPagingMode.WINDOW || !hasNewer || loadingWindowNewer) return
         val cursor = newerCursor ?: return
         loadingWindowNewer = true
-        val anchorIndex = listState.firstVisibleItemIndex
-        val anchorKey = groups.getOrNull(anchorIndex)?.key
-        val anchorOffset = listState.firstVisibleItemScrollOffset
-        try { val result = api.aroundDate(cursor, activeAlbumId(), "newer"); if (result.items.isEmpty()) { hasNewer = false; return }; val merged = (result.items + items).distinctBy { it.id }; val mergedGroups = groupCloudPhotos(merged); items = merged; hasNewer = result.hasNewer; newerCursor = result.newerCursor; yield(); if (anchorKey != null) mergedGroups.indexOfFirst { it.key == anchorKey }.takeIf { it >= 0 }?.let { listState.scrollToItem(it, anchorOffset) } } finally { loadingWindowNewer = false }
+        try { val result = api.aroundDate(cursor, activeAlbumId(), "newer"); if (result.items.isEmpty()) { hasNewer = false; return }; items = (result.items + items).distinctBy { it.id }; hasNewer = result.hasNewer; newerCursor = result.newerCursor } finally { loadingWindowNewer = false }
     }
 
     suspend fun loadWindowOlder() {
@@ -245,7 +245,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
         olderCursor = result.olderCursor
     }
     suspend fun loadNextNormalPage(){if(pagingMode!=CloudPagingMode.NORMAL||!hasMore||loadingMoreNormal)return;loadingMoreNormal=true;try{val result=api.photos(page+1,albumId=activeAlbumId(),trashed=cloudView==CloudView.TRASH);items=(items+result.items).distinctBy{it.id};page=result.page;hasMore=result.hasMore}finally{loadingMoreNormal=false}}
-    LaunchedEffect(listState, pagingMode, hasNewer, newerCursor) { snapshotFlow { Triple(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, listState.isScrollInProgress) }.distinctUntilChanged().collect { (index, offset, scrolling) -> if (scrolling && pagingMode == CloudPagingMode.WINDOW && hasNewer && index == 0 && offset < 300) loadWindowNewer() } }
+    LaunchedEffect(listState, pagingMode, hasNewer, newerCursor) { var movedAwayFromWindowTop=false; snapshotFlow { CloudWindowScrollProbe(listState.firstVisibleItemIndex,listState.firstVisibleItemScrollOffset,listIsDragged,listState.lastScrolledBackward) }.distinctUntilChanged().collect { state -> if(state.index>0||state.offset>=300)movedAwayFromWindowTop=true;if(state.dragged&&movedAwayFromWindowTop&&state.scrollingBackward&&pagingMode==CloudPagingMode.WINDOW&&hasNewer&&state.index==0&&state.offset<300){movedAwayFromWindowTop=false;loadWindowNewer()} } }
     LaunchedEffect(listState,pagingMode,hasMore){snapshotFlow{val info=listState.layoutInfo;Pair(info.visibleItemsInfo.lastOrNull()?.index?:0,info.totalItemsCount)}.distinctUntilChanged().collect{(last,total)->if(pagingMode==CloudPagingMode.NORMAL&&hasMore&&last>=total-2)loadNextNormalPage()}}
 
 if(albumDialogOpen){val selectableAlbums=albums.filter{(it.isOwner||it.canContribute)&&(cloudView!=CloudView.ALBUM_DETAIL||it.id!=selectedAlbum?.id)};val filteredAlbums=selectableAlbums.filter{albumSearchQuery.isBlank()||it.title.contains(albumSearchQuery.trim(),ignoreCase=true)};AlertDialog(onDismissRequest={if(!bulkBusy&&!albumCreating)albumDialogOpen=false},title={Text("Añadir a álbum")},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){OutlinedTextField(value=albumSearchQuery,onValueChange={albumSearchQuery=it},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("Buscar álbum")});TextButton(enabled=!bulkBusy&&!albumCreating,onClick={newAlbumTitle="";createAlbumDialogOpen=true}){Icon(CloudAlbumActionIcon,null,Modifier.size(20.dp));Spacer(Modifier.width(6.dp));Text("Crear álbum")};if(selectableAlbums.isEmpty())Text("No hay álbumes disponibles para añadir contenido.") else if(filteredAlbums.isEmpty())Text("No hay álbumes que coincidan con la búsqueda.") else LazyColumn(modifier=Modifier.fillMaxWidth().heightIn(max=360.dp)){items(items=filteredAlbums,key={it.id}){album->Row(modifier=Modifier.fillMaxWidth().clickable{targetAlbumId=album.id}.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically){RadioButton(selected=targetAlbumId==album.id,onClick={targetAlbumId=album.id});Text(text=album.title,modifier=Modifier.weight(1f),maxLines=2,overflow=TextOverflow.Ellipsis)}}}}},confirmButton={TextButton(enabled=!bulkBusy&&!targetAlbumId.isNullOrBlank()&&selected.size<=MAX_CLOUD_BULK_SELECTION,onClick={runBulk{val id=targetAlbumId!!;selectedPhotos.forEach{api.addPhotoToAlbum(id,it.id)};albums=api.albums();albumDialogOpen=false}}){Text("Añadir")}},dismissButton={TextButton(onClick={if(!bulkBusy&&!albumCreating)albumDialogOpen=false}){Text("Cancelar")}})}
@@ -326,15 +326,17 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                 else if (cloudView == CloudView.TRASH && items.isEmpty()) Text("La papelera nube está vacía.", modifier = Modifier.align(Alignment.Center))
                 else BoxWithConstraints(Modifier.fillMaxSize().padding(top = if (selectedAlbum != null || cloudView == CloudView.TRASH) 52.dp else 0.dp)) {
                     val availableWidth = maxWidth.value
-                    val groups = groupCloudPhotos(items)
+                    val justifiedRowsByDay = remember(groups, availableWidth) { buildMap { groups.forEach { period -> period.days.forEach { day -> put("${period.key}:${day.key}", buildJustifiedRows(day.photos, availableWidth)) } } } }
                     LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         groups.forEachIndexed { periodIndex, period ->
-                            item(key = "period:${period.key}") {
-                                Column(Modifier.fillMaxWidth()) {
-                                    Text(period.label, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = if (periodIndex == 0) 10.dp else 20.dp, bottom = 6.dp))
-                                    period.days.forEach { day ->
+                            item(key = "period:${period.key}", contentType = "period-header") { Text(period.label, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = if (periodIndex == 0) 10.dp else 20.dp, bottom = 6.dp)) }
+                            period.days.forEach { day ->
+                                        item(key = "day:${period.key}:${day.key}", contentType = "day-header") {
                                         Row(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=7.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){val ids=day.photos.map{it.id};val all=ids.isNotEmpty()&&ids.all{it in selected};Box(Modifier.size(24.dp).background(if(all)OrangePrimary else Color.Transparent,CircleShape).border(2.dp,if(all)OrangePrimary else MaterialTheme.colorScheme.outline,CircleShape).clickable{toggleDay(day)},contentAlignment=Alignment.Center){if(ids.any{it in selected})Text("✓",color=if(all)Color.White else OrangePrimary,fontWeight=FontWeight.Bold)};Text(day.label,style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-                                        buildJustifiedRows(day.photos, availableWidth).forEach { row ->
+                                        }
+                                        justifiedRowsByDay["${period.key}:${day.key}"].orEmpty().forEach { row ->
+                                            item(key = "row:${period.key}:${day.key}:${row.photos.joinToString(","){it.id}}", contentType = "photo-row") {
+                                            Column(Modifier.fillMaxWidth()) {
                                             Row(Modifier.fillMaxWidth().height(row.height.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                                 row.photos.forEach { photo ->
                                                     val photoSelected=photo.id in selected
@@ -348,10 +350,10 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                                                 }
                                             }
                                             Spacer(Modifier.height(2.dp))
+                                            }
+                                            }
                                         }
                                     }
-                                }
-                            }
                         }
                         if (pagingMode == CloudPagingMode.WINDOW && hasOlder && olderCursor != null) item(key = "window-load-older") { LaunchedEffect(olderCursor) { loadWindowOlder() } }
                     }
