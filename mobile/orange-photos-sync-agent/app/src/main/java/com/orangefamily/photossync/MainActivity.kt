@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
@@ -58,6 +59,7 @@ import com.orangefamily.photossync.media.MediaPermissionAccess
 import com.orangefamily.photossync.media.MediaPermissions
 import com.orangefamily.photossync.ui.LoginScreen
 import com.orangefamily.photossync.ui.StatusScreen
+import com.orangefamily.photossync.ui.AppReleaseState
 import com.orangefamily.photossync.ui.theme.OrangeFamilyPhotosSyncTheme
 import com.orangefamily.photossync.sync.OrangePhotosSyncScheduler
 import com.orangefamily.photossync.data.LocalMediaItem
@@ -161,6 +163,7 @@ class MainActivity : ComponentActivity() {
                             (application as OrangePhotosSyncApplication).configureMediaObservation(null)
                             authController.logout(lifecycleScope)
                         },
+                        onOpenAppUpdate = ::openAppUpdate,
                         onMediaObservationChanged = ::updateMediaObservation,
                         onRequestMediaPermission = {
                             MediaPermissions.markRequested(this)
@@ -223,6 +226,34 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             repository.enqueueDeviceMedia(items, forceDuplicate)
             scheduler.scheduleImmediateSync(items.first().accountUserId)
+        }
+    }
+
+    private fun openAppUpdate(downloadUrl: String) {
+        val uri = Uri.parse(downloadUrl)
+
+        if (!uri.scheme.equals("https", ignoreCase = true)) {
+            Toast.makeText(
+                this,
+                getString(R.string.app_update_open_failed),
+                Toast.LENGTH_SHORT,
+            ).show()
+            return
+        }
+
+        try {
+            startActivity(
+                Intent(
+                    Intent.ACTION_VIEW,
+                    uri,
+                ),
+            )
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(
+                this,
+                getString(R.string.app_update_open_failed),
+                Toast.LENGTH_SHORT,
+            ).show()
         }
     }
 
@@ -378,6 +409,7 @@ private fun AuthContent(
     mediaPermissionAccess: MediaPermissionAccess,
     onLogin: (String, String) -> Unit,
     onLogout: () -> Unit,
+    onOpenAppUpdate: (String) -> Unit,
     onMediaObservationChanged: (Boolean) -> Unit,
     onRequestMediaPermission: () -> Unit,
     onOpenPermissionSettings: () -> Unit,
@@ -435,13 +467,61 @@ private fun AuthContent(
             }
             var librarySource by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(LibrarySource.DEVICE) }
             var cloudSessionToken by androidx.compose.runtime.remember(state.user.id) { mutableStateOf<String?>(null) }
+            var appReleaseState by androidx.compose.runtime.remember(state.user.id) { mutableStateOf<AppReleaseState>(AppReleaseState.Loading) }
+            var dismissedAppReleaseCode by androidx.compose.runtime.saveable.rememberSaveable(state.user.id) { mutableStateOf<Int?>(null) }
+            suspend fun checkAppRelease(token: String): AppReleaseState =
+                withContext(Dispatchers.IO) {
+                    when (val result = runCatching {
+                        OrangeFamilyAuthApi(BuildConfig.API_BASE_URL).latestAndroidRelease(token)
+                    }.getOrNull()) {
+                        is OrangeFamilyAuthApi.AppReleaseResult.Success -> AppReleaseState.Ready(result.release)
+                        else -> AppReleaseState.Error
+                    }
+                }
             LaunchedEffect(state.user.id) {
-                cloudSessionToken = withContext(Dispatchers.IO) { sessionStore.load(BuildConfig.API_BASE_URL) }
+                val token = withContext(Dispatchers.IO) { sessionStore.load(BuildConfig.API_BASE_URL) }
+                cloudSessionToken = token
+                appReleaseState = if (token == null) AppReleaseState.Error else checkAppRelease(token)
+            }
+            LaunchedEffect(screen, cloudSessionToken) {
+                if (screen != AgentScreen.SETTINGS) return@LaunchedEffect
+                val token = cloudSessionToken ?: return@LaunchedEffect
+                appReleaseState = AppReleaseState.Loading
+                appReleaseState = checkAppRelease(token)
             }
             val cloudApi = androidx.compose.runtime.remember(cloudSessionToken) {
                 cloudSessionToken?.let { OrangePhotosCloudApi(BuildConfig.API_BASE_URL, it) }
             }
             val remoteThumbnailLoader = androidx.compose.runtime.remember { RemoteThumbnailLoader() }
+            val availableAppRelease =
+                (appReleaseState as? AppReleaseState.Ready)
+                    ?.release
+                    ?.takeIf { it.versionCode > BuildConfig.VERSION_CODE }
+            if (availableAppRelease != null && dismissedAppReleaseCode != availableAppRelease.versionCode) {
+                AlertDialog(
+                    onDismissRequest = { dismissedAppReleaseCode = availableAppRelease.versionCode },
+                    title = { Text(stringResource(R.string.app_update_available)) },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("${availableAppRelease.versionName} · ${availableAppRelease.versionCode}")
+                            availableAppRelease.releaseNotes
+                                ?.takeIf { it.isNotBlank() }
+                                ?.let { Text(it) }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            dismissedAppReleaseCode = availableAppRelease.versionCode
+                            onOpenAppUpdate(availableAppRelease.downloadUrl)
+                        }) { Text(stringResource(R.string.download_app_update)) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { dismissedAppReleaseCode = availableAppRelease.versionCode }) {
+                            Text(stringResource(R.string.app_update_later))
+                        }
+                    },
+                )
+            }
             val librarySelector: @Composable () -> Unit = {
                 LibrarySourceSelector(
                     selected = librarySource,
@@ -492,6 +572,8 @@ private fun AuthContent(
                 onActivate = { cameraBackupController.activate(scope) },
                 onScan = { cameraBackupController.syncNow(scope) },
                 onLogout = onLogout,
+                appReleaseState = appReleaseState,
+                onDownloadAppUpdate = onOpenAppUpdate,
                 onNetworkPolicyChanged={onNetworkPolicyChanged(state.user.id,it)},
                 modifier = modifier.padding(settingsPadding),
             ) }

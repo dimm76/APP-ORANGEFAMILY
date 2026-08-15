@@ -139,6 +139,8 @@
     <string name="no_app_release">Todavía no hay una versión publicada.</string>
     <string name="app_update_available">Hay una actualización disponible.</string>
     <string name="download_app_update">Descargar actualización</string>
+    <string name="app_update_later">Más tarde</string>
+    <string name="app_update_open_failed">No se pudo abrir la descarga de la actualización.</string>
     <string name="app_is_updated">La aplicación está actualizada.</string>
     <string name="app_is_newer_than_published">Esta instalación es posterior a la versión publicada.</string>
     <string name="cloud_library">Nube</string>

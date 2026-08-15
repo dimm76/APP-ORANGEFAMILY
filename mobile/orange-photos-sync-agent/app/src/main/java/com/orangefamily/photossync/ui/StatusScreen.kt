@@ -1,8 +1,5 @@
 package com.orangefamily.photossync.ui
 
-import android.content.Intent
-import android.net.Uri
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,7 +32,6 @@ import com.orangefamily.photossync.R
 import com.orangefamily.photossync.BuildConfig
 import com.orangefamily.photossync.auth.AuthUser
 import com.orangefamily.photossync.auth.OrangeFamilyAuthApi
-import com.orangefamily.photossync.auth.SecureSessionStore
 import com.orangefamily.photossync.backup.CameraBackupController.CameraBackupState
 import com.orangefamily.photossync.data.LocalMediaItem
 import com.orangefamily.photossync.data.CameraBackupRepository
@@ -49,10 +45,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @Composable
-fun StatusScreen(
+internal fun StatusScreen(
     user: AuthUser,
     loggingOut: Boolean,
     cameraBackupState: CameraBackupState,
+    appReleaseState: AppReleaseState,
+    onDownloadAppUpdate: (String) -> Unit,
     onRequestMediaPermission: () -> Unit,
     onOpenPermissionSettings: () -> Unit,
     onActivate: () -> Unit,
@@ -97,7 +95,10 @@ fun StatusScreen(
             }
         }
 
-        AppVersionCard(user.id)
+        AppVersionCard(
+            state = appReleaseState,
+            onDownloadAppUpdate = onDownloadAppUpdate,
+        )
 
         CameraBackupCard(
             state = cameraBackupState,
@@ -117,26 +118,14 @@ fun StatusScreen(
     }
 }
 
-private sealed interface AppReleaseState {
+internal sealed interface AppReleaseState {
     data object Loading : AppReleaseState
     data class Ready(val release: OrangeFamilyAuthApi.AppRelease?) : AppReleaseState
     data object Error : AppReleaseState
 }
 
 @Composable
-private fun AppVersionCard(userId: String) {
-    val context = LocalContext.current
-    val state by produceState<AppReleaseState>(AppReleaseState.Loading, userId) {
-        value = withContext(Dispatchers.IO) {
-            val token = SecureSessionStore(context).load(BuildConfig.API_BASE_URL)
-            if (token == null) AppReleaseState.Error else when (val result = runCatching {
-                OrangeFamilyAuthApi(BuildConfig.API_BASE_URL).latestAndroidRelease(token)
-            }.getOrNull()) {
-                is OrangeFamilyAuthApi.AppReleaseResult.Success -> AppReleaseState.Ready(result.release)
-                else -> AppReleaseState.Error
-            }
-        }
-    }
+private fun AppVersionCard(state: AppReleaseState, onDownloadAppUpdate: (String) -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.app_version_title), style = MaterialTheme.typography.titleLarge)
@@ -150,7 +139,9 @@ private fun AppVersionCard(userId: String) {
                     else if (release.versionCode > BuildConfig.VERSION_CODE) {
                         StatusValue(stringResource(R.string.available_version_label), release.versionName + " · " + release.versionCode)
                         Text(stringResource(R.string.app_update_available), color = MaterialTheme.colorScheme.primary)
-                        Button(onClick = {context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(release.downloadUrl),),)},modifier = Modifier.fillMaxWidth(),) {Text(stringResource(R.string.download_app_update),)}
+                Button(onClick = { onDownloadAppUpdate(release.downloadUrl) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.download_app_update))
+                }
                     } else if (release.versionCode == BuildConfig.VERSION_CODE) Text(stringResource(R.string.app_is_updated), color = MaterialTheme.colorScheme.primary)
                     else Text(stringResource(R.string.app_is_newer_than_published))
                 }
