@@ -539,8 +539,8 @@ async function purge(req, id) {
     await recordPhotoEvent(client,{familyId:auth.familyId,photoId:id,actorUserId:auth.userId,eventType:'purged',...clientContext(req),metadata:{photo_id:id,original_filename:photo.original_filename,checksum_sha256:SHA256_RE.test(checksum)?checksum:null,media_type:photo.media_type}});
     await client.query(`DELETE FROM public.orange_photos WHERE family_id=$1::uuid AND id=$2::uuid AND owner_user_id=$3::uuid AND is_trashed=true`, [auth.familyId, id, auth.userId]);
     await client.query("COMMIT");
+    return ok({ deleted: true, id, deleted_files: files.length });
   }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
-  return ok({ deleted: true, id, deleted_files: files.length });
 }
 
 async function emptyTrash(req) {
