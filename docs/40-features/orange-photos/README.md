@@ -46,6 +46,8 @@ La pertenencia persistente puede actuar como fuente autenticada de acceso. `acce
 
 La migración inicial crea una pertenencia únicamente para el propietario original de cada fotografía existente. Las nuevas fotografías crean de forma transaccional una pertenencia inicial para su propietario original en `orange_photo_library_items`. La tabla se introdujo de forma aditiva; en la Fase 3A la membership ya puede conservar acceso autenticado independientemente de la compartición, pero todavía no modifica la biblioteca principal, papelera, `purge`, deduplicación ni Android.
 
+Mientras `is_trashed` siga siendo global, una fotografía con memberships de otros usuarios no puede moverse a la papelera global ni purgarse físicamente por su propietario original. Ambas operaciones devuelven `409 PHOTO_RETAINED_BY_LIBRARY`. Es una protección temporal hasta implementar estados personales de biblioteca y papelera; no cambia todavía la experiencia de biblioteca ni Android.
+
 ## Permisos
 
 Node resuelve la familia autenticada; el cliente nunca elige `family_id`. El propietario siempre accede. `family` permite miembros activos; `selected` exige una compartición. La papelera solo es visible explícitamente para el propietario. Las mutaciones de metadatos, papelera y compartición requieren propiedad. Registrar objetos existentes está limitado al rol familiar `owner`.
