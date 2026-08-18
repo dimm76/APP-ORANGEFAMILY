@@ -20,6 +20,11 @@ export const restoreOrangePhoto=id=>request(`/api/orange-photos/${encodeURICompo
 export const purgeOrangePhoto=id=>request(`/api/orange-photos/${encodeURIComponent(id)}`,{method:'DELETE'});
 export const emptyOrangePhotosTrash=()=>request('/api/orange-photos/trash',{method:'DELETE'});
 export const shareOrangePhoto=(id,body)=>request(`/api/orange-photos/${encodeURIComponent(id)}/share`,{method:'POST',body:JSON.stringify(body)});
+export const addOrangePhotoToLibrary = id =>
+  request(`/api/orange-photos/${encodeURIComponent(id)}/library`, {
+    method: "POST",
+    body: "{}",
+  });
 export const createOrangePhotoPublicLink=(id,regenerate=false)=>request(`/api/orange-photos/${encodeURIComponent(id)}/public-link`,{method:'POST',body:JSON.stringify({regenerate})});
 export const revokeOrangePhotoPublicLink=id=>request(`/api/orange-photos/${encodeURIComponent(id)}/public-link`,{method:'DELETE'});
 export const orangePhotoDownloadUrl=id=>`${BASE}/api/orange-photos/${encodeURIComponent(id)}/download`;
