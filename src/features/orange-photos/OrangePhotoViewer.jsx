@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { IonIcon } from "@ionic/react";
 import {
+  addOutline,
   arrowUndoOutline,
   checkboxOutline,
   ellipsisVerticalOutline,
@@ -16,7 +17,7 @@ import { OD_ICONS } from "../../shared/ui/odIcons.js";
 import OrangePhotoDetailsPanel from "./OrangePhotoDetailsPanel.jsx";
 import OrangePhotoShareModal from "./OrangePhotoShareModal.jsx";
 import OrangePhotoEventsModal from "./OrangePhotoEventsModal.jsx";
-const DEFAULT_CAPABILITIES = Object.freeze({select:true,favorite:true,share:true,download:true,editDetails:true,history:true,generatePoster:true,trash:true,restore:true,purge:true});
+const DEFAULT_CAPABILITIES = Object.freeze({select:true,favorite:true,share:true,download:true,editDetails:true,history:true,generatePoster:true,trash:true,restore:true,purge:true,addToLibrary:false});
 
 export default function OrangePhotoViewer({
   photo,
@@ -32,6 +33,7 @@ export default function OrangePhotoViewer({
   onTrash,
   onRestore,
   onPurge,
+  onAddToLibrary,
   onPrevious,
   onNext,
   hasPrevious,
@@ -50,6 +52,8 @@ export default function OrangePhotoViewer({
   const [eventsPhotoId, setEventsPhotoId] = useState(null);
   const [posterBusy,setPosterBusy]=useState(false);
   const [posterError,setPosterError]=useState("");
+  const [libraryBusy, setLibraryBusy] = useState(false);
+  const [libraryError, setLibraryError] = useState("");
 
   const shareButtonRef = useRef(null);
   const moreButtonRef = useRef(null);
@@ -124,6 +128,25 @@ export default function OrangePhotoViewer({
     }
   };
 
+  const handleAddToLibrary = async () => {
+    if (libraryBusy) return;
+
+    setLibraryBusy(true);
+    setLibraryError("");
+
+    try {
+      await onAddToLibrary?.();
+      notify("Añadida a tu biblioteca");
+      closeMore();
+    } catch (error) {
+      setLibraryError(
+        error?.message || "No se pudo añadir a tu biblioteca.",
+      );
+    } finally {
+      setLibraryBusy(false);
+    }
+  };
+
   return (
     <>
       <AttachmentsImageLightbox
@@ -150,7 +173,7 @@ export default function OrangePhotoViewer({
             members={members}
             onSave={save}
             feedback={feedback}
-            readOnly={!allowed.editDetails}
+            readOnly={!photo.is_owner || !allowed.editDetails}
           />
         )}
         renderInfoHeaderActions={photo.is_owner&&allowed.history ? () => (
@@ -179,7 +202,7 @@ export default function OrangePhotoViewer({
                   <IonIcon icon={checkboxOutline} />
                 </button>:null}
 
-                {allowed.favorite?<button
+                {allowed.favorite&&photo.is_owner?<button
                   className={`od-attachments-lightbox__btn od-attachments-lightbox__btn--primary-action${photo.is_favorite ? " is-active" : ""}`}
                   type="button"
                   aria-label={photo.is_favorite ? "Quitar de favoritas" : "Añadir a favoritas"}
@@ -189,7 +212,7 @@ export default function OrangePhotoViewer({
                   <IonIcon icon={photo.is_favorite ? heart : heartOutline} />
                 </button>:null}
 
-                {allowed.share?<button
+                {allowed.share&&photo.is_owner?<button
                   ref={shareButtonRef}
                   className={`od-attachments-lightbox__btn od-attachments-lightbox__btn--primary-action${photo.visibility !== "private" ? " is-active" : ""}`}
                   type="button"
@@ -227,6 +250,13 @@ export default function OrangePhotoViewer({
                   <div className="od-attachments-lightbox__more-menu" role="menu">
                     {photo.media_type==="video"&&photo.is_owner?<button className="od-attachments-lightbox__more-item" type="button" role="menuitem" disabled={posterBusy} onClick={handleGeneratePoster}><IonIcon icon={imageOutline}/><span>{posterBusy?"Generando miniatura…":hasPoster?"Recrear miniatura":"Generar miniatura"}</span></button>:null}
                     {posterError?<small className="od-status-line od-status-line--error">{posterError}</small>:null}
+                    {!trashMode&&allowed.addToLibrary&&photo.is_original_owner===false&&photo.is_in_library!==true ? <>
+                      <button className="od-attachments-lightbox__more-item" type="button" role="menuitem" disabled={libraryBusy} onClick={handleAddToLibrary}>
+                        <IonIcon icon={addOutline} />
+                        <span>{libraryBusy ? "Añadiendo a tu biblioteca…" : "Añadir a mi biblioteca"}</span>
+                      </button>
+                      {libraryError ? <small className="od-status-line od-status-line--error">{libraryError}</small> : null}
+                    </> : null}
                     {!trashMode&&allowed.download ? (
                       <a
                         className="od-attachments-lightbox__more-item"
