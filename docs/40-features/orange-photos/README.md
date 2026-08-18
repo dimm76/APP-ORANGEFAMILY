@@ -38,6 +38,8 @@ OrangePhotos diferencia entre propiedad original, acceso compartido y pertenenci
 
 `orange_photo_library_items` representa las bibliotecas personales: una misma fotografía puede estar incorporada a las bibliotecas de varios usuarios sin duplicar `orange_photos`, `orange_photo_files` ni los objetos almacenados en Wasabi.
 
+La tabla debe pertenecer a `orangefamily_app_user` para que el backend gestione las pertenencias. Esta corrección se recoge en `20260818181000_orange_photo_library_items_owner.sql`.
+
 La migración inicial crea una pertenencia únicamente para el propietario original de cada fotografía existente. Las nuevas fotografías crean de forma transaccional una pertenencia inicial para su propietario original en `orange_photo_library_items`. La tabla se introduce de forma aditiva y todavía no modifica las consultas, permisos, papelera, comparticiones, álbumes, deduplicación ni el agente Android.
 
 ## Permisos
