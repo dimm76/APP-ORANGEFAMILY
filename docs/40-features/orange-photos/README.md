@@ -27,7 +27,18 @@ OrangePhotos es la biblioteca privada de fotografías y vídeos de OrangeFamily.
 - `orange_photo_albums` y `orange_photo_album_items`: álbumes jerárquicos y relación N:M.
 - `orange_photo_shares` y `orange_photo_album_shares`: destinatarios concretos.
 - `orange_photo_user_settings`: ocultación y favorito particulares.
+- `orange_photo_library_items`: pertenencia persistente de una fotografía a la biblioteca personal de uno o varios usuarios. No sustituye a `orange_photos.owner_user_id`, que identifica al propietario/origen original.
 - `orange_photo_tags` y `orange_photo_tag_items`: etiquetas familiares.
+
+## Pertenencia a biblioteca
+
+OrangePhotos diferencia entre propiedad original, acceso compartido y pertenencia a biblioteca.
+
+`orange_photos.owner_user_id` identifica de forma estable al usuario propietario/origen original de la fotografía.
+
+`orange_photo_library_items` representa las bibliotecas personales: una misma fotografía puede estar incorporada a las bibliotecas de varios usuarios sin duplicar `orange_photos`, `orange_photo_files` ni los objetos almacenados en Wasabi.
+
+La migración inicial crea una pertenencia únicamente para el propietario original de cada fotografía existente. La tabla se introduce de forma aditiva y todavía no modifica las consultas, permisos, papelera, comparticiones, álbumes, deduplicación ni el agente Android.
 
 ## Permisos
 
