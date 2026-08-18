@@ -40,9 +40,11 @@ OrangePhotos diferencia entre propiedad original, acceso compartido y pertenenci
 
 La tabla debe pertenecer a `orangefamily_app_user` para que el backend gestione las pertenencias. Esta corrección se recoge en `20260818181000_orange_photo_library_items_owner.sql`.
 
-Las respuestas autenticadas de fotografías exponen `is_original_owner`, que indica si el usuario autenticado es el propietario/origen original (`owner_user_id`), e `is_in_library`, que indica si existe una pertenencia del usuario en `orange_photo_library_items`. `is_owner` se conserva por compatibilidad y actualmente es equivalente a `is_original_owner`; `is_in_library` todavía no altera consultas, permisos, filtros, `access_source` ni el contenido de la biblioteca.
+Las respuestas autenticadas de fotografías exponen `is_original_owner`, que indica si el usuario autenticado es el propietario/origen original (`owner_user_id`), e `is_in_library`, que indica si existe una pertenencia del usuario en `orange_photo_library_items`. `is_owner` se conserva por compatibilidad y actualmente es equivalente a `is_original_owner`; `is_in_library` informa de la pertenencia persistente, que ya puede actuar como fuente autenticada de acceso y como `access_source=library`, pero todavía no modifica por defecto el contenido de la biblioteca principal.
 
-La migración inicial crea una pertenencia únicamente para el propietario original de cada fotografía existente. Las nuevas fotografías crean de forma transaccional una pertenencia inicial para su propietario original en `orange_photo_library_items`. La tabla se introduce de forma aditiva y todavía no modifica las consultas, permisos, papelera, comparticiones, álbumes, deduplicación ni el agente Android.
+La pertenencia persistente puede actuar como fuente autenticada de acceso. `access_source` admite `owned`, `library`, `direct` y `album`, con prioridad `owned → library → direct → album`; `library` representa una membership de un usuario distinto del propietario original. Todavía no existe una acción para que el receptor cree esa membership, y la biblioteca principal, la papelera, `purge` y Android no cambian.
+
+La migración inicial crea una pertenencia únicamente para el propietario original de cada fotografía existente. Las nuevas fotografías crean de forma transaccional una pertenencia inicial para su propietario original en `orange_photo_library_items`. La tabla se introdujo de forma aditiva; en la Fase 3A la membership ya puede conservar acceso autenticado independientemente de la compartición, pero todavía no modifica la biblioteca principal, papelera, `purge`, deduplicación ni Android.
 
 ## Permisos
 
