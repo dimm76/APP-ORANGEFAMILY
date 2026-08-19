@@ -92,7 +92,7 @@ export default function OrangePhotoDetailsPanel({
     .filter(Boolean)
     .join(" ");
 
-  if(readOnly){const date=photo.captured_at?new Date(photo.captured_at).toLocaleString("es-ES"):"—",duration=photo.duration_seconds?`${Math.round(Number(photo.duration_seconds))} s`:"—";return <div className="od-orange-photo-details"><DetailSection icon={documentOutline} title="Descripción"><p>{photo.description||"—"}</p></DetailSection><DetailSection icon={personOutline} title="Propiedad"><p><strong>Propietario:</strong> {photo.owner_display_name||"—"}</p></DetailSection><DetailSection icon={calendarOutline} title="Fecha y hora"><p>{date}</p></DetailSection><DetailSection icon={cameraOutline} title="Cámara y captura"><p>{camera||"—"}</p><p><strong>Lente:</strong> {photo.lens_model||"—"}</p></DetailSection><DetailSection icon={documentOutline} title="Archivo"><p><strong>{photo.title||"—"}</strong></p><p>{photo.original_filename||"—"}</p><small>{photo.width&&photo.height?`${photo.width} × ${photo.height}`:"—"}{photo.media_type==="video"?` · ${duration}`:""}</small></DetailSection><DetailSection icon={locationOutline} title="Ubicación"><p>{photo.location_name||"—"}</p></DetailSection></div>;}
+  if(readOnly){const date=photo.captured_at?new Date(photo.captured_at).toLocaleString("es-ES"):"—",duration=photo.duration_seconds?`${Math.round(Number(photo.duration_seconds))} s`:"—";return <div className="od-orange-photo-details"><DetailSection icon={documentOutline} title="Descripción"><p>{photo.description||"—"}</p></DetailSection><DetailSection icon={personOutline} title="Propiedad"><p><strong>Propietario original:</strong>{" "}{photo.owner_display_name||"—"}</p>{typeof photo.is_in_library === "boolean" ? <p><strong>En mi biblioteca:</strong>{" "}{photo.is_in_library ? "Sí" : "No"}</p> : null}</DetailSection><DetailSection icon={calendarOutline} title="Fecha y hora"><p>{date}</p></DetailSection><DetailSection icon={cameraOutline} title="Cámara y captura"><p>{camera||"—"}</p><p><strong>Lente:</strong> {photo.lens_model||"—"}</p></DetailSection><DetailSection icon={documentOutline} title="Archivo"><p><strong>{photo.title||"—"}</strong></p><p>{photo.original_filename||"—"}</p><small>{photo.width&&photo.height?`${photo.width} × ${photo.height}`:"—"}{photo.media_type==="video"?` · ${duration}`:""}</small></DetailSection><DetailSection icon={locationOutline} title="Ubicación"><p>{photo.location_name||"—"}</p></DetailSection></div>;}
 
   return (
     <div className="od-orange-photo-details">
@@ -109,9 +109,16 @@ export default function OrangePhotoDetailsPanel({
 
       <DetailSection icon={personOutline} title="Propiedad y compartición">
         <p className="od-orange-photo-details__primary">
-          <strong>Propietario:</strong>{" "}
+          <strong>Propietario original:</strong>{" "}
           {photo.owner_display_name || "No disponible"}
         </p>
+
+        {typeof photo.is_in_library === "boolean" ? (
+          <p className="od-orange-photo-details__secondary">
+            <strong>En mi biblioteca:</strong>{" "}
+            {photo.is_in_library ? "Sí" : "No"}
+          </p>
+        ) : null}
 
         <p className="od-orange-photo-details__secondary">
           {visibility}
