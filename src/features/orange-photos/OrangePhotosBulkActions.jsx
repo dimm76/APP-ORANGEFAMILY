@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { IonIcon } from "@ionic/react";
-import { albumsOutline, shareSocialOutline } from "ionicons/icons";
+import { addOutline, albumsOutline, shareSocialOutline } from "ionicons/icons";
 import ODFilterSelect from "../../shared/components/ODFilterSelect.jsx";
 import { OD_ICONS } from "../../shared/ui/odIcons.js";
 import OrangeAlbumCreateModal from "./OrangeAlbumCreateModal.jsx";
@@ -22,6 +22,7 @@ export default function OrangePhotosBulkActions({
   onCreateAlbum,
   onShare,
   onDownload,
+  onAddToLibrary,
   onTrash,
   onFavorite,
   onEdit,
@@ -29,7 +30,7 @@ export default function OrangePhotosBulkActions({
   trashEligibleCount = photos.length,
   trashSkippedCount = 0,
 }) {
-  const can = { share: capabilities.share !== false, album: capabilities.album !== false, download: capabilities.download !== false, trash: capabilities.trash !== false, favorite: capabilities.favorite !== false, edit: capabilities.edit !== false };
+  const can = { share: capabilities.share !== false, album: capabilities.album !== false, download: capabilities.download !== false, trash: capabilities.trash !== false, favorite: capabilities.favorite !== false, edit: capabilities.edit !== false, addToLibrary: capabilities.addToLibrary === true };
   const [modal, setModal] = useState("");
   const [albumId, setAlbumId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -122,6 +123,18 @@ export default function OrangePhotosBulkActions({
         >
           <IonIcon icon={albumsOutline} />
         </button> : null}
+        {can.addToLibrary && onAddToLibrary ? (
+          <button
+            className="od-orangephotos-header-icon"
+            type="button"
+            aria-label="Añadir a mi biblioteca"
+            title="Añadir a mi biblioteca"
+            disabled={busy}
+            onClick={() => void run(onAddToLibrary)}
+          >
+            <IonIcon icon={addOutline} />
+          </button>
+        ) : null}
         {can.download ? <button
           className="od-orangephotos-header-icon"
           type="button"
