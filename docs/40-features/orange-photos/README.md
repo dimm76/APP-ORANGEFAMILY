@@ -36,7 +36,9 @@ OrangePhotos diferencia entre propiedad original, acceso compartido y pertenenci
 
 `orange_photos.owner_user_id` identifica de forma estable al usuario propietario/origen original de la fotografía.
 
-`orange_photo_library_items` representa las bibliotecas personales: una misma fotografía puede estar incorporada a las bibliotecas de varios usuarios sin duplicar `orange_photos`, `orange_photo_files` ni los objetos almacenados en Wasabi.
+`orange_photo_library_items` representa una copia lógica propia de cada usuario: una misma fotografía puede estar incorporada a las bibliotecas de varios usuarios sin duplicar `orange_photos`, `orange_photo_files` ni los objetos almacenados en Wasabi. El modelo objetivo permite que esas copias lógicas tengan metadatos, compartición, enlace público y papelera independientes. «Añadir a mi biblioteca» equivale funcionalmente a importar el mismo archivo a la biblioteca propia sin duplicar el almacenamiento físico. Esta fase prepara el modelo mediante migración; el runtime actual todavía no utiliza todos esos campos y se adaptará después de aplicar y validar el modelo.
+
+La migración preparatoria mantiene temporalmente `orange_photo_shares.owner_user_id` y `orange_photo_album_items.source_user_id` como columnas nullable, y conserva la clave primaria legacy de `orange_photo_shares`, para que el runtime actual continúe funcionando hasta el cambio coordinado de ownership.
 
 La tabla debe pertenecer a `orangefamily_app_user` para que el backend gestione las pertenencias. Esta corrección se recoge en `20260818181000_orange_photo_library_items_owner.sql`.
 
