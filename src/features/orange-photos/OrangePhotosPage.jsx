@@ -274,7 +274,25 @@ export default function OrangePhotosPage() {
     }
     void load();
   }, [load, albumsView, albumId, filters.album_id]);
-  useEffect(() => { void reloadTimeline(); }, [filters.search, filters.media_type, filters.library_scope, filters.share_scope, filters.favorite, filters.trashed, filters.album_id, albumId, albumsView, sharedWithMeView]);
+  useEffect(() => {
+    void reloadTimeline();
+  }, [
+    filters.search,
+    filters.media_type,
+    filters.library_scope,
+    filters.share_scope,
+    filters.access_sources,
+    filters.access_sources_mode,
+    filters.owner_user_ids,
+    filters.owner_user_ids_mode,
+    filters.share_states,
+    filters.favorite,
+    filters.trashed,
+    filters.album_id,
+    albumId,
+    albumsView,
+    sharedWithMeView,
+  ]);
   useEffect(() => () => {loadAbortRef.current?.abort();timelineAbortRef.current?.abort();clearTimeout(timelineScrollTimerRef.current);clearTimeout(timelineScrubRef.current.timer);cancelAnimationFrame(timelineFrameRef.current);void releaseUploadWakeLock();}, []);
   const restoredRemoteStatus=(remoteStatus,hasFile)=>{if(remoteStatus==="completing")return{status:"verifying",message:"Verificando archivo…",progress:100};if(remoteStatus==="processing")return{status:"processing",message:"Procesando archivo…",progress:100};if(hasFile)return{status:"paused",message:"Subida pausada"};return{status:"missing_file",message:"Es necesario volver a seleccionar el archivo"};};
   useEffect(()=>{let mounted=true;Promise.all([loadUploadQueue().catch(()=>{setPersistenceWarning("No se pudo recuperar la cola persistente.");return[];}),listActiveOrangePhotoUploads().catch(()=>({uploads:[]}))]).then(([local,{uploads=[]}])=>{if(!mounted)return;const byUpload=new Map(local.filter(item=>item.uploadId).map(item=>[item.uploadId,item])),byKey=new Map(local.map(item=>[item.clientUploadKey,item]));const merged=[...local];for(const remote of uploads){const existing=byUpload.get(remote.id)||byKey.get(remote.client_upload_key);if(existing){const restored=restoredRemoteStatus(remote.status,Boolean(existing.file));Object.assign(existing,{uploadId:remote.id,filename:existing.filename||remote.original_filename,mimeType:existing.mimeType||remote.mime_type,sizeBytes:existing.sizeBytes||Number(remote.size_bytes)||0,totalBytes:existing.totalBytes||Number(remote.size_bytes)||0,...restored});}else{const restored=restoredRemoteStatus(remote.status,false);merged.push({key:remote.client_upload_key||remote.id,clientUploadKey:remote.client_upload_key,uploadId:remote.id,filename:remote.original_filename,mimeType:remote.mime_type,sizeBytes:Number(remote.size_bytes)||0,file:null,createdAt:remote.created_at,updatedAt:remote.updated_at,completedParts:[],sentBytes:remote.status==="completing"||remote.status==="processing"?Number(remote.size_bytes)||0:0,totalBytes:Number(remote.size_bytes)||0,progress:remote.status==="completing"||remote.status==="processing"?100:0,...restored});}}queueRef.current=[...merged];setQueue([...merged]);if(merged.some(item=>!["completed","cancelled"].includes(item.status)))setUploadVisible(true);});return()=>{mounted=false;};},[]);
