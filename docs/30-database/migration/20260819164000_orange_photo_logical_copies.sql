@@ -50,7 +50,7 @@ END $$;
 
 ALTER TABLE public.orange_photo_library_items
     ADD CONSTRAINT orange_photo_library_items_captured_source_check
-        CHECK (captured_at_source IN ('exif','file_mtime','upload_date','manual','unknown')),
+        CHECK (captured_at_source IN ('exif','file_mtime','upload_date','manual','unknown','filename')),
     ADD CONSTRAINT orange_photo_library_items_location_source_check
         CHECK (location_source IS NULL OR location_source IN ('exif','manual','geocoded')),
     ADD CONSTRAINT orange_photo_library_items_visibility_check
