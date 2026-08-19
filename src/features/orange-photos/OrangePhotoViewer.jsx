@@ -8,6 +8,7 @@ import {
   heart,
   heartOutline,
   imageOutline,
+  removeOutline,
   shareSocialOutline,
   timeOutline,
 } from "ionicons/icons";
@@ -17,7 +18,7 @@ import { OD_ICONS } from "../../shared/ui/odIcons.js";
 import OrangePhotoDetailsPanel from "./OrangePhotoDetailsPanel.jsx";
 import OrangePhotoShareModal from "./OrangePhotoShareModal.jsx";
 import OrangePhotoEventsModal from "./OrangePhotoEventsModal.jsx";
-const DEFAULT_CAPABILITIES = Object.freeze({select:true,favorite:true,share:true,download:true,editDetails:true,history:true,generatePoster:true,trash:true,restore:true,purge:true,addToLibrary:false});
+const DEFAULT_CAPABILITIES = Object.freeze({select:true,favorite:true,share:true,download:true,editDetails:true,history:true,generatePoster:true,trash:true,restore:true,purge:true,addToLibrary:false,removeFromLibrary:false});
 
 export default function OrangePhotoViewer({
   photo,
@@ -34,6 +35,7 @@ export default function OrangePhotoViewer({
   onRestore,
   onPurge,
   onAddToLibrary,
+  onRemoveFromLibrary,
   onPrevious,
   onNext,
   hasPrevious,
@@ -147,6 +149,39 @@ export default function OrangePhotoViewer({
     }
   };
 
+  const handleRemoveFromLibrary = async () => {
+    if (libraryBusy) return;
+
+    if (
+      !window.confirm(
+        "Se quitará de tu biblioteca. La foto original no se eliminará. Si ya no está compartida contigo, dejarás de tener acceso.",
+      )
+    ) {
+      return;
+    }
+
+    setLibraryBusy(true);
+    setLibraryError("");
+
+    let removed = false;
+
+    try {
+      await onRemoveFromLibrary?.();
+      removed = true;
+      closeMore();
+    } catch (error) {
+      setLibraryError(
+        error?.message || "No se pudo quitar de tu biblioteca.",
+      );
+    } finally {
+      setLibraryBusy(false);
+    }
+
+    if (removed) {
+      onClose?.();
+    }
+  };
+
   return (
     <>
       <AttachmentsImageLightbox
@@ -254,6 +289,13 @@ export default function OrangePhotoViewer({
                       <button className="od-attachments-lightbox__more-item" type="button" role="menuitem" disabled={libraryBusy} onClick={handleAddToLibrary}>
                         <IonIcon icon={addOutline} />
                         <span>{libraryBusy ? "Añadiendo a tu biblioteca…" : "Añadir a mi biblioteca"}</span>
+                      </button>
+                      {libraryError ? <small className="od-status-line od-status-line--error">{libraryError}</small> : null}
+                    </> : null}
+                    {!trashMode&&allowed.removeFromLibrary&&photo.is_original_owner===false&&photo.is_in_library===true ? <>
+                      <button className="od-attachments-lightbox__more-item" type="button" role="menuitem" disabled={libraryBusy} onClick={handleRemoveFromLibrary}>
+                        <IonIcon icon={removeOutline} />
+                        <span>{libraryBusy ? "Quitando de tu biblioteca…" : "Quitar de mi biblioteca"}</span>
                       </button>
                       {libraryError ? <small className="od-status-line od-status-line--error">{libraryError}</small> : null}
                     </> : null}
