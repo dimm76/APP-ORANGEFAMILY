@@ -22,41 +22,83 @@ OrangePhotos es la biblioteca privada de fotografías y vídeos de OrangeFamily.
 
 ## Entidades
 
-- `orange_photos`: metadatos, propietario, privacidad, EXIF saneado, localización y estado.
+- `orange_photos`: asset físico compartido y procedencia original. `owner_user_id` identifica al usuario que originó/subió el asset y se conserva como provenance; los archivos físicos y derivados se almacenan una sola vez.
 - `orange_photo_files`: original y variantes físicas (`preview`, `thumbnail`, `poster`).
-- `orange_photo_albums` y `orange_photo_album_items`: álbumes jerárquicos y relación N:M.
-- `orange_photo_shares` y `orange_photo_album_shares`: destinatarios concretos.
+- `orange_photo_albums` y `orange_photo_album_items`: álbumes jerárquicos y relación N:M. Cada item conserva `source_user_id` para identificar qué copia lógica aporta el contenido al álbum.
+- `orange_photo_shares` y `orange_photo_album_shares`: destinatarios concretos. Las comparticiones directas de fotografías quedan acotadas por `(photo_id, owner_user_id)` para que cada propietario lógico gestione su propia compartición.
 - `orange_photo_user_settings`: ocultación y favorito particulares.
-- `orange_photo_library_items`: pertenencia persistente de una fotografía a la biblioteca personal de uno o varios usuarios. No sustituye a `orange_photos.owner_user_id`, que identifica al propietario/origen original.
+- `orange_photo_library_items`: copia lógica propia de cada usuario sobre un mismo asset físico. Contiene el ownership operativo y el estado mutable personal de la copia: metadatos editables, privacidad, enlace público y papelera.
+- `orange_photo_events`: trazabilidad del asset físico acotada por `copy_owner_user_id`, de forma que cada propietario lógico consulta el historial correspondiente a su propia copia.
 - `orange_photo_tags` y `orange_photo_tag_items`: etiquetas familiares.
 
 ## Pertenencia a biblioteca
 
-OrangePhotos diferencia entre propiedad original, acceso compartido y pertenencia a biblioteca.
+OrangePhotos separa el asset físico de las copias lógicas que pertenecen a cada usuario.
 
-`orange_photos.owner_user_id` identifica de forma estable al usuario propietario/origen original de la fotografía.
+`orange_photos` representa el asset físico compartido. `orange_photos.owner_user_id` es inmutable desde el punto de vista funcional y conserva la procedencia/origen original del archivo; ya no determina por sí solo quién puede gestionar una copia.
 
-`orange_photo_library_items` representa una copia lógica propia de cada usuario: una misma fotografía puede estar incorporada a las bibliotecas de varios usuarios sin duplicar `orange_photos`, `orange_photo_files` ni los objetos almacenados en Wasabi. El modelo objetivo permite que esas copias lógicas tengan metadatos, compartición, enlace público y papelera independientes. «Añadir a mi biblioteca» equivale funcionalmente a importar el mismo archivo a la biblioteca propia sin duplicar el almacenamiento físico. Esta fase prepara el modelo mediante migración; el runtime actual todavía no utiliza todos esos campos y se adaptará después de aplicar y validar el modelo.
+`orange_photo_library_items` representa una copia lógica propia. Una misma fotografía o vídeo puede pertenecer simultáneamente a varios usuarios sin duplicar `orange_photos`, `orange_photo_files` ni los objetos almacenados en Wasabi.
 
-La migración preparatoria mantiene temporalmente `orange_photo_shares.owner_user_id` y `orange_photo_album_items.source_user_id` como columnas nullable, y conserva la clave primaria legacy de `orange_photo_shares`, para que el runtime actual continúe funcionando hasta el cambio coordinado de ownership.
+Cada copia lógica puede gestionar de forma independiente sus metadatos editables, fecha y hora, título, descripción, ubicación, favorito, privacidad, compartición directa, enlace público, pertenencia a álbumes, papelera, restauración, eliminación e historial.
 
-La tabla debe pertenecer a `orangefamily_app_user` para que el backend gestione las pertenencias. Esta corrección se recoge en `20260818181000_orange_photo_library_items_owner.sql`.
+Las respuestas autenticadas distinguen:
 
-Las respuestas autenticadas de fotografías exponen `is_original_owner`, que indica si el usuario autenticado es el propietario/origen original (`owner_user_id`), e `is_in_library`, que indica si existe una pertenencia del usuario en `orange_photo_library_items`. `is_owner` se conserva por compatibilidad y actualmente es equivalente a `is_original_owner`; `is_in_library` informa de la pertenencia persistente, que ya puede actuar como fuente autenticada de acceso y como `access_source=library` dentro de la biblioteca web `owned` + `library`. El panel de información web muestra explícitamente «Propietario original: <nombre>» y «En mi biblioteca: Sí/No»; este segundo valor solo se muestra cuando la respuesta contiene el estado personal de biblioteca.
+- `is_original_owner`: el usuario actual es quien originó/subió el asset físico.
+- `is_owner`: la copia lógica efectiva pertenece al usuario actual.
+- `is_in_library`: existe una copia lógica propia en `orange_photo_library_items`.
+- `copy_owner_user_id`: propietario de la copia lógica efectiva que se está mostrando.
+- `access_source`: origen por el que se ha resuelto la fotografía.
 
-La pertenencia persistente puede actuar como fuente autenticada de acceso. `access_source` admite `owned`, `library`, `direct` y `album`, con prioridad `owned → library → direct → album`; `library` representa una membership de un usuario distinto del propietario original. La biblioteca web principal representa `owned` + `library`; la papelera mantiene todavía su modelo actual y Android continúa sin cambios.
+`access_source` admite:
 
-`POST /api/orange-photos/:id/library` crea de forma idempotente una membership cuando el usuario autenticado tiene acceso actual a la fotografía. `DELETE /api/orange-photos/:id/library` elimina únicamente la membership del usuario autenticado; el propietario original no puede eliminar la suya y la operación sigue funcionando aunque ya no exista la compartición. Ninguna operación borra la fotografía ni sus archivos, y Android continúa sin cambios. Usa la clave primaria (`photo_id`, `user_id`), no duplica la fotografía ni sus archivos, conserva el acceso aunque desaparezca la compartición y mantiene inmutable `owner_user_id`. La protección de `trash`/`purge` de la Fase 3B continúa activa; la membership incorpora la fotografía a la biblioteca web principal.
+- `owned`: copia propia cuyo usuario coincide con el propietario/origen original.
+- `library`: copia lógica propia adquirida mediante «Añadir a mi biblioteca».
+- `direct`: fotografía recibida mediante compartición directa de otra copia lógica.
+- `album`: fotografía recibida mediante un álbum compartido.
 
-La biblioteca web principal representa ahora `owned` + `library`: `owned` sigue significando propietario original y `library` una membership persistente de una foto cuyo propietario original es otro usuario. «Compartido conmigo» conserva `direct` + `album`; el visor web permite «Añadir a mi biblioteca» para una foto ajena accesible que todavía no tenga membership y «Quitar de mi biblioteca» para una foto ajena incorporada. La selección masiva también permite «Añadir a mi biblioteca»: solo procesa fotos ajenas que todavía no estén incorporadas; las propias y las ya incorporadas se ignoran como candidatas. Reutiliza el POST idempotente existente, no duplica la fotografía ni sus archivos, mantiene `owner_user_id` y refresca la biblioteca y el timeline después de la operación, conservando el límite general actual de 500 elementos. Nunca ofrece retirar la membership del propietario original, confirma antes de quitarla, no elimina la foto original ni sus archivos y Android continúa sin cambios. Las acciones de propietario en el visor y en la selección masiva se ocultan para elementos ajenos, manteniendo la selección, la descarga y las operaciones compatibles.
+La prioridad de resolución autenticada es `owned → library → direct → album`.
 
-La migración inicial crea una pertenencia únicamente para el propietario original de cada fotografía existente. Las nuevas fotografías crean de forma transaccional una pertenencia inicial para su propietario original en `orange_photo_library_items`. La tabla se introdujo de forma aditiva; en la Fase 3A la membership ya puede conservar acceso autenticado independientemente de la compartición, sin modificar aún la biblioteca principal, papelera, `purge`, deduplicación ni Android.
+Cuando un usuario recibe una fotografía pero todavía no la ha incorporado a su biblioteca, visualiza la copia lógica del usuario que la comparte. Los metadatos visibles proceden de esa copia fuente, no de los campos legacy de `orange_photos`.
 
-Mientras `is_trashed` siga siendo global, una fotografía con memberships de otros usuarios no puede moverse a la papelera global ni purgarse físicamente por su propietario original. Ambas operaciones devuelven `409 PHOTO_RETAINED_BY_LIBRARY`. Es una protección temporal hasta implementar estados personales de biblioteca y papelera; no modifica Android y evita que el modelo global de papelera invalide memberships persistentes.
+`POST /api/orange-photos/:id/library` convierte una fotografía recibida en una copia lógica propia sin duplicar el archivo físico. La nueva copia toma como punto de partida los metadatos efectivos de la copia recibida, comienza activa y privada y no hereda enlaces públicos ni comparticiones directas.
+
+Si el usuario ya tenía una copia lógica en papelera, «Añadir a mi biblioteca» restaura esa copia existente en lugar de crear otra. Se conservan sus metadatos personales, vuelve a estado privado y se eliminan sus enlaces públicos y comparticiones directas anteriores.
+
+La interfaz web no ofrece «Quitar de mi biblioteca» como operación paralela. Una copia lógica propia utiliza el flujo normal de cualquier fotografía propia: «Mover a la papelera», «Restaurar» y «Eliminar definitivamente». El endpoint `DELETE /api/orange-photos/:id/library` se conserva únicamente por compatibilidad; para una copia adquirida aplica el estado de papelera lógico y no elimina el asset físico.
+
+La papelera es personal. Enviar una copia lógica a la papelera no afecta a las copias de otros usuarios.
+
+La eliminación definitiva elimina únicamente la copia lógica del usuario que ejecuta la operación. `orange_photos`, `orange_photo_files` y los objetos físicos de Wasabi solo se eliminan cuando desaparece la última copia lógica del asset.
+
+Las comparticiones directas pertenecen a cada copia lógica. `orange_photo_shares.owner_user_id` identifica al propietario lógico que comparte y su clave efectiva queda acotada por `(photo_id, owner_user_id, user_id)`.
+
+Los elementos de álbum conservan `source_user_id`. El contenido del álbum se resuelve contra esa copia lógica concreta; si esa copia deja de estar activa, deja de aportar contenido al álbum.
+
+Los eventos de fotografía utilizan `copy_owner_user_id` para separar la trazabilidad de cada copia lógica aunque varias copias compartan el mismo `photo_id`.
+
+Los archivos físicos, previews, thumbnails, playback y posters siguen compartiéndose entre las copias lógicas. No se multiplican por cada usuario.
+
+La generación o regeneración manual del poster de un vídeo queda reservada al propietario/origen original porque modifica un derivado físico compartido por todas las copias.
+
+Las estadísticas de almacenamiento contabilizan los bytes físicos una única vez. La atribución física por usuario continúa utilizando `orange_photos.owner_user_id`. Un asset solo cuenta como almacenamiento físicamente en papelera cuando existe al menos una copia lógica y no queda ninguna copia lógica activa.
+
+Android continúa consumiendo la misma API Node; este cutover no introduce una API específica para Android.
 
 ## Permisos
 
-Node resuelve la familia autenticada; el cliente nunca elige `family_id`. El propietario siempre accede. `family` permite miembros activos; `selected` exige una compartición. La papelera solo es visible explícitamente para el propietario. Las mutaciones de metadatos, papelera y compartición requieren propiedad. Registrar objetos existentes está limitado al rol familiar `owner`.
+Node resuelve siempre la familia y el usuario autenticados; el frontend nunca decide `family_id`, ownership ni permisos.
+
+Para fotografías, las mutaciones funcionales se autorizan mediante ownership lógico (`is_owner` / copia de `orange_photo_library_items`), no mediante `orange_photos.owner_user_id`.
+
+Cada propietario lógico puede editar sus metadatos personales, favorito, compartición, enlace público, álbumes, papelera, restauración, eliminación de su copia e historial.
+
+`orange_photos.owner_user_id` se utiliza como procedencia/origen original y para operaciones físicas que necesariamente afectan a todas las copias, como la regeneración manual del poster de vídeo.
+
+El borrado físico del asset solo puede producirse al eliminar la última copia lógica.
+
+Los permisos de álbum continúan siendo independientes y se resuelven mediante ownership, grants y permisos de contribución del álbum.
+
+Registrar objetos existentes continúa limitado al rol familiar `owner`.
 
 ## API
 
@@ -68,11 +110,11 @@ Etiquetas: `GET/POST /api/orange-photo-tags`. Miembros seleccionables: `GET /api
 
 ## Filtros y enlaces públicos
 
-La biblioteca admite `access_sources=owned,library,direct,album`, `owner_user_ids` y `share_states=private,family,selected,public_link`. Los filtros múltiples usan `access_sources_mode` y `owner_user_ids_mode`, con semántica `include` o `exclude`; una lista vacía no restringe en ninguno de los modos. Node valida los propietarios contra usuarios y membresías activas de la familia. La clasificación es exclusiva y sigue la prioridad `owned → library → direct → album`; para elementos ajenos, `direct` incluye visibilidad familiar o selección directa y tiene prioridad sobre `album`, reservado al acceso obtenido únicamente mediante un álbum compartido.
+La biblioteca admite `access_sources=owned,library,direct,album`, `owner_user_ids` y `share_states=private,family,selected,public_link`. Los filtros múltiples usan `access_sources_mode` y `owner_user_ids_mode`, con semántica `include` o `exclude`; una lista vacía no restringe en ninguno de los modos. `owned` identifica la copia lógica propia del usuario que además originó el asset; `library` identifica una copia lógica propia adquirida posteriormente; `direct` y `album` identifican contenido recibido que todavía se resuelve desde una copia lógica ajena. La prioridad exclusiva es `owned → library → direct → album`. `owner_user_ids` continúa utilizando `orange_photos.owner_user_id` para filtrar por procedencia/origen original, no para decidir ownership operativo.
 
 Los modos y selecciones visuales se persisten por usuario y navegador. «Fotos de» no muestra al usuario actual y se reserva para distinguir propietarios del contenido recibido; los elementos propios se controlan mediante «Origen → Mis elementos».
 
-El enlace público es independiente de `visibility`. Solo el propietario puede crearlo, copiarlo, regenerarlo o revocarlo mediante `POST/DELETE /api/orange-photos/:id/public-link` y `POST/DELETE /api/orange-photo-albums/:id/public-link`. Regenerar invalida inmediatamente el token anterior y revocar responde públicamente como recurso inexistente.
+El enlace público es independiente de `visibility`. En fotografías pertenece a cada copia lógica y cada propietario lógico puede crear, regenerar o revocar el enlace de su propia copia. En álbumes continúa perteneciendo al propietario del álbum. Las operaciones utilizan `POST/DELETE /api/orange-photos/:id/public-link` y `POST/DELETE /api/orange-photo-albums/:id/public-link`. Regenerar invalida inmediatamente el token anterior y revocar responde públicamente como recurso inexistente.
 
 Las APIs públicas parten de `/api/public/orangephotos/photo/:token` y `/api/public/orangephotos/album/:token`, con URL temporal, descarga individual, listado de álbum y ZIP. El listado limita `per_page` a 100 y el ZIP a 500 elementos. Node valida token activo, papelera y pertenencia al álbum, sin exponer familia, propietario interno, correo, claves de almacenamiento, checksum, EXIF completo ni permisos.
 

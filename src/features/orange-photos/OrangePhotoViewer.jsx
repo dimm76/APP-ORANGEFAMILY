@@ -283,7 +283,7 @@ export default function OrangePhotoViewer({
                   />
 
                   <div className="od-attachments-lightbox__more-menu" role="menu">
-                    {photo.media_type==="video"&&photo.is_owner?<button className="od-attachments-lightbox__more-item" type="button" role="menuitem" disabled={posterBusy} onClick={handleGeneratePoster}><IonIcon icon={imageOutline}/><span>{posterBusy?"Generando miniatura…":hasPoster?"Recrear miniatura":"Generar miniatura"}</span></button>:null}
+                    {photo.media_type==="video"&&photo.is_original_owner===true?<button className="od-attachments-lightbox__more-item" type="button" role="menuitem" disabled={posterBusy} onClick={handleGeneratePoster}><IonIcon icon={imageOutline}/><span>{posterBusy?"Generando miniatura…":hasPoster?"Recrear miniatura":"Generar miniatura"}</span></button>:null}
                     {posterError?<small className="od-status-line od-status-line--error">{posterError}</small>:null}
                     {!trashMode&&allowed.addToLibrary&&photo.is_original_owner===false&&photo.is_in_library!==true ? <>
                       <button className="od-attachments-lightbox__more-item" type="button" role="menuitem" disabled={libraryBusy} onClick={handleAddToLibrary}>

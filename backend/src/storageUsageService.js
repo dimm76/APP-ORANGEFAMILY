@@ -69,11 +69,35 @@ async function getStorageUsage(req) {
           0
         )::numeric AS videos_bytes,
         COALESCE(
-          SUM(f.size_bytes) FILTER (WHERE p.is_trashed = true),
+          SUM(f.size_bytes) FILTER (
+            WHERE EXISTS (
+              SELECT 1
+              FROM public.orange_photo_library_items trash_copy
+              WHERE trash_copy.photo_id = p.id
+            )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM public.orange_photo_library_items active_copy
+                WHERE active_copy.photo_id = p.id
+                  AND active_copy.is_trashed = false
+              )
+          ),
           0
         )::numeric AS trash_bytes,
         COUNT(DISTINCT p.id)
-          FILTER (WHERE p.is_trashed = true)::int AS trash_items,
+          FILTER (
+            WHERE EXISTS (
+              SELECT 1
+              FROM public.orange_photo_library_items trash_copy
+              WHERE trash_copy.photo_id = p.id
+            )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM public.orange_photo_library_items active_copy
+                WHERE active_copy.photo_id = p.id
+                  AND active_copy.is_trashed = false
+              )
+          )::int AS trash_items,
         COUNT(*)
           FILTER (
             WHERE f.id IS NOT NULL
@@ -138,11 +162,35 @@ async function getStorageUsage(req) {
           0
         )::numeric AS videos_bytes,
         COALESCE(
-          SUM(f.size_bytes) FILTER (WHERE p.is_trashed = true),
+          SUM(f.size_bytes) FILTER (
+            WHERE EXISTS (
+              SELECT 1
+              FROM public.orange_photo_library_items trash_copy
+              WHERE trash_copy.photo_id = p.id
+            )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM public.orange_photo_library_items active_copy
+                WHERE active_copy.photo_id = p.id
+                  AND active_copy.is_trashed = false
+              )
+          ),
           0
         )::numeric AS trash_bytes,
         COUNT(DISTINCT p.id)
-          FILTER (WHERE p.is_trashed = true)::int AS trash_items
+          FILTER (
+            WHERE EXISTS (
+              SELECT 1
+              FROM public.orange_photo_library_items trash_copy
+              WHERE trash_copy.photo_id = p.id
+            )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM public.orange_photo_library_items active_copy
+                WHERE active_copy.photo_id = p.id
+                  AND active_copy.is_trashed = false
+              )
+          )::int AS trash_items
       FROM public.orange_photos p
       LEFT JOIN public.orange_photo_files f
         ON f.photo_id = p.id
