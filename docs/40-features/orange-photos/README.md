@@ -128,7 +128,11 @@ La Wiki admite los nodos Tiptap `orangePhotoAlbum` (`albumId`, `height`) y `oran
 
 ## Agente Android
 
-El [agente Android privado de sincronización](ANDROID_SYNC_AGENT.md) está en desarrollo. Actualmente solo se ha creado el proyecto base; la sincronización automática todavía no está implementada.
+El [agente Android privado de sincronización](ANDROID_SYNC_AGENT.md) es una APK
+privada Kotlin/Compose que utiliza MediaStore, Room y WorkManager. Incluye backup
+manual y automático, subida simple y multipart reanudable, biblioteca cloud,
+álbumes, selección y acciones, descarga al dispositivo, papelera local y cloud,
+y consume la misma API Node que la web.
 
 ## Limitaciones actuales
 

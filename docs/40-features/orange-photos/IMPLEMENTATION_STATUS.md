@@ -118,19 +118,29 @@ Las credenciales de Wasabi permanecen exclusivamente en el backend.
 
 Propiedad y privacidad
 
-Cada fotografía o vídeo tiene un propietario.
+`orange_photos` representa el asset físico y conserva `owner_user_id` como
+procedencia/origen original. `orange_photo_library_items` representa las copias
+lógicas propias y contiene el ownership operativo de cada copia.
 
-El propietario se obtiene siempre de la sesión autenticada.
+Una misma fotografía o vídeo puede tener varias copias lógicas de distintos
+usuarios sin duplicar necesariamente el asset físico ni los objetos de Wasabi.
+El propietario original se obtiene de la sesión autenticada que originó la
+subida, mientras que el propietario operativo se obtiene de la copia lógica
+efectiva.
 
 Por defecto:
 
-el propietario es el usuario que realiza la subida;
+la copia inicial pertenece al usuario que realiza la subida;
 la visibilidad inicial es private;
 pertenecer a la misma familia no concede acceso automático;
 compartir es una acción explícita;
-compartir no cambia la propiedad.
+compartir no crea ownership automáticamente.
 
-Android y la web no pueden indicar libremente otro propietario.
+`is_original_owner` identifica al usuario que originó/subió el asset e
+`is_owner` al propietario de la copia lógica efectiva. `owned` y `library` son
+ambos ownership lógico del usuario actual; `direct` y `album` son fuentes de
+acceso recibido. «Añadir a mi biblioteca» crea una copia lógica propia sin
+duplicar el archivo físico.
 
 La comprobación exacta de duplicados está aislada por:
 
@@ -145,8 +155,11 @@ quién es su propietario;
 sus metadatos;
 su identificador.
 
-Dos propietarios pueden almacenar el mismo contenido como entidades y objetos
-físicos independientes.
+El preflight de duplicados sigue aislado por familia, propietario y checksum, y
+no revela contenido privado de otros usuarios. Una subida independiente de otro
+usuario no se deduplica revelando existencia ajena; una foto recibida que se
+añade a la biblioteca reutiliza el mismo asset físico mediante una nueva copia
+lógica.
 
 Aplicación web
 Biblioteca
@@ -213,20 +226,21 @@ sanea los nombres;
 evita colisiones de nombres dentro del ZIP.
 Papelera
 
-Mover un elemento a la papelera:
+Mover una copia lógica a la papelera:
 
-actualiza PostgreSQL;
-no elimina el objeto de Wasabi.
+actualiza PostgreSQL para esa copia;
+no elimina el objeto de Wasabi;
+no afecta a las copias lógicas de otros usuarios.
 
 Restaurar revierte el estado de papelera.
 
 El purge definitivo:
 
-exige ownership;
-exige que el elemento esté en la papelera;
-elimina únicamente los objetos registrados;
-puede incluir original, thumbnail, preview y poster;
-no infiere objetos por nombres o carpetas;
+exige ownership de la copia lógica;
+exige que esa copia esté en la papelera;
+elimina la copia lógica del usuario;
+conserva las demás copias lógicas;
+elimina los objetos físicos solo cuando no queda ninguna copia lógica;
 conserva una supresión por familia, propietario y checksum.
 
 Si falla la eliminación física, PostgreSQL no debe registrar la operación como
@@ -364,14 +378,14 @@ Compartir un álbum concede acceso efectivo y reversible a su contenido sin:
 cambiar orange_photos.visibility;
 crear necesariamente una compartición directa;
 duplicar el archivo en Wasabi;
-cambiar su propietario.
+cambiar su propietario lógico.
 
 Los colaboradores:
 
 solo pueden añadir contenido propio;
 pueden retirar relaciones creadas por ellos;
 no pueden administrar el álbum;
-no adquieren la propiedad de su contenido.
+no adquieren ownership lógico de su contenido por colaborar.
 
 El propietario puede retirar cualquier elemento.
 
@@ -514,7 +528,8 @@ Los eventos pueden identificar:
 
 familia;
 fotografía o vídeo;
-propietario;
+propietario original;
+`copy_owner_user_id`, que delimita el historial de cada copia lógica;
 actor;
 tipo de cliente;
 instalación Android;

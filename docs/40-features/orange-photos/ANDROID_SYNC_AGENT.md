@@ -47,14 +47,32 @@ Principio de propiedad y privacidad
 
 Orange Photos no es una biblioteca visible automáticamente para toda la familia.
 
-Cada fotografía o vídeo tiene un propietario.
+`orange_photos` representa el asset físico y conserva `owner_user_id` como
+procedencia/origen original. `orange_photo_library_items` representa las copias
+lógicas propias. Una misma foto o vídeo puede tener varias copias lógicas de
+distintos usuarios sin duplicar necesariamente el asset físico ni los objetos
+Wasabi.
 
 Por defecto:
 
-el propietario es el usuario autenticado que realiza la subida;
-la visibilidad es private;
+el propietario original es el usuario autenticado que realiza la subida;
+la visibilidad de la copia inicial es private;
 otros miembros de la familia no pueden ver el elemento;
 compartir es una acción posterior y explícita.
+
+`is_original_owner` identifica al usuario que originó/subió el asset, mientras
+que `is_owner` identifica al propietario de la copia lógica efectiva.
+`access_source` puede ser `owned`, `library`, `direct` o `album`; `owned` y
+`library` son ambos ownership lógico del usuario actual.
+
+Compartir no crea ownership automáticamente. «Añadir a mi biblioteca» crea una
+copia lógica propia sin duplicar el archivo físico. La papelera y el purge son
+personales para cada copia lógica: el asset físico solo se elimina cuando
+desaparece la última copia lógica.
+
+Las comparticiones directas pertenecen a la copia lógica que comparte. La
+regeneración manual del poster sigue reservada al propietario/origen original
+porque el poster es un derivado físico común.
 
 La pertenencia a una familia delimita el dominio y permite comparticiones internas, pero no concede acceso automático al contenido privado de los demás miembros.
 
@@ -534,12 +552,13 @@ entidad lógica propiedad de un usuario;
 objeto físico almacenado;
 permisos de acceso.
 
-El almacenamiento físico permanece independiente por propietario. No se reutilizan
-objetos Wasabi entre propietarios.
+El preflight de duplicados de subida sigue aislado por usuario y no revela
+contenido privado de otros usuarios. Una subida independiente de otro usuario
+no debe deduplicarse revelando la existencia ajena. Sin embargo, una foto
+recibida que se añade a la biblioteca reutiliza el mismo asset físico mediante
+una nueva copia lógica.
 
 El mismo contenido no implica necesariamente la misma entidad lógica.
-
-No se debe fusionar automáticamente contenido entre propietarios.
 
 Registro oficial remoto
 
