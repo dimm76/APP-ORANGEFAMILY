@@ -16,9 +16,14 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
         if (it.endsWith('/')) it else "$it/"
     }
 
-    suspend fun photos(page: Int = 1, perPage: Int = 100, albumId: String? = null, trashed: Boolean = false): CloudPhotoPage = withContext(Dispatchers.IO) {
+    suspend fun photos(page: Int = 1, perPage: Int = 100, albumId: String? = null, trashed: Boolean = false, sharedWithMe: Boolean = false): CloudPhotoPage = withContext(Dispatchers.IO) {
         val albumQuery = albumId?.takeIf { it.isNotBlank() }?.let { "&album_id=${encode(it)}" }.orEmpty()
-        val accessQuery = if (trashed) "&trashed=true&library_scope=owned" else ownedQuery(albumId)
+        val accessQuery = when {
+            trashed -> "&trashed=true&library_scope=owned"
+            albumId != null -> ""
+            sharedWithMe -> "&access_sources=direct,album&library_scope=shared_with_me"
+            else -> "&access_sources=owned,library"
+        }
         request("${baseUrl}api/orange-photos?page=$page&per_page=$perPage$albumQuery$accessQuery", "No se pudo cargar la biblioteca.") { json ->
             val values = json.optJSONArray("items") ?: throw CloudApiException(200, "La respuesta no contiene elementos.")
             val items = buildList { for (index in 0 until values.length()) values.optJSONObject(index)?.let(::parsePhoto)?.let(::add) }
@@ -26,8 +31,12 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
         }
     }
 
-    suspend fun timeline(albumId: String? = null): List<CloudTimelineYear> = withContext(Dispatchers.IO) {
-        val query = if (albumId == null) "?access_sources=owned,library" else "?album_id=${encode(albumId)}"
+    suspend fun timeline(albumId: String? = null, sharedWithMe: Boolean = false): List<CloudTimelineYear> = withContext(Dispatchers.IO) {
+        val query = when {
+            albumId != null -> "?album_id=${encode(albumId)}"
+            sharedWithMe -> "?access_sources=direct,album&library_scope=shared_with_me"
+            else -> "?access_sources=owned,library"
+        }
         request("${baseUrl}api/orange-photos/timeline$query", "No se pudo cargar el timeline.") { json ->
             val years = json.optJSONArray("items") ?: return@request emptyList()
             buildList {
@@ -48,10 +57,14 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
         }
     }
 
-    suspend fun aroundDate(date: String, albumId: String? = null, direction: String? = null, perPage: Int = 100): CloudPhotoWindow = withContext(Dispatchers.IO) {
+    suspend fun aroundDate(date: String, albumId: String? = null, direction: String? = null, perPage: Int = 100, sharedWithMe: Boolean = false): CloudPhotoWindow = withContext(Dispatchers.IO) {
         val query = buildString {
             append("date=${encode(date)}&per_page=$perPage")
-            if (albumId == null) append("&access_sources=owned,library") else append("&album_id=${encode(albumId)}")
+            when {
+                albumId != null -> append("&album_id=${encode(albumId)}")
+                sharedWithMe -> append("&access_sources=direct,album&library_scope=shared_with_me")
+                else -> append("&access_sources=owned,library")
+            }
             direction?.takeIf { it == "newer" || it == "older" }?.let { append("&direction=$it") }
         }
         request("${baseUrl}api/orange-photos/around-date?$query", "No se pudo cargar el periodo.") { json ->
@@ -78,8 +91,10 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
         val id = item.optString("id").trim()
         val mediaType = item.optString("media_type").trim()
         if (id.isBlank() || mediaType !in setOf("image", "video")) return null
-        return CloudPhoto(id=id,mediaType=mediaType,title=item.optionalString("title"),originalFilename=item.optionalString("original_filename"),capturedAt=item.optionalString("captured_at"),width=item.optionalInt("width"),height=item.optionalInt("height"),durationSeconds=item.optionalDouble("duration_seconds"),thumbnailUrl=item.optionalString("thumbnail_url"),previewUrl=item.optionalString("preview_url"),posterUrl=item.optionalString("poster_url"),videoPreviewUrl=item.optionalString("video_preview_url"),videoPlaybackUrl=item.optionalString("video_playback_url"),originalUrl=item.optionalString("original_url"),ownerUserId=item.optionalString("owner_user_id"),isOwner=item.optBoolean("is_owner",false),visibility=item.optionalString("visibility")?:"private",isSharedEffectively=item.optBoolean("is_shared_effectively",false),sharedByDisplayName=item.optionalString("shared_by_display_name"),isFavorite=item.optBoolean("is_favorite",false),mimeType=item.optionalString("mime_type"))
+        return CloudPhoto(id=id,mediaType=mediaType,title=item.optionalString("title"),originalFilename=item.optionalString("original_filename"),capturedAt=item.optionalString("captured_at"),width=item.optionalInt("width"),height=item.optionalInt("height"),durationSeconds=item.optionalDouble("duration_seconds"),thumbnailUrl=item.optionalString("thumbnail_url"),previewUrl=item.optionalString("preview_url"),posterUrl=item.optionalString("poster_url"),videoPreviewUrl=item.optionalString("video_preview_url"),videoPlaybackUrl=item.optionalString("video_playback_url"),originalUrl=item.optionalString("original_url"),ownerUserId=item.optionalString("owner_user_id"),isOriginalOwner=item.optBoolean("is_original_owner",false),isOwner=item.optBoolean("is_owner",false),isInLibrary=item.optBoolean("is_in_library",false),accessSource=item.optionalString("access_source"),visibility=item.optionalString("visibility")?:"private",isSharedEffectively=item.optBoolean("is_shared_effectively",false),sharedByDisplayName=item.optionalString("shared_by_display_name"),isFavorite=item.optBoolean("is_favorite",false),mimeType=item.optionalString("mime_type"))
     }
+
+    suspend fun addToLibrary(photoId: String) = withContext(Dispatchers.IO) { request("${baseUrl}api/orange-photos/${encode(photoId)}/library", "No se pudo añadir la foto a mi biblioteca.", "POST") {} }
 
     suspend fun members(): List<CloudMember> = withContext(Dispatchers.IO) { request<List<CloudMember>>("${baseUrl}api/orange-photo-members", "No se pudieron cargar los miembros.") { json -> buildList { val values=json.optJSONArray("items")?:return@request emptyList<CloudMember>(); for(i in 0 until values.length()){val item=values.optJSONObject(i)?:continue;val id=item.optString("id").trim();if(id.isNotBlank())add(CloudMember(id,item.optString("display_name"),item.optionalString("role")))}} } }
     suspend fun addPhotoToAlbum(albumId:String,photoId:String)=withContext(Dispatchers.IO){request("${baseUrl}api/orange-photo-albums/${encode(albumId)}/photos","No se pudo añadir la foto.","POST",JSONObject().put("photo_id",photoId)) {}}
@@ -127,7 +142,6 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
 
     private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
     suspend fun downloadOriginalTo(photoId:String,output:OutputStream)=withContext(Dispatchers.IO){val connection=URL("${baseUrl}api/orange-photos/${encode(photoId)}/download").openConnection() as HttpURLConnection;try{connection.requestMethod="GET";connection.connectTimeout=15_000;connection.readTimeout=30_000;connection.setRequestProperty("Accept","application/octet-stream");connection.setRequestProperty("Cookie","of_session=$sessionToken");val status=connection.responseCode;if(status !in 200..299){val body=connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use{it.readText()}.orEmpty();val message=runCatching{JSONObject(body).optString("message").takeIf{it.isNotBlank()}}.getOrNull()?:"No se pudo descargar el original.";throw CloudApiException(status,message)};connection.inputStream.use{input->input.copyTo(output,8192)}}finally{connection.disconnect()}}
-    private fun ownedQuery(albumId: String?): String = if (albumId == null) "&access_sources=owned,library" else ""
     private fun JSONObject.optionalString(name: String): String? = if (isNull(name)) null else optString(name).trim().takeIf { it.isNotBlank() }
     private fun JSONObject.optionalInt(name: String): Int? = if (isNull(name) || !has(name)) null else optInt(name)
     private fun JSONObject.optionalDouble(name: String): Double? = if (isNull(name) || !has(name)) null else optDouble(name)

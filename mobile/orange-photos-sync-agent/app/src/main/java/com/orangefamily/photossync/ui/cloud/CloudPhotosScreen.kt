@@ -72,7 +72,7 @@ private data class CloudPhotoPeriod(val key: String, val label: String, val days
 private data class CloudJustifiedRow(val photos: List<CloudPhoto>, val height: Float)
 private data class CloudWindowScrollProbe(val index: Int, val offset: Int, val dragged: Boolean, val scrollingBackward: Boolean)
 private data class WeightedTimelinePeriod(val item: CloudTimelineMonth, val start: Float, val end: Float, val center: Float)
-private enum class CloudView { LIBRARY, ALBUMS, ALBUM_DETAIL, TRASH }
+private enum class CloudView { LIBRARY, ALBUMS, ALBUM_DETAIL, TRASH, SHARED_WITH_ME }
 private enum class CloudPagingMode { NORMAL, WINDOW }
 private fun cloudPeriodKeyFromLazyItemKey(key: Any?): String? { val value=key as? String ?: return null; val payload=when { value.startsWith("period:")->value.removePrefix("period:");value.startsWith("day:")->value.removePrefix("day:");value.startsWith("row:")->value.removePrefix("row:");else->return null };val periodKey=payload.substringBefore(":");return periodKey.takeIf{it.length==7&&it.getOrNull(4)=='-'} }
 private const val MAX_CLOUD_BULK_SELECTION=500
@@ -174,7 +174,8 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
             loading = false
             return
         }
-        runCatching { api.photos(albumId = activeAlbumId()) to api.timeline(activeAlbumId()) }
+        val sharedWithMe = cloudView == CloudView.SHARED_WITH_ME
+        runCatching { api.photos(albumId = activeAlbumId(), sharedWithMe = sharedWithMe) to api.timeline(activeAlbumId(), sharedWithMe) }
             .onSuccess { (photos, periods) -> items = photos.items; page = photos.page; hasMore = photos.hasMore; hasNewer = false; newerCursor = null; hasOlder = false; olderCursor = null; pagingMode = CloudPagingMode.NORMAL; timeline = periods }
             .onFailure { error = it.message ?: "No se pudo cargar la biblioteca." }
         loading = false
@@ -188,6 +189,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
 
     val groups = remember(items) { groupCloudPhotos(items) }
     val selectedPhotos=items.filter{it.id in selected}
+    val addableToLibrary=selectedPhotos.filter{!it.isOriginalOwner&&!it.isInLibrary}
     val selectedLocalItems=selectedPhotos.flatMap{localByRemoteId[it.id].orEmpty()}.distinctBy{"${it.mediaCollection}:${it.mediaType}:${it.mediaStoreId}"}
     val downloadCandidates=selectedPhotos.filter{localByRemoteId[it.id].isNullOrEmpty()}
     val downloader=remember(api,repository,accountUserId){CloudMediaDownloader(context.applicationContext,repository,api,accountUserId)}
@@ -197,6 +199,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     fun runBulk(block:suspend()->Unit){if(bulkBusy)return;if(selectedPhotos.size>MAX_CLOUD_BULK_SELECTION){bulkMessage="Puedes realizar acciones sobre un máximo de 500 elementos a la vez.";return};scope.launch{bulkBusy=true;runCatching{block()}.onFailure{bulkMessage=it.message;reload()}.onSuccess{reload();clearSelection()};bulkBusy=false}}
     fun selectAllTrash(){if(cloudView!=CloudView.TRASH||bulkBusy)return;scope.launch{bulkBusy=true;try{var currentPage=api.photos(page=1,perPage=100,trashed=true);if(currentPage.total>MAX_CLOUD_BULK_SELECTION){bulkMessage="Puedes realizar acciones sobre un máximo de 500 elementos a la vez.";return@launch};val allItems=currentPage.items.toMutableList();while(currentPage.hasMore){currentPage=api.photos(page=currentPage.page+1,perPage=100,trashed=true);allItems+=currentPage.items};val loadedItems=allItems.distinctBy{it.id};if(loadedItems.size>MAX_CLOUD_BULK_SELECTION){bulkMessage="Puedes realizar acciones sobre un máximo de 500 elementos a la vez.";return@launch};items=loadedItems;page=currentPage.page;hasMore=false;hasNewer=false;newerCursor=null;hasOlder=false;olderCursor=null;pagingMode=CloudPagingMode.NORMAL;timeline=emptyList();selected=loadedItems.map{it.id}.toSet();selectedDays=emptySet();selectionAnchor=loadedItems.lastOrNull()?.id}catch(error:Exception){bulkMessage=error.message?:"No se pudo seleccionar toda la papelera."}finally{bulkBusy=false}}}
     val selectionActions=remember(selected,allSelectedOwned,allFavorite,bulkSelectionAllowed){listOf(SelectionActionItem("album","Álbum",enabled=bulkSelectionAllowed,onClick={albumSearchQuery="";targetAlbumId=null;albumDialogOpen=true},icon={Icon(CloudAlbumActionIcon,null)}),SelectionActionItem("share","Compartir",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={shareDialogOpen=true},icon={Icon(OrangeShareIcon,null)}),SelectionActionItem("favorite",if(allFavorite)"Quitar favorita" else "Favorita",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={runBulk{selectedPhotos.forEach{api.setFavorite(it.id,!allFavorite)}}},icon={Icon(CloudFavoriteActionIcon,null)}),SelectionActionItem("date","Fecha y hora",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={val initial=selectedPhotos.firstOrNull()?.capturedAt?.let{runCatching{Instant.parse(it).atZone(ZoneId.systemDefault())}.getOrNull()}?:ZonedDateTime.now();android.app.DatePickerDialog(context,{_,y,m,d->android.app.TimePickerDialog(context,{_,h,min->val iso=ZonedDateTime.of(LocalDateTime.of(y,m+1,d,h,min),ZoneId.systemDefault()).toInstant().toString();runBulk{selectedPhotos.forEach{api.setCapturedAt(it.id,iso)}}},initial.hour,initial.minute,true).show()},initial.year,initial.monthValue-1,initial.dayOfMonth).show()},icon={Icon(CloudDateActionIcon,null)}),SelectionActionItem("location","Ubicación",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={locationValue="";locationDialogOpen=true},icon={Icon(CloudLocationActionIcon,null)}),SelectionActionItem("trash","Papelera nube",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={trashDialogOpen=true},icon={CloudTrashActionIcon()}))}
+    val addToLibraryAction=SelectionActionItem("add-library","Añadir a mi biblioteca",enabled=bulkSelectionAllowed&&addableToLibrary.isNotEmpty(),onClick={runBulk{addableToLibrary.forEach{api.addToLibrary(it.id)}}},icon={Icon(OrangeFilledCloudIcon,null,tint=Color.Unspecified)})
     val downloadAction=SelectionActionItem("download-device","Descargar",enabled=bulkSelectionAllowed&&android.os.Build.VERSION.SDK_INT>=android.os.Build.VERSION_CODES.Q&&downloadCandidates.isNotEmpty(),onClick={runBulk{val downloadedImageCount=downloadCandidates.count{it.mediaType=="image"};val downloadedVideoCount=downloadCandidates.count{it.mediaType=="video"};downloadCandidates.forEach{photo->val downloaded=downloader.download(photo);localByRemoteId=localByRemoteId+(photo.id to (localByRemoteId[photo.id].orEmpty()+downloaded).distinctBy{"${it.mediaCollection}:${it.mediaType}:${it.mediaStoreId}"})};val message=when{downloadedImageCount>0&&downloadedVideoCount==0->if(downloadedImageCount==1)"Imagen descargada en Imágenes/OrangeFamily." else "$downloadedImageCount imágenes descargadas en Imágenes/OrangeFamily.";downloadedVideoCount>0&&downloadedImageCount==0->if(downloadedVideoCount==1)"Vídeo descargado en Vídeos/OrangeFamily." else "$downloadedVideoCount vídeos descargados en Vídeos/OrangeFamily.";else->"${downloadedImageCount+downloadedVideoCount} elementos descargados en Imágenes/OrangeFamily y Vídeos/OrangeFamily."};Toast.makeText(context,message,Toast.LENGTH_LONG).show()}},icon={Icon(CloudDownloadActionIcon,null)})
     val deleteLocalAction=SelectionActionItem("delete-local","Eliminar local",enabled=bulkSelectionAllowed&&android.os.Build.VERSION.SDK_INT>=android.os.Build.VERSION_CODES.R&&selectedLocalItems.isNotEmpty(),onClick={deleteLocalDialogOpen=true},icon={LocalTrashActionIcon()})
     val deleteBothAction=SelectionActionItem("delete-both","Eliminar de ambos",enabled=bulkSelectionAllowed&&allSelectedOwned&&(android.os.Build.VERSION.SDK_INT>=android.os.Build.VERSION_CODES.R||selectedLocalItems.isEmpty()),onClick={deleteBothDialogOpen=true},icon={BothTrashActionIcon()})
@@ -224,7 +227,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
         val cursor = period.cursor ?: return
         val generation = timelineRequestGeneration + 1
         timelineRequestGeneration = generation
-        val result = api.aroundDate(cursor, activeAlbumId())
+        val result = api.aroundDate(cursor, activeAlbumId(), sharedWithMe = cloudView == CloudView.SHARED_WITH_ME)
         if (generation != timelineRequestGeneration) return
         items = result.items; page = 1; pagingMode = CloudPagingMode.WINDOW; hasMore = false; hasNewer = result.hasNewer; newerCursor = result.newerCursor; hasOlder = result.hasOlder; olderCursor = result.olderCursor; activePeriod = period.key; listState.scrollToItem(0)
     }
@@ -233,18 +236,18 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
         if (pagingMode != CloudPagingMode.WINDOW || !hasNewer || loadingWindowNewer) return
         val cursor = newerCursor ?: return
         loadingWindowNewer = true
-        try { val result = api.aroundDate(cursor, activeAlbumId(), "newer"); if (result.items.isEmpty()) { hasNewer = false; return }; items = (result.items + items).distinctBy { it.id }; hasNewer = result.hasNewer; newerCursor = result.newerCursor } finally { loadingWindowNewer = false }
+        try { val result = api.aroundDate(cursor, activeAlbumId(), "newer", sharedWithMe = cloudView == CloudView.SHARED_WITH_ME); if (result.items.isEmpty()) { hasNewer = false; return }; items = (result.items + items).distinctBy { it.id }; hasNewer = result.hasNewer; newerCursor = result.newerCursor } finally { loadingWindowNewer = false }
     }
 
     suspend fun loadWindowOlder() {
         if (pagingMode != CloudPagingMode.WINDOW || !hasOlder) return
         val cursor = olderCursor ?: return
-        val result = api.aroundDate(cursor, activeAlbumId(), "older")
+        val result = api.aroundDate(cursor, activeAlbumId(), "older", sharedWithMe = cloudView == CloudView.SHARED_WITH_ME)
         items = (items + result.items).distinctBy { it.id }
         hasOlder = result.hasOlder
         olderCursor = result.olderCursor
     }
-    suspend fun loadNextNormalPage(){if(pagingMode!=CloudPagingMode.NORMAL||!hasMore||loadingMoreNormal)return;loadingMoreNormal=true;try{val result=api.photos(page+1,albumId=activeAlbumId(),trashed=cloudView==CloudView.TRASH);items=(items+result.items).distinctBy{it.id};page=result.page;hasMore=result.hasMore}finally{loadingMoreNormal=false}}
+    suspend fun loadNextNormalPage(){if(pagingMode!=CloudPagingMode.NORMAL||!hasMore||loadingMoreNormal)return;loadingMoreNormal=true;try{val result=api.photos(page+1,albumId=activeAlbumId(),trashed=cloudView==CloudView.TRASH,sharedWithMe=cloudView==CloudView.SHARED_WITH_ME);items=(items+result.items).distinctBy{it.id};page=result.page;hasMore=result.hasMore}finally{loadingMoreNormal=false}}
     LaunchedEffect(listState, pagingMode, hasNewer, newerCursor) { var movedAwayFromWindowTop=false; snapshotFlow { CloudWindowScrollProbe(listState.firstVisibleItemIndex,listState.firstVisibleItemScrollOffset,listIsDragged,listState.lastScrolledBackward) }.distinctUntilChanged().collect { state -> if(state.index>0||state.offset>=300)movedAwayFromWindowTop=true;if(state.dragged&&movedAwayFromWindowTop&&state.scrollingBackward&&pagingMode==CloudPagingMode.WINDOW&&hasNewer&&state.index==0&&state.offset<300){movedAwayFromWindowTop=false;loadWindowNewer()} } }
     LaunchedEffect(listState,pagingMode,hasMore){snapshotFlow{val info=listState.layoutInfo;Pair(info.visibleItemsInfo.lastOrNull()?.index?:0,info.totalItemsCount)}.distinctUntilChanged().collect{(last,total)->if(pagingMode==CloudPagingMode.NORMAL&&hasMore&&last>=total-2)loadNextNormalPage()}}
 
@@ -261,6 +264,7 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
         ModalDrawerSheet {
             Spacer(Modifier.height(20.dp))
             NavigationDrawerItem({ Text(stringResource(R.string.cloud_all_photos)) }, cloudView == CloudView.LIBRARY, { selectedAlbum = null; cloudView = CloudView.LIBRARY; scope.launch { drawerState.close() } })
+            NavigationDrawerItem({ Text("Compartidas conmigo") }, cloudView == CloudView.SHARED_WITH_ME, { selectedAlbum = null; cloudView = CloudView.SHARED_WITH_ME; scope.launch { drawerState.close() } })
             NavigationDrawerItem({ Text(stringResource(R.string.cloud_albums)) }, cloudView == CloudView.ALBUMS, { selectedAlbum = null; cloudView = CloudView.ALBUMS; scope.launch { drawerState.close() } })
             NavigationDrawerItem({ Text("Papelera nube") }, cloudView == CloudView.TRASH, { selectedAlbum = null; cloudView = CloudView.TRASH; scope.launch { drawerState.close() } })
             HorizontalDivider()
@@ -313,7 +317,7 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                     )
                 }
             },
-            bottomBar = { if(selectedPhotos.isNotEmpty()){Column{if(selected.size>MAX_CLOUD_BULK_SELECTION)Text("Puedes realizar acciones sobre un máximo de 500 elementos a la vez.",modifier=Modifier.padding(8.dp));SelectionActionTray(actions=if(cloudView==CloudView.TRASH)listOf(restoreCloudAction,purgeCloudAction) else listOf(selectionActions.first(),downloadAction,selectionActions[1],selectionActions[5],deleteLocalAction,deleteBothAction,selectionActions[2],selectionActions[3],selectionActions[4]),reopenKey=selected)}}},
+            bottomBar = { if(selectedPhotos.isNotEmpty()){Column{if(selected.size>MAX_CLOUD_BULK_SELECTION)Text("Puedes realizar acciones sobre un máximo de 500 elementos a la vez.",modifier=Modifier.padding(8.dp));SelectionActionTray(actions=if(cloudView==CloudView.TRASH)listOf(restoreCloudAction,purgeCloudAction) else listOf(selectionActions.first(),addToLibraryAction,downloadAction,selectionActions[1],selectionActions[5],deleteLocalAction,deleteBothAction,selectionActions[2],selectionActions[3],selectionActions[4]),reopenKey=selected)}}},
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
                 if (cloudView == CloudView.ALBUMS) {
