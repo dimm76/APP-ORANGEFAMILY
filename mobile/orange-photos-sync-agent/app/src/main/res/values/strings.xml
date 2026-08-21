@@ -103,6 +103,8 @@
     <string name="upload_total_count">Total: %1$d</string>
     <string name="upload_waiting_wifi_count">Esperando Wi-Fi: %1$d</string>
     <string name="network_usage_title">Uso de red para subidas</string>
+    <string name="network_manual_only">Manual · Sin sincronización automática</string>
+    <string name="network_manual_only_detail">Solo sincroniza cuando eliges Sincronizar ahora o Subir a la nube. Al volver a un modo automático, también se procesará el contenido creado durante la pausa.</string>
     <string name="network_wifi_only">Económica · Solo Wi-Fi</string>
     <string name="network_wifi_only_detail">No subir archivos mediante red móvil.</string>
     <string name="network_mobile_800">Intermedia · Datos móviles hasta 800 MB</string>

@@ -793,6 +793,11 @@ El worker decide por archivo utilizando
 
 Políticas implementadas:
 
+- `MANUAL_ONLY`: pausa la sincronización automática; no programa trabajo
+  periódico; no responde automáticamente a nuevos elementos MediaStore ni a
+  cambios de conectividad; permite «Sincronizar ahora» y «Subir a la nube»; no
+  modifica la baseline ni elimina pendientes; al regresar a un modo automático,
+  el siguiente análisis incluye también el contenido creado durante la pausa;
 - `WIFI_ONLY`: detecta y registra los archivos con cualquier red disponible, pero
   mantiene la transferencia pendiente hasta una red no medida;
 - `MOBILE_UP_TO_800_MB`: permite transferir mediante red medida archivos de hasta

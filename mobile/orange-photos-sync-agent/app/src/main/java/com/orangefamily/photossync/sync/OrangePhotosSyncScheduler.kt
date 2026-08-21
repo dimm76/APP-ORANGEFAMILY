@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit
 
 class OrangePhotosSyncScheduler(context: Context) {
     private val workManager = WorkManager.getInstance(context.applicationContext)
+    private val policyStore = UploadNetworkPolicyStore(context.applicationContext)
     private val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
     fun scheduleImmediateSync(accountUserId: String) {
@@ -23,17 +24,28 @@ class OrangePhotosSyncScheduler(context: Context) {
         workManager.enqueueUniqueWork(immediateName(accountUserId), ExistingWorkPolicy.KEEP, request)
     }
 
+    fun scheduleAutomaticImmediateSync(accountUserId: String) {
+        if (policyStore.get(accountUserId) == UploadNetworkPolicy.MANUAL_ONLY) return
+        scheduleImmediateSync(accountUserId)
+    }
+
     fun scheduleUnmeteredSync(accountUserId: String) {
+        if (policyStore.get(accountUserId) == UploadNetworkPolicy.MANUAL_ONLY) return
         val request = oneTimeRequest(NetworkType.UNMETERED)
         workManager.enqueueUniqueWork(unmeteredName(accountUserId), ExistingWorkPolicy.REPLACE, request)
     }
 
     fun scheduleMediaChangeSync(accountUserId: String) {
+        if (policyStore.get(accountUserId) == UploadNetworkPolicy.MANUAL_ONLY) return
         val request = oneTimeRequest(NetworkType.CONNECTED, 2)
         workManager.enqueueUniqueWork(mediaChangeName(accountUserId), ExistingWorkPolicy.REPLACE, request)
     }
 
     fun schedulePeriodicSync(accountUserId: String) {
+        if (policyStore.get(accountUserId) == UploadNetworkPolicy.MANUAL_ONLY) {
+            workManager.cancelUniqueWork(periodicName(accountUserId))
+            return
+        }
         val request = PeriodicWorkRequestBuilder<OrangePhotosSyncWorker>(15, TimeUnit.MINUTES)
             .setConstraints(constraints)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
@@ -42,8 +54,13 @@ class OrangePhotosSyncScheduler(context: Context) {
     }
 
     fun onUnmeteredNetworkAvailable(accountUserId: String, policy: UploadNetworkPolicy) {
-        if (policy != UploadNetworkPolicy.ANY_NETWORK) {
-            scheduleUnmeteredSync(accountUserId)
+        when (policy) {
+            UploadNetworkPolicy.MANUAL_ONLY,
+            UploadNetworkPolicy.ANY_NETWORK,
+            -> Unit
+            UploadNetworkPolicy.WIFI_ONLY,
+            UploadNetworkPolicy.MOBILE_UP_TO_800_MB,
+            -> scheduleUnmeteredSync(accountUserId)
         }
     }
 
@@ -53,10 +70,19 @@ class OrangePhotosSyncScheduler(context: Context) {
         workManager.cancelUniqueWork(mediaChangeName(accountUserId))
 
         when (policy) {
-            UploadNetworkPolicy.WIFI_ONLY -> scheduleUnmeteredSync(accountUserId)
+            UploadNetworkPolicy.MANUAL_ONLY -> {
+                workManager.cancelUniqueWork(periodicName(accountUserId))
+            }
+            UploadNetworkPolicy.WIFI_ONLY -> {
+                schedulePeriodicSync(accountUserId)
+                scheduleUnmeteredSync(accountUserId)
+            }
             UploadNetworkPolicy.MOBILE_UP_TO_800_MB,
             UploadNetworkPolicy.ANY_NETWORK,
-            -> scheduleImmediateSync(accountUserId)
+            -> {
+                schedulePeriodicSync(accountUserId)
+                scheduleImmediateSync(accountUserId)
+            }
         }
     }
 

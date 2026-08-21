@@ -85,7 +85,7 @@ class CameraBackupController(
                 state = state.copy(busy = false, error = SCAN_ERROR)
             } else {
                 scheduler.schedulePeriodicSync(userId)
-                scheduler.scheduleImmediateSync(userId)
+                scheduler.scheduleAutomaticImmediateSync(userId)
                 refresh(userId)
             }
         }
