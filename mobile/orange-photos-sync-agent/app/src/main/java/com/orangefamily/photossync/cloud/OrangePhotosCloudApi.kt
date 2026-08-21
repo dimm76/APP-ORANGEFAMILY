@@ -27,7 +27,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
     }
 
     suspend fun timeline(albumId: String? = null): List<CloudTimelineYear> = withContext(Dispatchers.IO) {
-        val query = if (albumId == null) "?access_sources=owned" else "?album_id=${encode(albumId)}"
+        val query = if (albumId == null) "?access_sources=owned,library" else "?album_id=${encode(albumId)}"
         request("${baseUrl}api/orange-photos/timeline$query", "No se pudo cargar el timeline.") { json ->
             val years = json.optJSONArray("items") ?: return@request emptyList()
             buildList {
@@ -51,7 +51,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
     suspend fun aroundDate(date: String, albumId: String? = null, direction: String? = null, perPage: Int = 100): CloudPhotoWindow = withContext(Dispatchers.IO) {
         val query = buildString {
             append("date=${encode(date)}&per_page=$perPage")
-            if (albumId == null) append("&access_sources=owned") else append("&album_id=${encode(albumId)}")
+            if (albumId == null) append("&access_sources=owned,library") else append("&album_id=${encode(albumId)}")
             direction?.takeIf { it == "newer" || it == "older" }?.let { append("&direction=$it") }
         }
         request("${baseUrl}api/orange-photos/around-date?$query", "No se pudo cargar el periodo.") { json ->
@@ -127,7 +127,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
 
     private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
     suspend fun downloadOriginalTo(photoId:String,output:OutputStream)=withContext(Dispatchers.IO){val connection=URL("${baseUrl}api/orange-photos/${encode(photoId)}/download").openConnection() as HttpURLConnection;try{connection.requestMethod="GET";connection.connectTimeout=15_000;connection.readTimeout=30_000;connection.setRequestProperty("Accept","application/octet-stream");connection.setRequestProperty("Cookie","of_session=$sessionToken");val status=connection.responseCode;if(status !in 200..299){val body=connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use{it.readText()}.orEmpty();val message=runCatching{JSONObject(body).optString("message").takeIf{it.isNotBlank()}}.getOrNull()?:"No se pudo descargar el original.";throw CloudApiException(status,message)};connection.inputStream.use{input->input.copyTo(output,8192)}}finally{connection.disconnect()}}
-    private fun ownedQuery(albumId: String?): String = if (albumId == null) "&access_sources=owned" else ""
+    private fun ownedQuery(albumId: String?): String = if (albumId == null) "&access_sources=owned,library" else ""
     private fun JSONObject.optionalString(name: String): String? = if (isNull(name)) null else optString(name).trim().takeIf { it.isNotBlank() }
     private fun JSONObject.optionalInt(name: String): Int? = if (isNull(name) || !has(name)) null else optInt(name)
     private fun JSONObject.optionalDouble(name: String): Double? = if (isNull(name) || !has(name)) null else optDouble(name)
