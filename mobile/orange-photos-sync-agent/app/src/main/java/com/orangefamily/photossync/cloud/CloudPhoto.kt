@@ -15,6 +15,12 @@ data class CloudPhoto(
     val videoPreviewUrl: String?,
     val videoPlaybackUrl: String?,
     val originalUrl: String?,
+    val ownerUserId: String? = null,
+    val isOwner: Boolean = true,
+    val visibility: String = "private",
+    val isSharedEffectively: Boolean = false,
+    val sharedByDisplayName: String? = null,
+    val isFavorite: Boolean = false,
 ) {
     val displayName: String
         get() = title?.takeIf { it.isNotBlank() }

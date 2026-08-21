@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CameraBackupDao {
+    @Query("SELECT * FROM local_media_items WHERE account_user_id = :accountUserId AND remote_photo_id IN (:remotePhotoIds)")
+    suspend fun getRemoteLinkedItems(accountUserId: String, remotePhotoIds: List<String>): List<LocalMediaItem>
     @Query("SELECT * FROM agent_configs WHERE account_user_id = :accountUserId LIMIT 1")
     suspend fun getConfig(accountUserId: String): AgentConfig?
 

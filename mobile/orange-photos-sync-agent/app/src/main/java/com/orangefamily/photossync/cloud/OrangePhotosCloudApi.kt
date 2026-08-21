@@ -76,7 +76,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
         val id = item.optString("id").trim()
         val mediaType = item.optString("media_type").trim()
         if (id.isBlank() || mediaType !in setOf("image", "video")) return null
-        return CloudPhoto(id, mediaType, item.optionalString("title"), item.optionalString("original_filename"), item.optionalString("captured_at"), item.optionalInt("width"), item.optionalInt("height"), item.optionalDouble("duration_seconds"), item.optionalString("thumbnail_url"), item.optionalString("preview_url"), item.optionalString("poster_url"), item.optionalString("video_preview_url"), item.optionalString("video_playback_url"), item.optionalString("original_url"))
+        return CloudPhoto(id, mediaType, item.optionalString("title"), item.optionalString("original_filename"), item.optionalString("captured_at"), item.optionalInt("width"), item.optionalInt("height"), item.optionalDouble("duration_seconds"), item.optionalString("thumbnail_url"), item.optionalString("preview_url"), item.optionalString("poster_url"), item.optionalString("video_preview_url"), item.optionalString("video_playback_url"), item.optionalString("original_url"), item.optionalString("owner_user_id"), item.optBoolean("is_owner", false), item.optionalString("visibility") ?: "private", item.optBoolean("is_shared_effectively", false), item.optionalString("shared_by_display_name"), item.optBoolean("is_favorite", false))
     }
 
     private suspend fun <T> request(url: String, fallback: String, parse: (JSONObject) -> T): T {

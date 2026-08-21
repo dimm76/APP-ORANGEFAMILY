@@ -4,6 +4,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
@@ -21,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -30,9 +33,15 @@ import androidx.compose.ui.text.font.FontWeight
 import com.orangefamily.photossync.R
 import com.orangefamily.photossync.cloud.*
 import com.orangefamily.photossync.ui.theme.OrangeBorder
+import com.orangefamily.photossync.ui.theme.OrangePrimary
+import com.orangefamily.photossync.data.CameraBackupRepository
+import com.orangefamily.photossync.data.LocalMediaItem
+import com.orangefamily.photossync.device.DeviceMediaStoreScanner
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.yield
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import java.time.Instant
@@ -49,9 +58,9 @@ private data class WeightedTimelinePeriod(val item: CloudTimelineMonth, val star
 private enum class CloudView { LIBRARY, ALBUMS, ALBUM_DETAIL }
 private enum class CloudPagingMode { NORMAL, WINDOW }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class,ExperimentalFoundationApi::class)
 @Composable
-fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnailLoader, librarySelector: @Composable () -> Unit, onOpen: (CloudPhoto) -> Unit, modifier: Modifier) {
+fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnailLoader, accountUserId:String, repository:CameraBackupRepository, deviceScanner:DeviceMediaStoreScanner, mediaRefreshVersion:Int, librarySelector: @Composable () -> Unit, onOpen: (CloudPhoto) -> Unit, modifier: Modifier) {
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val listState = rememberLazyListState()
@@ -73,6 +82,11 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     var loadingWindowNewer by remember { mutableStateOf(false) }
     var pagingMode by remember { mutableStateOf(CloudPagingMode.NORMAL) }
     var timelineThumbVisible by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf(emptySet<String>()) }
+    var selectedDays by remember { mutableStateOf(emptySet<String>()) }
+    var localByRemoteId by remember { mutableStateOf<Map<String,LocalMediaItem>>(emptyMap()) }
+    var anchor by remember { mutableStateOf<String?>(null) }
+    fun clearSelection(){selected=emptySet();selectedDays=emptySet();anchor=null}
 
     fun activeAlbumId(): String? = if (cloudView == CloudView.ALBUM_DETAIL) selectedAlbum?.id else null
     suspend fun reload() {
@@ -85,9 +99,17 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     }
     LaunchedEffect(Unit) { albums = runCatching { api.albums() }.getOrDefault(emptyList()) }
     LaunchedEffect(api, cloudView, selectedAlbum?.id) { reload() }
+    LaunchedEffect(cloudView,selectedAlbum?.id){clearSelection()}
+    LaunchedEffect(items,mediaRefreshVersion){val ids=items.map{it.id};localByRemoteId=if(ids.isEmpty())emptyMap()else withContext(Dispatchers.IO){repository.remoteLinkedItems(accountUserId,ids)}.mapNotNull{item->item.remotePhotoId?.let{it to item}}.filter{deviceScanner.exists(it.second)}.toMap()}
     LaunchedEffect(listState.isScrollInProgress) { if (listState.isScrollInProgress) timelineThumbVisible = true else { delay(1500); timelineThumbVisible = false } }
 
     val groups = groupCloudPhotos(items)
+    LaunchedEffect(items, selectedDays) {
+        if (selectedDays.isEmpty()) return@LaunchedEffect
+        val next = selected.toMutableSet()
+        groupCloudPhotos(items).flatMap { it.days }.filter { it.key in selectedDays }.flatMap { it.photos }.forEach { next += it.id }
+        if (next != selected) selected = next
+    }
     LaunchedEffect(listState.firstVisibleItemIndex, groups) { activePeriod = groups.getOrNull(listState.firstVisibleItemIndex)?.key }
     suspend fun jumpToPeriod(period: CloudTimelineMonth) {
         val cursor = period.cursor ?: return
@@ -126,7 +148,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
             HorizontalDivider()
         }
     }) {
-        Scaffold(modifier = modifier, containerColor = OrangeBorder, topBar = { TopAppBar(title = { librarySelector() }, navigationIcon = { IconButton({ scope.launch { drawerState.open() } }) { Text("☰", style = MaterialTheme.typography.titleLarge) } }) }) { padding ->
+        Scaffold(modifier = modifier, containerColor = OrangeBorder, topBar = { if (selected.isNotEmpty()) TopAppBar(title = { Text("${selected.size} seleccionados", style = MaterialTheme.typography.titleMedium) }, navigationIcon = { IconButton(onClick = { clearSelection() }) { Text("×", style = MaterialTheme.typography.titleLarge) } }, actions = { TextButton(onClick = { selected = items.map { it.id }.toSet(); selectedDays = groupCloudPhotos(items).flatMap { it.days }.map { it.key }.toSet(); anchor = items.lastOrNull()?.id }) { Text("Todo") } }) else TopAppBar(title = { librarySelector() }, navigationIcon = { IconButton({ scope.launch { drawerState.open() } }) { Text("☰", style = MaterialTheme.typography.titleLarge) } }) }) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
                 if (cloudView == CloudView.ALBUMS) {
                     CloudAlbumsView(albums, thumbnailLoader) { selectedAlbum = it; cloudView = CloudView.ALBUM_DETAIL }
@@ -143,12 +165,17 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
                                 Column(Modifier.fillMaxWidth()) {
                                     Text(period.label, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = if (periodIndex == 0) 10.dp else 20.dp, bottom = 6.dp))
                                     period.days.forEach { day ->
-                                        Text(day.label, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp))
+                                        val dayIds=day.photos.map{it.id}; val daySelected=dayIds.count{it in selected}; val allDay=dayIds.isNotEmpty()&&daySelected==dayIds.size
+                                        Row(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=5.dp),verticalAlignment=Alignment.CenterVertically){Box(Modifier.size(24.dp).clip(CircleShape).background(if(allDay)OrangePrimary else Color.Transparent).border(1.dp,if(daySelected>0)OrangePrimary else MaterialTheme.colorScheme.outline,CircleShape).clickable{selected=selected.toMutableSet().apply{if(allDay)removeAll(dayIds)else addAll(dayIds)}} ,contentAlignment=Alignment.Center){if(daySelected>0)Text("✓",color=if(allDay)Color.White else OrangePrimary)}; Text(day.label, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start=8.dp))}
                                         buildJustifiedRows(day.photos, availableWidth).forEach { row ->
                                             Row(Modifier.fillMaxWidth().height(row.height.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                                 row.photos.forEach { photo ->
-                                                    Box(Modifier.width((cloudAspectRatio(photo) * row.height).dp).fillMaxHeight().clickable { onOpen(photo) }) {
+                                                    val isSelected=photo.id in selected
+                                                    Box(Modifier.width((cloudAspectRatio(photo) * row.height).dp).fillMaxHeight().clip(RoundedCornerShape(if(isSelected)8.dp else 0.dp)).border(if(isSelected)3.dp else 0.dp,OrangePrimary,RoundedCornerShape(8.dp)).combinedClickable(onClick={if(selected.isEmpty())onOpen(photo)else selected=selected.toMutableSet().apply{if(!add(photo.id))remove(photo.id)}},onLongClick={selected=selected+photo.id;anchor=photo.id})) {
                                                         RemoteBitmap(photo.gridUrl, thumbnailLoader, ContentScale.Crop, Modifier.fillMaxSize())
+                                                        if(selected.isNotEmpty()) Box(Modifier.padding(6.dp).size(24.dp).background(if(isSelected)OrangePrimary else Color.White.copy(.85f),CircleShape).border(1.dp,OrangePrimary,CircleShape),contentAlignment=Alignment.Center){if(isSelected)Text("✓",color=Color.White)}
+                                                        if(photo.isSharedEffectively) CloudSharedBadge(photo.isOwner,Modifier.align(Alignment.TopEnd).padding(5.dp))
+                                                        if(photo.id in localByRemoteId) Text("✓",color=Color.White,modifier=Modifier.align(Alignment.TopStart).padding(5.dp).background(Color.Black.copy(.7f),RoundedCornerShape(4.dp)).padding(3.dp))
                                                         if (photo.mediaType == "video") Text(stringResource(R.string.cloud_video), color = Color.White, modifier = Modifier.align(Alignment.BottomStart).background(Color.Black.copy(alpha = .6f)).padding(4.dp))
                                                     }
                                                 }
@@ -170,6 +197,8 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     }
 }
 
+@Composable private fun CloudSharedBadge(owned:Boolean,modifier:Modifier=Modifier){val c=if(owned)OrangePrimary else Color(0xFF1D4ED8);Box(modifier.size(23.dp).background(Color.White.copy(.88f),CircleShape),contentAlignment=Alignment.Center){Box(Modifier.offset((-4).dp,(-3).dp).size(7.dp).background(c,CircleShape));Box(Modifier.offset(4.dp,(-3).dp).size(7.dp).background(c,CircleShape));Box(Modifier.offset(y=5.dp).width(15.dp).height(6.dp).background(c,RoundedCornerShape(6.dp,6.dp,0.dp,0.dp)))}}
+@Composable private fun CloudLocalCopyBadge(modifier:Modifier=Modifier){Box(modifier.size(24.dp).background(Color.Black.copy(.68f),RoundedCornerShape(6.dp)),contentAlignment=Alignment.Center){Box(Modifier.width(10.dp).height(15.dp).border(1.5.dp,Color.White,RoundedCornerShape(2.dp)));Text("✓",color=Color.White,fontSize=10.sp,fontWeight=FontWeight.Bold,modifier=Modifier.align(Alignment.BottomEnd).padding(end=2.dp,bottom=1.dp))}}
 private fun cloudAspectRatio(photo: CloudPhoto): Float = if ((photo.width ?: 0) > 0 && (photo.height ?: 0) > 0) ((photo.width!!.toFloat() / photo.height!!).coerceIn(.125f, 8f)) else if (photo.mediaType == "video") 16f / 9f else 1f
 private fun buildJustifiedRows(photos: List<CloudPhoto>, availableWidth: Float): List<CloudJustifiedRow> {
     val target = 170f; val minimum = 140f; val gap = 2f; val result = mutableListOf<CloudJustifiedRow>(); var current = mutableListOf<CloudPhoto>()
