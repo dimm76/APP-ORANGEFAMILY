@@ -562,7 +562,7 @@ async function aroundDate(req) {
   const context = await buildPhotoQuery(req, baseQuery); if (!context.ok) return context;
   const { values, joins, condition } = context.payload;
   const newerBoundary = newerCursor || date.toISOString(), olderBoundary = olderCursor || date.toISOString();
-  const bounds = (await pool.query(`SELECT EXISTS(SELECT 1 ${joins} ${condition} AND li.captured_at>${values.length + 1}::timestamptz) has_newer,EXISTS(SELECT 1 ${joins} ${condition} AND li.captured_at<${values.length + 2}::timestamptz) has_older`, [...values, newerBoundary, olderBoundary])).rows[0];
+  const bounds = (await pool.query(`SELECT EXISTS(SELECT 1 ${joins} ${condition} AND li.captured_at>$${values.length + 1}::timestamptz) has_newer,EXISTS(SELECT 1 ${joins} ${condition} AND li.captured_at<$${values.length + 2}::timestamptz) has_older`, [...values, newerBoundary, olderBoundary])).rows[0];
   return ok({ ...result.payload, items, has_newer: bounds.has_newer === true, has_older: bounds.has_older === true, newer_cursor: newerCursor, older_cursor: olderCursor });
 }
 

@@ -227,25 +227,33 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
         val cursor = period.cursor ?: return
         val generation = timelineRequestGeneration + 1
         timelineRequestGeneration = generation
-        val result = api.aroundDate(cursor, activeAlbumId(), sharedWithMe = cloudView == CloudView.SHARED_WITH_ME)
-        if (generation != timelineRequestGeneration) return
-        items = result.items; page = 1; pagingMode = CloudPagingMode.WINDOW; hasMore = false; hasNewer = result.hasNewer; newerCursor = result.newerCursor; hasOlder = result.hasOlder; olderCursor = result.olderCursor; activePeriod = period.key; listState.scrollToItem(0)
+        try {
+            val result = api.aroundDate(cursor, activeAlbumId(), sharedWithMe = cloudView == CloudView.SHARED_WITH_ME)
+            if (generation != timelineRequestGeneration) return
+            items = result.items; page = 1; pagingMode = CloudPagingMode.WINDOW; hasMore = false; hasNewer = result.hasNewer; newerCursor = result.newerCursor; hasOlder = result.hasOlder; olderCursor = result.olderCursor; activePeriod = period.key; listState.scrollToItem(0)
+        } catch (error: Exception) {
+            bulkMessage = error.message ?: "No se pudo cargar el periodo."
+        }
     }
 
     suspend fun loadWindowNewer() {
         if (pagingMode != CloudPagingMode.WINDOW || !hasNewer || loadingWindowNewer) return
         val cursor = newerCursor ?: return
         loadingWindowNewer = true
-        try { val result = api.aroundDate(cursor, activeAlbumId(), "newer", sharedWithMe = cloudView == CloudView.SHARED_WITH_ME); if (result.items.isEmpty()) { hasNewer = false; return }; items = (result.items + items).distinctBy { it.id }; hasNewer = result.hasNewer; newerCursor = result.newerCursor } finally { loadingWindowNewer = false }
+        try { val result = api.aroundDate(cursor, activeAlbumId(), "newer", sharedWithMe = cloudView == CloudView.SHARED_WITH_ME); if (result.items.isEmpty()) { hasNewer = false; return }; items = (result.items + items).distinctBy { it.id }; hasNewer = result.hasNewer; newerCursor = result.newerCursor } catch (error: Exception) { bulkMessage = error.message ?: "No se pudo cargar el periodo." } finally { loadingWindowNewer = false }
     }
 
     suspend fun loadWindowOlder() {
         if (pagingMode != CloudPagingMode.WINDOW || !hasOlder) return
         val cursor = olderCursor ?: return
-        val result = api.aroundDate(cursor, activeAlbumId(), "older", sharedWithMe = cloudView == CloudView.SHARED_WITH_ME)
-        items = (items + result.items).distinctBy { it.id }
-        hasOlder = result.hasOlder
-        olderCursor = result.olderCursor
+        try {
+            val result = api.aroundDate(cursor, activeAlbumId(), "older", sharedWithMe = cloudView == CloudView.SHARED_WITH_ME)
+            items = (items + result.items).distinctBy { it.id }
+            hasOlder = result.hasOlder
+            olderCursor = result.olderCursor
+        } catch (error: Exception) {
+            bulkMessage = error.message ?: "No se pudo cargar el periodo."
+        }
     }
     suspend fun loadNextNormalPage(){if(pagingMode!=CloudPagingMode.NORMAL||!hasMore||loadingMoreNormal)return;loadingMoreNormal=true;try{val result=api.photos(page+1,albumId=activeAlbumId(),trashed=cloudView==CloudView.TRASH,sharedWithMe=cloudView==CloudView.SHARED_WITH_ME);items=(items+result.items).distinctBy{it.id};page=result.page;hasMore=result.hasMore}finally{loadingMoreNormal=false}}
     LaunchedEffect(listState, pagingMode, hasNewer, newerCursor) { var movedAwayFromWindowTop=false; snapshotFlow { CloudWindowScrollProbe(listState.firstVisibleItemIndex,listState.firstVisibleItemScrollOffset,listIsDragged,listState.lastScrolledBackward) }.distinctUntilChanged().collect { state -> if(state.index>0||state.offset>=300)movedAwayFromWindowTop=true;if(state.dragged&&movedAwayFromWindowTop&&state.scrollingBackward&&pagingMode==CloudPagingMode.WINDOW&&hasNewer&&state.index==0&&state.offset<300){movedAwayFromWindowTop=false;loadWindowNewer()} } }
