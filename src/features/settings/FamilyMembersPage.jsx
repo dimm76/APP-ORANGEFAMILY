@@ -16,6 +16,7 @@ import {
   listFamilyMembers,
   revokeFamilyGuestAlbumAccess,
   revokeGuestAlbumGrant,
+  resendInvitation,
   updateFamilyMember,
 } from "./familyMembersApi.js";
 import "./familyMembers.css";
@@ -125,6 +126,8 @@ export default function FamilyMembersPage() {
     () => new Set(),
   );
   const [revokingGrantId, setRevokingGrantId] = useState("");
+  const [resendingInvitationId, setResendingInvitationId] =
+    useState("");
   const [guestAccessError, setGuestAccessError] = useState("");
 
   const load = async () => {
@@ -385,6 +388,40 @@ export default function FamilyMembersPage() {
     }
   };
 
+  const resendMemberAccess = async (item) => {
+    const personId = item.person_id;
+
+    if (
+      !personId ||
+      item.auth_status !== "pending" ||
+      !item.email ||
+      resendingInvitationId
+    ) {
+      return;
+    }
+
+    setError("");
+    setMessage("");
+    setResendingInvitationId(String(personId));
+
+    try {
+      const result = await resendInvitation(personId);
+
+      setMessage(
+        result.invitation_sent === false
+          ? "La invitación se ha generado, pero el email no pudo enviarse."
+          : `Acceso reenviado a ${item.email}.`,
+      );
+    } catch (resendError) {
+      setError(
+        resendError.message ||
+          "No se pudo reenviar el acceso.",
+      );
+    } finally {
+      setResendingInvitationId("");
+    }
+  };
+
   const close = () => {
     if (saving) {
       return;
@@ -519,6 +556,26 @@ export default function FamilyMembersPage() {
                               >
                                 Editar
                               </button>
+
+                              {item.auth_status === "pending" &&
+                              item.email ? (
+                                <button
+                                  type="button"
+                                  className="od-btn od-btn-secondary"
+                                  disabled={
+                                    resendingInvitationId ===
+                                    String(item.person_id)
+                                  }
+                                  onClick={() =>
+                                    resendMemberAccess(item)
+                                  }
+                                >
+                                  {resendingInvitationId ===
+                                  String(item.person_id)
+                                    ? "Enviando…"
+                                    : "Reenviar acceso"}
+                                </button>
+                              ) : null}
 
                               {isGuest ? (
                                 <button
