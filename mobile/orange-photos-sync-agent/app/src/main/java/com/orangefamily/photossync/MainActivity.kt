@@ -184,7 +184,7 @@ class MainActivity : ComponentActivity() {
                         onOpenMedia = ::openMedia,
                         onOpenCloudMedia = ::openCloudMedia,
                         onUploadMedia = ::enqueueMedia,
-                        onSyncNow = scheduler::scheduleImmediateSync,
+                        onSyncNow = scheduler::scheduleManualSync,
                         onNetworkPolicyChanged = scheduler::rescheduleForPolicy,
                         onDeleteMedia = ::deleteMedia,
                         onDeleteTotalMedia = ::deleteTotalMedia,
@@ -225,7 +225,7 @@ class MainActivity : ComponentActivity() {
         if (items.isEmpty()) return
         lifecycleScope.launch(Dispatchers.IO) {
             repository.enqueueDeviceMedia(items, forceDuplicate)
-            scheduler.scheduleImmediateSync(items.first().accountUserId)
+            scheduler.scheduleManualSync(items.first().accountUserId)
         }
     }
 

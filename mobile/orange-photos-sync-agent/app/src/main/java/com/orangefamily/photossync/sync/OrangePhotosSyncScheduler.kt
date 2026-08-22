@@ -24,6 +24,11 @@ class OrangePhotosSyncScheduler(context: Context) {
         workManager.enqueueUniqueWork(immediateName(accountUserId), ExistingWorkPolicy.KEEP, request)
     }
 
+    fun scheduleManualSync(accountUserId: String) {
+        if (accountUserId.isBlank()) return
+        workManager.enqueue(oneTimeRequest(NetworkType.CONNECTED))
+    }
+
     fun scheduleAutomaticImmediateSync(accountUserId: String) {
         if (policyStore.get(accountUserId) == UploadNetworkPolicy.MANUAL_ONLY) return
         scheduleImmediateSync(accountUserId)
@@ -81,9 +86,18 @@ class OrangePhotosSyncScheduler(context: Context) {
             UploadNetworkPolicy.ANY_NETWORK,
             -> {
                 schedulePeriodicSync(accountUserId)
-                scheduleImmediateSync(accountUserId)
+                scheduleReplacingImmediateSync(accountUserId)
             }
         }
+    }
+
+    private fun scheduleReplacingImmediateSync(accountUserId: String) {
+        val request = oneTimeRequest(NetworkType.CONNECTED)
+        workManager.enqueueUniqueWork(
+            immediateName(accountUserId),
+            ExistingWorkPolicy.REPLACE,
+            request,
+        )
     }
 
     private fun oneTimeRequest(networkType: NetworkType, delaySeconds: Long = 0) =

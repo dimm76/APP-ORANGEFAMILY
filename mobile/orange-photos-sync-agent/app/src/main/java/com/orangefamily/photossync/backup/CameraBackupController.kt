@@ -97,7 +97,7 @@ class CameraBackupController(
         if (!config.enabled || state.permission != MediaPermissionAccess.FULL || state.busy) return
         state = state.copy(busy = true, error = null)
         scope.launch {
-            val outcome = runCatching { scheduler.scheduleImmediateSync(userId) }
+            val outcome = runCatching { scheduler.scheduleManualSync(userId) }
             if (accountUserId != userId) return@launch
             if (outcome.isFailure) {
                 state = state.copy(busy = false, error = SCAN_ERROR)
