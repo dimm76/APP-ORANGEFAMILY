@@ -41,3 +41,24 @@ test("check devuelve multipart por encima del umbral de vídeo simple", async ()
   assert.equal(result.ok, true);
   assert.equal(result.payload.upload_mode, "multipart");
 });
+
+test("check con checksum nuevo devuelve upload_required sin supresión", async () => {
+  const originalQuery = pool.query;
+
+  pool.query = async () => ({ rows: [] });
+
+  try {
+    const result = await service.checkUpload(req, {
+      original_filename: "foto.jpg",
+      size_bytes: 1024,
+      mime_type: "image/jpeg",
+      checksum_sha256: "a".repeat(64),
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.payload.decision, "upload_required");
+    assert.equal(result.payload.upload_mode, "simple");
+  } finally {
+    pool.query = originalQuery;
+  }
+});

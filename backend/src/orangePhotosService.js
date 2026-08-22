@@ -154,7 +154,22 @@ async function findExactDuplicate(familyId,ownerUserId,checksumSha256){
 }
 
 async function findUploadSuppression(familyId, ownerUserId, checksumSha256) {
-  return result.rows[0]||null;
+  const checksum = String(checksumSha256 || "").trim().toLowerCase();
+
+  if (!uuid(ownerUserId) || !SHA256_RE.test(checksum)) {
+    return null;
+  }
+
+  const result = await pool.query(
+    `SELECT checksum_sha256,deleted_at
+     FROM public.orange_photo_upload_suppressions
+     WHERE family_id=$1::uuid
+       AND owner_user_id=$2::uuid
+       AND checksum_sha256=$3`,
+    [familyId, ownerUserId, checksum],
+  );
+
+  return result.rows[0] || null;
 }
 
 function uploadCheckDecision(duplicate,suppression) {
