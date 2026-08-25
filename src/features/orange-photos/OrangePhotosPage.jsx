@@ -320,7 +320,7 @@ export default function OrangePhotosPage() {
       const next = {
         ...current,
         ...mainVisualFilters,
-        ...(addToAlbumId ? {share_states: initial.share_states, favorite: initial.favorite, trashed: initial.trashed} : {}),
+        ...(addToAlbumId ? {search: "", share_states: initial.share_states, favorite: initial.favorite, trashed: initial.trashed} : {}),
         access_sources: sharedWithMeView ? ["direct", "album"] : inheritedMainDefault ? emptyVisualFilters.access_sources : mainVisualFilters.access_sources || current.access_sources,
         access_sources_mode: sharedWithMeView ? "include" : inheritedMainDefault ? emptyVisualFilters.access_sources_mode : mainVisualFilters.access_sources_mode || current.access_sources_mode,
         page: 1,
@@ -332,6 +332,8 @@ export default function OrangePhotosPage() {
       return next;
     });
   }, [albumId, addToAlbumId, albumsView, favoritesView, trashView, sharedWithMeView, isMainLibraryView, storageKey]);
+  useEffect(()=>{setSearchDraft("");if(addToAlbumId)setAlbumNotice("");},[addToAlbumId]);
+  useEffect(()=>{if(!albumNotice)return undefined;const timer=window.setTimeout(()=>setAlbumNotice(""),5000);return()=>window.clearTimeout(timer);},[albumNotice]);
   useEffect(() => {
     if(!isMainLibraryView||addToAlbumId)return;
     if(skipPersistRef.current){skipPersistRef.current=false;return;}
@@ -458,7 +460,8 @@ export default function OrangePhotosPage() {
   const openAlbumAction=value=>{setAlbumMenuOpen(false);setAlbumActionError("");if(value==="cover"){openCoverSelection(activeAlbum);return;}if(value==="rename")setAlbumActionTitle(activeAlbum.title);setAlbumAction(value);};
   const confirmAlbumRename=async event=>{event.preventDefault();setAlbumActionBusy(true);setAlbumActionError("");try{const updated=(await updateOrangeAlbum(activeAlbum.id,{title:albumActionTitle})).item;replaceAlbumInState(updated);setAlbumAction("");}catch(actionError){setAlbumActionError(actionError.message);}finally{setAlbumActionBusy(false);}};
   const confirmAlbumDelete=async()=>{setAlbumActionBusy(true);setAlbumActionError("");try{await deleteOrangeAlbum(activeAlbum.id);setAlbums(current=>current.filter(album=>album.id!==activeAlbum.id));navigate("/app/orangephotos/albums");}catch(actionError){setAlbumActionError(actionError.message);}finally{setAlbumActionBusy(false);}};
-  const confirmAddToAlbum=async()=>{if(!addToAlbumId||selected.size===0)return;const newIds=[...selected].filter(id=>!existingAlbumPhotoIds.has(String(id)));if(!newIds.length)return;const albumTitle=addToAlbum?.title||"álbum";setAlbumActionBusy(true);setAlbumActionError("");setAlbumNotice("");try{let addedCount=0;for(const photoId of newIds){const response=await baseAddPhotoToAlbum(addToAlbumId,photoId);if(response.added===true)addedCount+=1;}setAlbumNotice(addedCount===1?`1 elemento añadido a «${albumTitle}».`:addedCount>1?`${addedCount} elementos añadidos a «${albumTitle}».`:`Los elementos seleccionados ya estaban en «${albumTitle}».`);await loadAlbums();clearSelection();setExistingAlbumPhotoIds(new Set());navigate(`/app/orangephotos/albums/${encodeURIComponent(addToAlbumId)}`);}catch(actionError){setAlbumActionError(actionError.message);}finally{setAlbumActionBusy(false);}};
+  const buildAlbumNotice=(addedCount,requestedCount,albumTitle)=>{const skippedCount=requestedCount-addedCount;if(addedCount===requestedCount)return addedCount===1?`1 elemento añadido a «${albumTitle}».`:`${addedCount} elementos añadidos a «${albumTitle}».`;if(addedCount===0)return`Los elementos seleccionados ya estaban en «${albumTitle}».`;return`${addedCount} ${addedCount===1?"elemento":"elementos"} ${addedCount===1?"añadido":"añadidos"} a «${albumTitle}»; ${skippedCount} ya ${skippedCount===1?"estaba":"estaban"} en el álbum.`;};
+  const confirmAddToAlbum=async()=>{if(!addToAlbumId||selected.size===0)return;const newIds=[...selected].filter(id=>!existingAlbumPhotoIds.has(String(id)));if(!newIds.length)return;const albumTitle=addToAlbum?.title||"álbum";setAlbumActionBusy(true);setAlbumActionError("");setAlbumNotice("");try{let addedCount=0;for(const photoId of newIds){const response=await baseAddPhotoToAlbum(addToAlbumId,photoId);if(response.added===true)addedCount+=1;}setAlbumNotice(buildAlbumNotice(addedCount,newIds.length,albumTitle));await loadAlbums();clearSelection();setExistingAlbumPhotoIds(new Set());navigate(`/app/orangephotos/albums/${encodeURIComponent(addToAlbumId)}`);}catch(actionError){setAlbumActionError(actionError.message);}finally{setAlbumActionBusy(false);}};
   const BaseAlbumsView = OrangeAlbumsView, BaseBulkActions = OrangePhotosBulkActions, baseAddPhotoToAlbum = addPhotoToAlbum;
   {
   const addSelectedPhotosToLibrary = async () => {
@@ -489,7 +492,7 @@ export default function OrangePhotosPage() {
     ]);
     clearSelection();
     const albumTitle = album?.title || "álbum";
-    setAlbumNotice(addedCount === 1 ? `1 elemento añadido a «${albumTitle}».` : addedCount > 1 ? `${addedCount} elementos añadidos a «${albumTitle}».` : `Los elementos seleccionados ya estaban en «${albumTitle}».`);
+    setAlbumNotice(buildAlbumNotice(addedCount, photoIds.length, albumTitle));
   };
   const addPhotoToAlbum = async(id,photoId)=>{const response=await baseAddPhotoToAlbum(id,photoId);await Promise.all([loadAlbums(),reloadTimeline()]);return response;};
   const OrangePhotosBulkActions = props => addToAlbumId ? null : <BaseBulkActions {...props}/>;
