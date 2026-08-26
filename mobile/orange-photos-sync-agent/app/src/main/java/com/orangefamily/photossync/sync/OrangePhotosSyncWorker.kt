@@ -27,6 +27,8 @@ import kotlinx.coroutines.delay
 class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         Log.d(TAG, "Worker started")
+        val manualTrigger =
+            inputData.getBoolean(INPUT_MANUAL_TRIGGER, false)
         val sessionStore = SecureSessionStore(applicationContext)
         val sessionToken = sessionStore.load(BuildConfig.API_BASE_URL) ?: return success()
         val installationId = InstallationIdStore(applicationContext).getOrCreate()
@@ -53,6 +55,14 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
             Log.w(TAG, "Recovered abandoned sync lock accountUserId=$accountUserId")
         }
         if (!repository.tryAcquireSyncLock(accountUserId, lockToken, lockNow, lockNow + LOCK_TTL_MS)) {
+            if (manualTrigger) {
+                Log.d(
+                    TAG,
+                    "Manual worker retry because sync lock is active accountUserId=$accountUserId",
+                )
+                return retry()
+            }
+
             Log.d(TAG, "Worker skipped because sync lock is active accountUserId=$accountUserId")
             return success()
         }
@@ -252,6 +262,7 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
 
     companion object {
         const val BATCH_SIZE = 20
+        const val INPUT_MANUAL_TRIGGER = "manual_trigger"
         const val LOCK_TTL_MS = 30 * 60 * 1000L
         const val TAG = "OrangePhotosSync"
         val NON_RETRYABLE_CODES = setOf("LOCAL_FILE_UNAVAILABLE", "INVALID_METADATA", "UNSUPPORTED_FILE_TYPE", "FILE_TOO_LARGE", "UPLOAD_SUPPRESSED", "LARGE_UPLOAD_INTERRUPTED", "DUPLICATE_RECONCILIATION_REQUIRED")

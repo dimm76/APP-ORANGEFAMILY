@@ -9,6 +9,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.workDataOf
 import java.util.concurrent.TimeUnit
 
 class OrangePhotosSyncScheduler(context: Context) {
@@ -26,7 +27,16 @@ class OrangePhotosSyncScheduler(context: Context) {
 
     fun scheduleManualSync(accountUserId: String) {
         if (accountUserId.isBlank()) return
-        workManager.enqueue(oneTimeRequest(NetworkType.CONNECTED))
+        val request = oneTimeRequest(
+            networkType = NetworkType.CONNECTED,
+            manualTrigger = true,
+        )
+
+        workManager.enqueueUniqueWork(
+            manualName(accountUserId),
+            ExistingWorkPolicy.REPLACE,
+            request,
+        )
     }
 
     fun scheduleAutomaticImmediateSync(accountUserId: String) {
@@ -100,14 +110,24 @@ class OrangePhotosSyncScheduler(context: Context) {
         )
     }
 
-    private fun oneTimeRequest(networkType: NetworkType, delaySeconds: Long = 0) =
+    private fun oneTimeRequest(
+        networkType: NetworkType,
+        delaySeconds: Long = 0,
+        manualTrigger: Boolean = false,
+    ) =
         OneTimeWorkRequestBuilder<OrangePhotosSyncWorker>()
-            .setConstraints(Constraints.Builder().setRequiredNetworkType(networkType).build())
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(networkType)
+                    .build(),
+            )
+            .setInputData(workDataOf(OrangePhotosSyncWorker.INPUT_MANUAL_TRIGGER to manualTrigger))
             .setInitialDelay(delaySeconds, TimeUnit.SECONDS)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
             .build()
 
     private fun immediateName(userId: String) = "orange_photos_sync_$userId"
+    private fun manualName(userId: String) = "orange_photos_sync_manual_$userId"
     private fun unmeteredName(userId: String) = "orange_photos_sync_unmetered_$userId"
     private fun mediaChangeName(userId: String) = "orange_photos_media_change_$userId"
     // Conserva el nombre histórico para que una actualización no deje dos trabajos periódicos activos.

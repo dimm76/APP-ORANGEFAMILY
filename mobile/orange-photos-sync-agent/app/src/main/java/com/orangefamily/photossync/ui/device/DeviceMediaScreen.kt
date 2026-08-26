@@ -129,7 +129,20 @@ LaunchedEffect(listState,folder?.stableId,mediaView){snapshotFlow{val layoutInfo
     fun toggleSelection(item:LocalMediaItem){val id=DeviceMediaRules.stableId(item);selected=if(id in selected)selected-id else selected+id;anchorId=id}
     fun extendSelection(item:LocalMediaItem,index:Int){val id=DeviceMediaRules.stableId(item);selected=selected+id;anchorId=id}
     fun onMediaClick(item:LocalMediaItem){if(selected.isEmpty())onOpen(item)else toggleSelection(item)}
-    val uploadStatusAction:@Composable RowScope.()->Unit={UploadStatusAction(uploadCounts.pending>0||uploadCounts.uploading>0||uploadProgress.running,uploadCounts.uploading>0||uploadProgress.running){showUploadProgress=true}}
+    val uploadStatusAction: @Composable RowScope.() -> Unit = {
+        UploadStatusAction(
+            visible =
+                uploadCounts.pending > 0 ||
+                    uploadCounts.uploading > 0 ||
+                    uploadCounts.failed > 0 ||
+                    uploadProgress.running,
+            active =
+                uploadCounts.uploading > 0 ||
+                    uploadProgress.running,
+        ) {
+            showUploadProgress = true
+        }
+    }
     val selectionActions=buildList {
         add(SelectionActionItem("upload",stringResource(R.string.selection_upload_cloud),onClick={uploadConfirmation=selectedItems}){Icon(OrangeCloudUploadIcon,null,Modifier.size(26.dp))})
         add(SelectionActionItem("delete-device",stringResource(R.string.selection_delete_device),enabled=Build.VERSION.SDK_INT>=Build.VERSION_CODES.R,onClick={deleteConfirmation=selectedItems}){Icon(OrangeDeleteIcon,null,Modifier.size(26.dp))})
