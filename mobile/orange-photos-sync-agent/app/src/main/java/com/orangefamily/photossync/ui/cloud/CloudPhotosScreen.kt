@@ -76,6 +76,7 @@ private enum class CloudView { LIBRARY, ALBUMS, ALBUM_DETAIL, TRASH, SHARED_WITH
 private enum class CloudPagingMode { NORMAL, WINDOW }
 private fun cloudPeriodKeyFromLazyItemKey(key: Any?): String? { val value=key as? String ?: return null; val payload=when { value.startsWith("period:")->value.removePrefix("period:");value.startsWith("day:")->value.removePrefix("day:");value.startsWith("row:")->value.removePrefix("row:");else->return null };val periodKey=payload.substringBefore(":");return periodKey.takeIf{it.length==7&&it.getOrNull(4)=='-'} }
 private const val MAX_CLOUD_BULK_SELECTION=500
+private const val CLOUD_PAGE_SIZE=30
 private fun cloudActionIcon(name: String, draw: PathBuilder.() -> Unit): ImageVector = ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).apply { path(fill = SolidColor(Color.Transparent), stroke = SolidColor(Color.Black), strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) { draw() } }.build()
 private val CloudAlbumActionIcon = cloudActionIcon("CloudAlbum") { moveTo(3f, 6f); horizontalLineTo(10f); lineTo(12f, 8f); horizontalLineTo(21f); verticalLineTo(19f); horizontalLineTo(3f); close() }
 private val CloudDownloadActionIcon = cloudActionIcon("CloudDownload") { moveTo(12f, 3f); verticalLineTo(15f); moveTo(7f, 10f); lineTo(12f, 15f); lineTo(17f, 10f); moveTo(4f, 19f); horizontalLineTo(20f) }
@@ -168,17 +169,29 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
         if (cloudView == CloudView.ALBUMS) { loading = false; return }
         loading = true; error = null
         if (cloudView == CloudView.TRASH) {
-            runCatching { api.photos(trashed = true) }
+            runCatching { api.photos(perPage = CLOUD_PAGE_SIZE, trashed = true) }
                 .onSuccess { photos -> items = photos.items; page = photos.page; hasMore = photos.hasMore; hasNewer = false; newerCursor = null; hasOlder = false; olderCursor = null; pagingMode = CloudPagingMode.NORMAL; timeline = emptyList() }
                 .onFailure { error = it.message ?: "No se pudo cargar la papelera." }
             loading = false
             return
         }
+        val albumId = activeAlbumId()
         val sharedWithMe = cloudView == CloudView.SHARED_WITH_ME
-        runCatching { api.photos(albumId = activeAlbumId(), sharedWithMe = sharedWithMe) to api.timeline(activeAlbumId(), sharedWithMe) }
-            .onSuccess { (photos, periods) -> items = photos.items; page = photos.page; hasMore = photos.hasMore; hasNewer = false; newerCursor = null; hasOlder = false; olderCursor = null; pagingMode = CloudPagingMode.NORMAL; timeline = periods }
+        timeline = emptyList()
+        val photosResult = runCatching {
+            api.photos(
+                perPage = CLOUD_PAGE_SIZE,
+                albumId = albumId,
+                sharedWithMe = sharedWithMe,
+            )
+        }
+        photosResult
+            .onSuccess { photos -> items = photos.items; page = photos.page; hasMore = photos.hasMore; hasNewer = false; newerCursor = null; hasOlder = false; olderCursor = null; pagingMode = CloudPagingMode.NORMAL }
             .onFailure { error = it.message ?: "No se pudo cargar la biblioteca." }
         loading = false
+        if (photosResult.isFailure) return
+        runCatching { api.timeline(albumId, sharedWithMe) }
+            .onSuccess { timeline = it }
     }
     LaunchedEffect(Unit) { albums = runCatching { api.albums() }.getOrDefault(emptyList()) }
     LaunchedEffect(Unit) { members = runCatching { api.members() }.getOrDefault(emptyList()) }
@@ -255,7 +268,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
             bulkMessage = error.message ?: "No se pudo cargar el periodo."
         }
     }
-    suspend fun loadNextNormalPage(){if(pagingMode!=CloudPagingMode.NORMAL||!hasMore||loadingMoreNormal)return;loadingMoreNormal=true;try{val result=api.photos(page+1,albumId=activeAlbumId(),trashed=cloudView==CloudView.TRASH,sharedWithMe=cloudView==CloudView.SHARED_WITH_ME);items=(items+result.items).distinctBy{it.id};page=result.page;hasMore=result.hasMore}finally{loadingMoreNormal=false}}
+    suspend fun loadNextNormalPage(){if(pagingMode!=CloudPagingMode.NORMAL||!hasMore||loadingMoreNormal)return;loadingMoreNormal=true;try{val result=api.photos(page+1,perPage=CLOUD_PAGE_SIZE,albumId=activeAlbumId(),trashed=cloudView==CloudView.TRASH,sharedWithMe=cloudView==CloudView.SHARED_WITH_ME);items=(items+result.items).distinctBy{it.id};page=result.page;hasMore=result.hasMore}finally{loadingMoreNormal=false}}
     LaunchedEffect(listState, pagingMode, hasNewer, newerCursor) { var movedAwayFromWindowTop=false; snapshotFlow { CloudWindowScrollProbe(listState.firstVisibleItemIndex,listState.firstVisibleItemScrollOffset,listIsDragged,listState.lastScrolledBackward) }.distinctUntilChanged().collect { state -> if(state.index>0||state.offset>=300)movedAwayFromWindowTop=true;if(state.dragged&&movedAwayFromWindowTop&&state.scrollingBackward&&pagingMode==CloudPagingMode.WINDOW&&hasNewer&&state.index==0&&state.offset<300){movedAwayFromWindowTop=false;loadWindowNewer()} } }
     LaunchedEffect(listState,pagingMode,hasMore){snapshotFlow{val info=listState.layoutInfo;Pair(info.visibleItemsInfo.lastOrNull()?.index?:0,info.totalItemsCount)}.distinctUntilChanged().collect{(last,total)->if(pagingMode==CloudPagingMode.NORMAL&&hasMore&&last>=total-2)loadNextNormalPage()}}
 
