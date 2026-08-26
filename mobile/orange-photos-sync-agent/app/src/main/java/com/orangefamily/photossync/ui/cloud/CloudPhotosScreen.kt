@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -63,6 +64,7 @@ import java.time.ZoneId
 import java.time.LocalDateTime
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.text.Collator
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
@@ -74,6 +76,12 @@ private data class CloudWindowScrollProbe(val index: Int, val offset: Int, val d
 private data class WeightedTimelinePeriod(val item: CloudTimelineMonth, val start: Float, val end: Float, val center: Float)
 private enum class CloudView { LIBRARY, ALBUMS, ALBUM_DETAIL, TRASH, SHARED_WITH_ME }
 private enum class CloudPagingMode { NORMAL, WINDOW }
+private enum class CloudAlbumSortMode {
+    ALBUM_DATE_DESC,
+    ALBUM_DATE_ASC,
+    TITLE_ASC,
+    TITLE_DESC,
+}
 private fun cloudPeriodKeyFromLazyItemKey(key: Any?): String? { val value=key as? String ?: return null; val payload=when { value.startsWith("period:")->value.removePrefix("period:");value.startsWith("day:")->value.removePrefix("day:");value.startsWith("row:")->value.removePrefix("row:");else->return null };val periodKey=payload.substringBefore(":");return periodKey.takeIf{it.length==7&&it.getOrNull(4)=='-'} }
 private const val MAX_CLOUD_BULK_SELECTION=500
 private const val CLOUD_PAGE_SIZE=30
@@ -117,6 +125,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     val listIsDragged by listState.interactionSource.collectIsDraggedAsState()
     var items by remember { mutableStateOf(emptyList<CloudPhoto>()) }
     var albums by remember { mutableStateOf(emptyList<CloudAlbum>()) }
+    var albumCategories by remember { mutableStateOf(emptyList<CloudAlbumCategory>()) }
     var cloudView by remember { mutableStateOf(CloudView.LIBRARY) }
     var selectedAlbum by remember { mutableStateOf<CloudAlbum?>(null) }
     var timeline by remember { mutableStateOf(emptyList<CloudTimelineYear>()) }
@@ -194,6 +203,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
             .onSuccess { timeline = it }
     }
     LaunchedEffect(Unit) { albums = runCatching { api.albums() }.getOrDefault(emptyList()) }
+    LaunchedEffect(Unit) { albumCategories = runCatching { api.albumCategories() }.getOrDefault(emptyList()) }
     LaunchedEffect(Unit) { members = runCatching { api.members() }.getOrDefault(emptyList()) }
     LaunchedEffect(api, cloudView, selectedAlbum?.id) { reload() }
     LaunchedEffect(cloudView, selectedAlbum?.id){clearSelection()}
@@ -272,7 +282,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     LaunchedEffect(listState, pagingMode, hasNewer, newerCursor) { var movedAwayFromWindowTop=false; snapshotFlow { CloudWindowScrollProbe(listState.firstVisibleItemIndex,listState.firstVisibleItemScrollOffset,listIsDragged,listState.lastScrolledBackward) }.distinctUntilChanged().collect { state -> if(state.index>0||state.offset>=300)movedAwayFromWindowTop=true;if(state.dragged&&movedAwayFromWindowTop&&state.scrollingBackward&&pagingMode==CloudPagingMode.WINDOW&&hasNewer&&state.index==0&&state.offset<300){movedAwayFromWindowTop=false;loadWindowNewer()} } }
     LaunchedEffect(listState,pagingMode,hasMore){snapshotFlow{val info=listState.layoutInfo;Pair(info.visibleItemsInfo.lastOrNull()?.index?:0,info.totalItemsCount)}.distinctUntilChanged().collect{(last,total)->if(pagingMode==CloudPagingMode.NORMAL&&hasMore&&last>=total-2)loadNextNormalPage()}}
 
-if(albumDialogOpen){val selectableAlbums=albums.filter{(it.isOwner||it.canContribute)&&(cloudView!=CloudView.ALBUM_DETAIL||it.id!=selectedAlbum?.id)};val filteredAlbums=selectableAlbums.filter{albumSearchQuery.isBlank()||it.title.contains(albumSearchQuery.trim(),ignoreCase=true)};AlertDialog(onDismissRequest={if(!bulkBusy&&!albumCreating)albumDialogOpen=false},title={Text("Añadir a álbum")},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){OutlinedTextField(value=albumSearchQuery,onValueChange={albumSearchQuery=it},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("Buscar álbum")});TextButton(enabled=!bulkBusy&&!albumCreating,onClick={newAlbumTitle="";createAlbumDialogOpen=true}){Icon(CloudAlbumActionIcon,null,Modifier.size(20.dp));Spacer(Modifier.width(6.dp));Text("Crear álbum")};if(selectableAlbums.isEmpty())Text("No hay álbumes disponibles para añadir contenido.") else if(filteredAlbums.isEmpty())Text("No hay álbumes que coincidan con la búsqueda.") else LazyColumn(modifier=Modifier.fillMaxWidth().heightIn(max=360.dp)){items(items=filteredAlbums,key={it.id}){album->Row(modifier=Modifier.fillMaxWidth().clickable{targetAlbumId=album.id}.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically){RadioButton(selected=targetAlbumId==album.id,onClick={targetAlbumId=album.id});Text(text=album.title,modifier=Modifier.weight(1f),maxLines=2,overflow=TextOverflow.Ellipsis)}}}}},confirmButton={TextButton(enabled=!bulkBusy&&!targetAlbumId.isNullOrBlank()&&selected.size<=MAX_CLOUD_BULK_SELECTION,onClick={runBulk{val id=targetAlbumId!!;selectedPhotos.forEach{api.addPhotoToAlbum(id,it.id)};albums=api.albums();albumDialogOpen=false}}){Text("Añadir")}},dismissButton={TextButton(onClick={if(!bulkBusy&&!albumCreating)albumDialogOpen=false}){Text("Cancelar")}})}
+if(albumDialogOpen){val selectableAlbums=albums.filter{(it.isOwner||it.canContribute)&&(cloudView!=CloudView.ALBUM_DETAIL||it.id!=selectedAlbum?.id)};val filteredAlbums=selectableAlbums.filter{albumSearchQuery.isBlank()||it.title.contains(albumSearchQuery.trim(),ignoreCase=true)};AlertDialog(onDismissRequest={if(!bulkBusy&&!albumCreating)albumDialogOpen=false},title={Text("Añadir a álbum")},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){OutlinedTextField(value=albumSearchQuery,onValueChange={albumSearchQuery=it},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("Buscar álbum")});TextButton(enabled=!bulkBusy&&!albumCreating,onClick={newAlbumTitle="";createAlbumDialogOpen=true}){Icon(CloudAlbumActionIcon,null,Modifier.size(20.dp));Spacer(Modifier.width(6.dp));Text("Crear álbum")};if(selectableAlbums.isEmpty())Text("No hay álbumes disponibles para añadir contenido.") else if(filteredAlbums.isEmpty())Text("No hay álbumes que coincidan con la búsqueda.") else LazyColumn(modifier=Modifier.fillMaxWidth().heightIn(max=360.dp)){items(items=filteredAlbums,key={it.id}){album->Row(modifier=Modifier.fillMaxWidth().clickable{targetAlbumId=album.id}.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically){RadioButton(selected=targetAlbumId==album.id,onClick={targetAlbumId=album.id});Text(text=album.title,modifier=Modifier.weight(1f),maxLines=2,overflow=TextOverflow.Ellipsis)}}}}},confirmButton={TextButton(enabled=!bulkBusy&&!targetAlbumId.isNullOrBlank()&&selected.size<=MAX_CLOUD_BULK_SELECTION,onClick={runBulk{val id=targetAlbumId!!;val targetAlbum=albums.firstOrNull{it.id==id};val targetAlbumTitle=targetAlbum?.title?.takeIf{it.isNotBlank()}?:"el álbum";var addedCount=0;selectedPhotos.forEach{photo->if(api.addPhotoToAlbum(id,photo.id))addedCount+=1};albums=api.albums();albumDialogOpen=false;val message=when{addedCount==0->"Los elementos seleccionados ya estaban en «$targetAlbumTitle».";addedCount==selectedPhotos.size&&addedCount==1->"1 elemento añadido a «$targetAlbumTitle».";addedCount==selectedPhotos.size->"$addedCount elementos añadidos a «$targetAlbumTitle».";else->"$addedCount de ${selectedPhotos.size} elementos añadidos a «$targetAlbumTitle»."};Toast.makeText(context,message,Toast.LENGTH_LONG).show()}}){Text("Añadir")}},dismissButton={TextButton(onClick={if(!bulkBusy&&!albumCreating)albumDialogOpen=false}){Text("Cancelar")}})}
 if(createAlbumDialogOpen)AlertDialog(onDismissRequest={if(!albumCreating)createAlbumDialogOpen=false},title={Text("Crear álbum")},text={OutlinedTextField(value=newAlbumTitle,onValueChange={newAlbumTitle=it.take(500)},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("Nombre del álbum")})},confirmButton={TextButton(enabled=!albumCreating&&newAlbumTitle.trim().isNotEmpty(),onClick={albumCreating=true;scope.launch{runCatching{val createdAlbumId=api.createAlbum(newAlbumTitle.trim());val refreshedAlbums=api.albums();createdAlbumId to refreshedAlbums}.onSuccess{(createdAlbumId,refreshedAlbums)->albums=refreshedAlbums;targetAlbumId=createdAlbumId;albumSearchQuery="";newAlbumTitle="";createAlbumDialogOpen=false}.onFailure{error->bulkMessage=error.message?:"No se pudo crear el álbum."};albumCreating=false}}){Text("Crear")}},dismissButton={TextButton(enabled=!albumCreating,onClick={createAlbumDialogOpen=false}){Text("Cancelar")}})
     if(shareDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)shareDialogOpen=false},title={Text("Compartir")},text={Column{listOf("private" to "Solo yo","family" to "Toda la familia","selected" to "Miembros concretos").forEach{(v,l)->Row(verticalAlignment=Alignment.CenterVertically){RadioButton(selected=shareVisibility==v,onClick={shareVisibility=v});Text(l)}};if(shareVisibility=="selected")members.filter{it.id!=accountUserId}.forEach{member->Row(verticalAlignment=Alignment.CenterVertically){Checkbox(checked=member.id in shareUserIds,onCheckedChange={shareUserIds=if(it)shareUserIds+member.id else shareUserIds-member.id});Text(member.displayName)}}}},confirmButton={TextButton(enabled=!bulkBusy&&(shareVisibility!="selected"||shareUserIds.isNotEmpty()),onClick={runBulk{selectedPhotos.forEach{api.sharePhoto(it.id,shareVisibility,shareUserIds.toList())};shareDialogOpen=false}}){Text("Compartir")}},dismissButton={TextButton(onClick={if(!bulkBusy)shareDialogOpen=false}){Text("Cancelar")}})
     if(locationDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)locationDialogOpen=false},title={Text("Ubicación")},text={OutlinedTextField(value=locationValue,onValueChange={locationValue=it},label={Text("Ubicación")},singleLine=true)},confirmButton={TextButton(enabled=!bulkBusy&&locationValue.trim().isNotEmpty(),onClick={runBulk{val value=locationValue.trim();selectedPhotos.forEach{api.setLocationName(it.id,value)};locationDialogOpen=false}}){Text("Guardar")}},dismissButton={TextButton(onClick={if(!bulkBusy)locationDialogOpen=false}){Text("Cancelar")}})
@@ -342,7 +352,7 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
                 if (cloudView == CloudView.ALBUMS) {
-                    CloudAlbumsView(albums, thumbnailLoader) { selectedAlbum = it; cloudView = CloudView.ALBUM_DETAIL }
+                    CloudAlbumsView(albums, albumCategories, thumbnailLoader) { selectedAlbum = it; cloudView = CloudView.ALBUM_DETAIL }
                 } else {
                 if (selectedAlbum != null) Text(selectedAlbum!!.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(12.dp))
            if (cloudView == CloudView.TRASH) Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal=12.dp),verticalAlignment=Alignment.CenterVertically) { Text("Papelera nube",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f));TextButton(enabled=!bulkBusy&&items.isNotEmpty()&&(hasMore||selected.size!=items.size),onClick={selectAllTrash()}){Text("Seleccionar todo")} }
@@ -501,8 +511,41 @@ private fun groupCloudPhotos(items: List<CloudPhoto>): List<CloudPhotoPeriod> {
     }
 }
 private val spanishLocale = Locale.forLanguageTag("es-ES")
+private val spanishAlbumCollator = Collator.getInstance(spanishLocale).apply { strength = Collator.PRIMARY }
 private val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", spanishLocale)
 private val dayFormatter = DateTimeFormatter.ofPattern("EEE d MMM", spanishLocale)
+
+private fun parseCloudAlbumDate(value: String?): java.time.LocalDate? {
+    val normalized = value?.trim()?.take(10)?.takeIf { it.isNotBlank() } ?: return null
+    return runCatching { java.time.LocalDate.parse(normalized) }.getOrNull()
+}
+
+private fun sortCloudAlbums(items: List<CloudAlbum>, mode: CloudAlbumSortMode): List<CloudAlbum> {
+    return items.sortedWith { first, second ->
+        val titleCompare = spanishAlbumCollator.compare(first.title, second.title)
+        val idCompare = first.id.compareTo(second.id)
+        when (mode) {
+            CloudAlbumSortMode.TITLE_ASC -> if (titleCompare != 0) titleCompare else idCompare
+            CloudAlbumSortMode.TITLE_DESC -> if (titleCompare != 0) -titleCompare else idCompare
+            CloudAlbumSortMode.ALBUM_DATE_DESC,
+            CloudAlbumSortMode.ALBUM_DATE_ASC,
+            -> {
+                val firstDate = parseCloudAlbumDate(first.dateStart)
+                val secondDate = parseCloudAlbumDate(second.dateStart)
+                when {
+                    firstDate == null && secondDate == null -> if (titleCompare != 0) titleCompare else idCompare
+                    firstDate == null -> 1
+                    secondDate == null -> -1
+                    else -> {
+                        val descendingCompare = secondDate.compareTo(firstDate)
+                        val dateCompare = if (mode == CloudAlbumSortMode.ALBUM_DATE_ASC) -descendingCompare else descendingCompare
+                        if (dateCompare != 0) dateCompare else if (titleCompare != 0) titleCompare else idCompare
+                    }
+                }
+            }
+        }
+    }
+}
 
 private fun weightedTimeline(years: List<CloudTimelineYear>): List<WeightedTimelinePeriod> { val periods = years.flatMap { it.months }; val total = periods.sumOf { maxOf(1, it.count) }.toFloat(); var accumulated = 0f; return periods.map { item -> val start = accumulated / total; accumulated += maxOf(1, item.count); val end = accumulated / total; WeightedTimelinePeriod(item, start, end, (start + end) / 2f) } }
 private data class WeightedTimelineYear(val year: Int, val start: Float, val end: Float, val center: Float, val count: Int)
@@ -562,19 +605,91 @@ private fun CloudTimeline(years: List<CloudTimelineYear>, activePeriod: String?,
     }
 }
 
-@Composable private fun CloudAlbumsView(albums: List<CloudAlbum>, thumbnailLoader: RemoteThumbnailLoader, onOpen: (CloudAlbum) -> Unit) {
+@Composable
+private fun CloudAlbumsView(
+    albums: List<CloudAlbum>,
+    categories: List<CloudAlbumCategory>,
+    thumbnailLoader: RemoteThumbnailLoader,
+    onOpen: (CloudAlbum) -> Unit,
+) {
+    var sortMode by remember { mutableStateOf(CloudAlbumSortMode.ALBUM_DATE_DESC) }
+    var sortMenuOpen by remember { mutableStateOf(false) }
+    var selectedCategoryIds by remember { mutableStateOf(emptySet<String>()) }
+    val visibleAlbums = remember(albums, selectedCategoryIds, sortMode) {
+        val filtered = if (selectedCategoryIds.isEmpty()) {
+            albums
+        } else {
+            albums.filter { album -> album.categories.any { it.id in selectedCategoryIds } }
+        }
+        sortCloudAlbums(filtered, sortMode)
+    }
+
     Column(Modifier.fillMaxSize()) {
-        Text(stringResource(R.string.cloud_albums), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(16.dp))
-        if (albums.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.cloud_no_albums)) }
-        else LazyVerticalGrid(GridCells.Fixed(2), Modifier.fillMaxSize(), contentPadding = PaddingValues(10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(albums, key = { it.id }) { album ->
-            Column(Modifier.clickable { onOpen(album) }) {
-                Box(Modifier.fillMaxWidth().aspectRatio(1.35f).background(Color.LightGray)) { RemoteBitmap(album.coverThumbnailUrl, thumbnailLoader, ContentScale.Crop, Modifier.fillMaxSize()) }
-                Text(album.title, style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(R.string.cloud_album_items, album.photoCount), style = MaterialTheme.typography.labelSmall)
-                album.sharedByDisplayName?.let { Text("Compartido por $it", style = MaterialTheme.typography.labelSmall) }
-                album.dateStart?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.cloud_albums), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+            Box {
+                TextButton(onClick = { sortMenuOpen = true }) { Text("Ordenar") }
+                DropdownMenu(expanded = sortMenuOpen, onDismissRequest = { sortMenuOpen = false }) {
+                    DropdownMenuItem(text = { Text("Fecha del álbum · más reciente") }, onClick = { sortMode = CloudAlbumSortMode.ALBUM_DATE_DESC; sortMenuOpen = false })
+                    DropdownMenuItem(text = { Text("Fecha del álbum · más antigua") }, onClick = { sortMode = CloudAlbumSortMode.ALBUM_DATE_ASC; sortMenuOpen = false })
+                    DropdownMenuItem(text = { Text("Título · A–Z") }, onClick = { sortMode = CloudAlbumSortMode.TITLE_ASC; sortMenuOpen = false })
+                    DropdownMenuItem(text = { Text("Título · Z–A") }, onClick = { sortMode = CloudAlbumSortMode.TITLE_DESC; sortMenuOpen = false })
+                }
             }
-        } }
+        }
+        if (categories.isNotEmpty()) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item {
+                    FilterChip(
+                        selected = selectedCategoryIds.isEmpty(),
+                        onClick = { selectedCategoryIds = emptySet() },
+                        label = { Text("Todos") },
+                    )
+                }
+                items(categories, key = { it.id }) { category ->
+                    FilterChip(
+                        selected = category.id in selectedCategoryIds,
+                        onClick = {
+                            selectedCategoryIds = if (category.id in selectedCategoryIds) {
+                                selectedCategoryIds - category.id
+                            } else {
+                                selectedCategoryIds + category.id
+                            }
+                        },
+                        label = { Text(category.name) },
+                    )
+                }
+            }
+        }
+        if (albums.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.cloud_no_albums)) }
+        } else if (visibleAlbums.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No hay álbumes en las categorías seleccionadas.") }
+        } else {
+            LazyVerticalGrid(
+                GridCells.Fixed(2),
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                items(visibleAlbums, key = { it.id }) { album ->
+                    Column(Modifier.clickable { onOpen(album) }) {
+                        Box(Modifier.fillMaxWidth().aspectRatio(1.35f).background(Color.LightGray)) { RemoteBitmap(album.coverThumbnailUrl, thumbnailLoader, ContentScale.Crop, Modifier.fillMaxSize()) }
+                        Text(album.title, style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.cloud_album_items, album.photoCount), style = MaterialTheme.typography.labelSmall)
+                        album.sharedByDisplayName?.let { Text("Compartido por $it", style = MaterialTheme.typography.labelSmall) }
+                        album.dateStart?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
+                    }
+                }
+            }
+        }
     }
 }
 @Composable private fun RemoteBitmap(url: String?, loader: RemoteThumbnailLoader, contentScale: ContentScale, modifier: Modifier = Modifier) { var bitmap by remember(url) { mutableStateOf<android.graphics.Bitmap?>(null) }; LaunchedEffect(url) { bitmap = url?.let { loader.load(it) } }; if (bitmap == null) Box(modifier.background(Color.LightGray)) else Image(bitmap!!.asImageBitmap(), null, modifier, contentScale = contentScale) }

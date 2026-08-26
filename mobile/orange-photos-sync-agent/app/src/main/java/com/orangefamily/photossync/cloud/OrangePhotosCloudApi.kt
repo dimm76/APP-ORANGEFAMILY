@@ -81,10 +81,65 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
                 for (i in 0 until values.length()) {
                     val item = values.optJSONObject(i) ?: continue
                     val id = item.optString("id").trim()
-                    if (id.isNotBlank()) add(CloudAlbum(id, item.optString("title").trim().ifBlank { "Álbum" }, item.optInt("photo_count"), item.optionalString("cover_thumbnail_url"), item.optionalString("date_mode"), item.optionalString("date_start"), item.optionalString("date_end"), item.optBoolean("is_owner"), item.optionalString("shared_by_display_name"), item.optBoolean("can_contribute")))
+                    val categories = buildList {
+                        val categoryValues = item.optJSONArray("categories")
+                        if (categoryValues != null) {
+                            for (index in 0 until categoryValues.length()) {
+                                categoryValues.optJSONObject(index)
+                                    ?.let(::parseAlbumCategory)
+                                    ?.let(::add)
+                            }
+                        }
+                    }
+                    if (id.isNotBlank()) add(
+                        CloudAlbum(
+                            id = id,
+                            title = item.optString("title").trim().ifBlank { "Álbum" },
+                            photoCount = item.optInt("photo_count"),
+                            coverThumbnailUrl = item.optionalString("cover_thumbnail_url"),
+                            dateMode = item.optionalString("date_mode"),
+                            dateStart = item.optionalString("date_start"),
+                            dateEnd = item.optionalString("date_end"),
+                            isOwner = item.optBoolean("is_owner"),
+                            sharedByDisplayName = item.optionalString("shared_by_display_name"),
+                            canContribute = item.optBoolean("can_contribute"),
+                            categories = categories,
+                        ),
+                    )
                 }
             }
         }
+    }
+
+    suspend fun albumCategories(): List<CloudAlbumCategory> = withContext(Dispatchers.IO) {
+        request(
+            "${baseUrl}api/orange-photo-album-categories",
+            "No se pudieron cargar las categorías de álbum.",
+        ) { json ->
+            val values = json.optJSONArray("items")
+                ?: return@request emptyList()
+
+            buildList {
+                for (index in 0 until values.length()) {
+                    values.optJSONObject(index)
+                        ?.let(::parseAlbumCategory)
+                        ?.let(::add)
+                }
+            }
+        }
+    }
+
+    private fun parseAlbumCategory(item: JSONObject): CloudAlbumCategory? {
+        val id = item.optString("id").trim()
+        val name = item.optString("name").trim()
+
+        if (id.isBlank() || name.isBlank()) return null
+
+        return CloudAlbumCategory(
+            id = id,
+            name = name,
+            sortOrder = item.optInt("sort_order", 0),
+        )
     }
 
     private fun parsePhoto(item: JSONObject): CloudPhoto? {
@@ -97,7 +152,16 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
     suspend fun addToLibrary(photoId: String) = withContext(Dispatchers.IO) { request("${baseUrl}api/orange-photos/${encode(photoId)}/library", "No se pudo añadir la foto a mi biblioteca.", "POST") {} }
 
     suspend fun members(): List<CloudMember> = withContext(Dispatchers.IO) { request<List<CloudMember>>("${baseUrl}api/orange-photo-members", "No se pudieron cargar los miembros.") { json -> buildList { val values=json.optJSONArray("items")?:return@request emptyList<CloudMember>(); for(i in 0 until values.length()){val item=values.optJSONObject(i)?:continue;val id=item.optString("id").trim();if(id.isNotBlank())add(CloudMember(id,item.optString("display_name"),item.optionalString("role")))}} } }
-    suspend fun addPhotoToAlbum(albumId:String,photoId:String)=withContext(Dispatchers.IO){request("${baseUrl}api/orange-photo-albums/${encode(albumId)}/photos","No se pudo añadir la foto.","POST",JSONObject().put("photo_id",photoId)) {}}
+    suspend fun addPhotoToAlbum(albumId: String, photoId: String): Boolean = withContext(Dispatchers.IO) {
+        request(
+            "${baseUrl}api/orange-photo-albums/${encode(albumId)}/photos",
+            "No se pudo añadir la foto.",
+            "POST",
+            JSONObject().put("photo_id", photoId),
+        ) { json ->
+            json.optBoolean("added", false)
+        }
+    }
     suspend fun sharePhoto(photoId:String,visibility:String,userIds:List<String>)=withContext(Dispatchers.IO){require(visibility in setOf("private","family","selected"));request("${baseUrl}api/orange-photos/${encode(photoId)}/share","No se pudo compartir la foto.","POST",JSONObject().put("visibility",visibility).put("user_ids",JSONArray(userIds))) {}}
     suspend fun setFavorite(photoId:String,value:Boolean)=patchPhoto(photoId,JSONObject().put("is_favorite",value))
     suspend fun setCapturedAt(photoId:String,isoValue:String)=patchPhoto(photoId,JSONObject().put("captured_at",isoValue))
