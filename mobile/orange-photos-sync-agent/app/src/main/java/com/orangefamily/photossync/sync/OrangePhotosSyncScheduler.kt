@@ -39,6 +39,35 @@ class OrangePhotosSyncScheduler(context: Context) {
         )
     }
 
+    fun scheduleManualSelectionSync(
+        accountUserId: String,
+        localMediaItemIds: List<Long>,
+    ) {
+        if (accountUserId.isBlank()) return
+
+        val normalizedIds = localMediaItemIds.asSequence()
+            .filter { it > 0L }
+            .distinct()
+            .toList()
+
+        if (normalizedIds.isEmpty() || normalizedIds.size > MAX_TARGETED_MANUAL_ITEMS) {
+            scheduleManualSync(accountUserId)
+            return
+        }
+
+        val request = oneTimeRequest(
+            networkType = NetworkType.CONNECTED,
+            manualTrigger = true,
+            manualItemIds = normalizedIds.toLongArray(),
+        )
+
+        workManager.enqueueUniqueWork(
+            manualName(accountUserId),
+            ExistingWorkPolicy.REPLACE,
+            request,
+        )
+    }
+
     fun scheduleAutomaticImmediateSync(accountUserId: String) {
         if (policyStore.get(accountUserId) == UploadNetworkPolicy.MANUAL_ONLY) return
         scheduleImmediateSync(accountUserId)
@@ -114,6 +143,7 @@ class OrangePhotosSyncScheduler(context: Context) {
         networkType: NetworkType,
         delaySeconds: Long = 0,
         manualTrigger: Boolean = false,
+        manualItemIds: LongArray = longArrayOf(),
     ) =
         OneTimeWorkRequestBuilder<OrangePhotosSyncWorker>()
             .setConstraints(
@@ -121,7 +151,12 @@ class OrangePhotosSyncScheduler(context: Context) {
                     .setRequiredNetworkType(networkType)
                     .build(),
             )
-            .setInputData(workDataOf(OrangePhotosSyncWorker.INPUT_MANUAL_TRIGGER to manualTrigger))
+            .setInputData(
+                workDataOf(
+                    OrangePhotosSyncWorker.INPUT_MANUAL_TRIGGER to manualTrigger,
+                    OrangePhotosSyncWorker.INPUT_MANUAL_ITEM_IDS to manualItemIds,
+                ),
+            )
             .setInitialDelay(delaySeconds, TimeUnit.SECONDS)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
             .build()
@@ -132,4 +167,8 @@ class OrangePhotosSyncScheduler(context: Context) {
     private fun mediaChangeName(userId: String) = "orange_photos_media_change_$userId"
     // Conserva el nombre histórico para que una actualización no deje dos trabajos periódicos activos.
     private fun periodicName(userId: String) = "orange-photos-sync-periodic-$userId"
+
+    private companion object {
+        const val MAX_TARGETED_MANUAL_ITEMS = 500
+    }
 }

@@ -21,6 +21,7 @@ import com.orangefamily.photossync.media.MediaPermissionAccess
 import com.orangefamily.photossync.media.MediaPermissions
 import java.io.IOException
 import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 import java.util.UUID
 import kotlinx.coroutines.delay
 
@@ -29,6 +30,13 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
         Log.d(TAG, "Worker started")
         val manualTrigger =
             inputData.getBoolean(INPUT_MANUAL_TRIGGER, false)
+        val manualItemIds = inputData.getLongArray(INPUT_MANUAL_ITEM_IDS)
+            ?.asSequence()
+            ?.filter { it > 0L }
+            ?.distinct()
+            ?.toList()
+            .orEmpty()
+        val targetedManualRun = manualTrigger && manualItemIds.isNotEmpty()
         val sessionStore = SecureSessionStore(applicationContext)
         val sessionToken = sessionStore.load(BuildConfig.API_BASE_URL) ?: return success()
         val installationId = InstallationIdStore(applicationContext).getOrCreate()
@@ -49,46 +57,68 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
         val config = repository.config(accountUserId) ?: return success()
         if (!config.enabled) return success()
         val lockToken = UUID.randomUUID().toString()
-        val lockNow = System.currentTimeMillis()
-        val recoveredLocks = repository.recoverAbandonedSyncLock(accountUserId, lockNow, lockNow + LOCK_TTL_MS)
-        if (recoveredLocks > 0) {
-            Log.w(TAG, "Recovered abandoned sync lock accountUserId=$accountUserId")
-        }
-        if (!repository.tryAcquireSyncLock(accountUserId, lockToken, lockNow, lockNow + LOCK_TTL_MS)) {
-            if (manualTrigger) {
-                Log.d(
-                    TAG,
-                    "Manual worker retry because sync lock is active accountUserId=$accountUserId",
-                )
-                return retry()
-            }
-
-            Log.d(TAG, "Worker skipped because sync lock is active accountUserId=$accountUserId")
-            return success()
-        }
+        ACTIVE_SYNC_LOCK_TOKENS.add(lockToken)
+        var databaseLockAcquired = false
 
         try {
-            try {
-                Log.d(TAG, "Scan started accountUserId=$accountUserId")
-                val scan = CameraMediaScanner(applicationContext).scan(accountUserId, repository.baselines(accountUserId))
-                val imported = repository.recordScan(accountUserId, scan, System.currentTimeMillis())
-                Log.d(TAG, "Scan completed discovered=${scan.items.size} imported=$imported accountUserId=$accountUserId")
-            } catch (error: SecurityException) {
-                Log.e(TAG, "Worker exception=${error.javaClass.simpleName} message=${error.message}", error)
+            val persistedLockToken = config.syncLockToken?.trim()?.takeIf { it.isNotBlank() }
+            if (persistedLockToken != null && persistedLockToken !in ACTIVE_SYNC_LOCK_TOKENS) {
+                repository.releaseSyncLock(accountUserId, persistedLockToken)
+                Log.w(TAG, "Recovered orphaned sync lock accountUserId=$accountUserId")
+            }
+
+            val lockNow = System.currentTimeMillis()
+            val recoveredLocks = repository.recoverAbandonedSyncLock(accountUserId, lockNow, lockNow + LOCK_TTL_MS)
+            if (recoveredLocks > 0) {
+                Log.w(TAG, "Recovered abandoned sync lock accountUserId=$accountUserId")
+            }
+            if (!repository.tryAcquireSyncLock(accountUserId, lockToken, lockNow, lockNow + LOCK_TTL_MS)) {
+                if (manualTrigger) {
+                    Log.d(
+                        TAG,
+                        "Manual worker retry because sync lock is active accountUserId=$accountUserId",
+                    )
+                    return retry()
+                }
+
+                Log.d(TAG, "Worker skipped because sync lock is active accountUserId=$accountUserId")
                 return success()
-            } catch (error: Exception) {
-                Log.e(TAG, "Worker exception=${error.javaClass.simpleName} message=${error.message}", error)
-                return retry()
+            }
+            databaseLockAcquired = true
+
+            if (!targetedManualRun) {
+                try {
+                    Log.d(TAG, "Scan started accountUserId=$accountUserId")
+                    val scan = CameraMediaScanner(applicationContext).scan(accountUserId, repository.baselines(accountUserId))
+                    val imported = repository.recordScan(accountUserId, scan, System.currentTimeMillis())
+                    Log.d(TAG, "Scan completed discovered=${scan.items.size} imported=$imported accountUserId=$accountUserId")
+                } catch (error: SecurityException) {
+                    Log.e(TAG, "Worker exception=${error.javaClass.simpleName} message=${error.message}", error)
+                    return success()
+                } catch (error: Exception) {
+                    Log.e(TAG, "Worker exception=${error.javaClass.simpleName} message=${error.message}", error)
+                    return retry()
+                }
+            } else {
+                Log.d(TAG, "Targeted manual sync items=${manualItemIds.size} accountUserId=$accountUserId")
             }
 
             repository.recoverUploading(accountUserId)
+            val targetedCandidates = if (targetedManualRun) {
+                repository.syncCandidatesByIds(
+                    accountUserId = accountUserId,
+                    ids = manualItemIds,
+                )
+            } else {
+                null
+            }
             val connectivity=applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
             val isUnmetered=connectivity.getNetworkCapabilities(connectivity.activeNetwork)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)==true
             val networkPolicy=UploadNetworkPolicyStore(applicationContext).get(accountUserId)
             var transientFailure = false
             var uploadedThisRun = 0
             var failedThisRun = 0
-            val totalThisRun = repository.countSyncCandidates(accountUserId)
+            val totalThisRun = targetedCandidates?.size ?: repository.countSyncCandidates(accountUserId)
             Log.d(TAG, "Sync run selected total=$totalThisRun accountUserId=$accountUserId")
             OrangePhotosUploadProgress.update(UploadProgressState(running=totalThisRun>0,totalThisRun=totalThisRun,pendingThisRun=totalThisRun))
             var afterDetectedAt: Long? = null
@@ -96,7 +126,11 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
             var visitedThisRun = 0
             while (visitedThisRun < totalThisRun) {
             val remaining = totalThisRun - visitedThisRun
-            val batch=repository.syncBatchAfter(accountUserId,afterDetectedAt,afterId,minOf(BATCH_SIZE,remaining))
+            val batch = if (targetedCandidates != null) {
+                targetedCandidates.drop(visitedThisRun).take(minOf(BATCH_SIZE, remaining))
+            } else {
+                repository.syncBatchAfter(accountUserId,afterDetectedAt,afterId,minOf(BATCH_SIZE,remaining))
+            }
             Log.d(TAG, "Batch selected size=${batch.size} visited=$visitedThisRun total=$totalThisRun accountUserId=$accountUserId")
             if (batch.isEmpty()) break
             for (item in batch) {
@@ -180,7 +214,10 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
             OrangePhotosSyncNotifier(applicationContext).notifyResult(uploadedThisRun, repository.syncCounts(accountUserId).failed)
             return if (transientFailure) retry() else success()
         } finally {
-            repository.releaseSyncLock(accountUserId, lockToken)
+            if (databaseLockAcquired) {
+                repository.releaseSyncLock(accountUserId, lockToken)
+            }
+            ACTIVE_SYNC_LOCK_TOKENS.remove(lockToken)
             OrangePhotosUploadProgress.update(OrangePhotosUploadProgress.state.value.copy(running=false,itemId=null,bytesSent=0,totalBytes=0))
         }
     }
@@ -263,8 +300,10 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
     companion object {
         const val BATCH_SIZE = 20
         const val INPUT_MANUAL_TRIGGER = "manual_trigger"
+        const val INPUT_MANUAL_ITEM_IDS = "manual_item_ids"
         const val LOCK_TTL_MS = 30 * 60 * 1000L
         const val TAG = "OrangePhotosSync"
+        private val ACTIVE_SYNC_LOCK_TOKENS = ConcurrentHashMap.newKeySet<String>()
         val NON_RETRYABLE_CODES = setOf("LOCAL_FILE_UNAVAILABLE", "INVALID_METADATA", "UNSUPPORTED_FILE_TYPE", "FILE_TOO_LARGE", "UPLOAD_SUPPRESSED", "LARGE_UPLOAD_INTERRUPTED", "DUPLICATE_RECONCILIATION_REQUIRED")
     }
 }

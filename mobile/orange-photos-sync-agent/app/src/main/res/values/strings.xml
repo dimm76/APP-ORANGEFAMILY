@@ -95,7 +95,7 @@
     <string name="upload_needs_attention">%1$d archivos necesitan atención</string>
     <string name="upload_completed_count">%1$d completados</string>
     <string name="upload_failed_count">%1$d fallidos</string>
-    <string name="upload_pending_count">%1$d pendientes</string>
+    <string name="upload_pending_count">Pendientes en cola: %1$d</string>
     <string name="retry_failed_uploads">Reintentar subida</string>
     <string name="retry_failed_message">Se reintentarán %1$d archivos fallidos.</string>
     <string name="retry_unsupported_large_videos">%1$d vídeos superan 500 MB y todavía no son compatibles.</string>

@@ -129,6 +129,39 @@ interface CameraBackupDao {
     """)
     suspend fun getSyncBatch(accountUserId: String, limit: Int): List<LocalMediaItem>
 
+    @Query(
+        """
+        SELECT *
+        FROM local_media_items
+        WHERE account_user_id = :accountUserId
+          AND id IN (:ids)
+          AND (
+            local_status = 'pending'
+            OR (
+              local_status = 'failed'
+              AND (
+                failure_code IS NULL
+                OR failure_code NOT IN (
+                  'LOCAL_FILE_UNAVAILABLE',
+                  'INVALID_METADATA',
+                  'UNSUPPORTED_FILE_TYPE',
+                  'FILE_TOO_LARGE',
+                  'UNSUPPORTED_MULTIPART',
+                  'UPLOAD_SUPPRESSED',
+                  'LARGE_UPLOAD_INTERRUPTED',
+                  'DUPLICATE_RECONCILIATION_REQUIRED'
+                )
+              )
+            )
+          )
+        ORDER BY detected_at ASC, id ASC
+    """,
+    )
+    suspend fun getSyncCandidatesByIds(
+        accountUserId: String,
+        ids: List<Long>,
+    ): List<LocalMediaItem>
+
     @Query("""
         SELECT COUNT(*)
         FROM local_media_items
