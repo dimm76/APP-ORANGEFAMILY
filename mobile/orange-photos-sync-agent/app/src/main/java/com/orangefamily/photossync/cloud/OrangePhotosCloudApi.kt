@@ -16,7 +16,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
         if (it.endsWith('/')) it else "$it/"
     }
 
-    suspend fun photos(page: Int = 1, perPage: Int = 30, albumId: String? = null, trashed: Boolean = false, sharedWithMe: Boolean = false): CloudPhotoPage = withContext(Dispatchers.IO) {
+    suspend fun photos(page: Int = 1, perPage: Int = 100, albumId: String? = null, trashed: Boolean = false, sharedWithMe: Boolean = false): CloudPhotoPage = withContext(Dispatchers.IO) {
         val albumQuery = albumId?.takeIf { it.isNotBlank() }?.let { "&album_id=${encode(it)}" }.orEmpty()
         val accessQuery = when {
             trashed -> "&trashed=true&library_scope=owned"
