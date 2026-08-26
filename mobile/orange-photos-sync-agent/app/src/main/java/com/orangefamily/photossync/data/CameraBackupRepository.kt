@@ -80,13 +80,6 @@ class CameraBackupRepository(
     suspend fun baselines(accountUserId: String) = dao.getBaselines(accountUserId)
     suspend fun recoverUploading(accountUserId: String) = dao.recoverUploading(accountUserId)
     suspend fun syncBatch(accountUserId: String, limit: Int) = dao.getSyncBatch(accountUserId, limit)
-    suspend fun syncCandidatesByIds(
-        accountUserId: String,
-        ids: List<Long>,
-    ) = dao.getSyncCandidatesByIds(
-        accountUserId = accountUserId,
-        ids = ids,
-    )
     suspend fun countSyncCandidates(accountUserId: String) =
         dao.countSyncCandidates(accountUserId)
     suspend fun syncBatchAfter(
@@ -130,10 +123,11 @@ class CameraBackupRepository(
     suspend fun updateCloudStatus(item: LocalMediaItem, status: String, remoteId: String?, at: Long) = dao.updateCloudStatus(item.accountUserId, item.mediaCollection, item.mediaType, item.mediaStoreId, status, remoteId, at)
     suspend fun removeLocalItem(item: LocalMediaItem) = dao.removeLocalItem(item.accountUserId, item.mediaCollection, item.mediaType, item.mediaStoreId)
     suspend fun enqueueDeviceMedia(items: List<LocalMediaItem>, forceDuplicate: Boolean = false) = database.withTransaction {
+        val queuedAt = System.currentTimeMillis()
         items.forEach { item ->
             val existing=dao.findMediaItem(item.accountUserId,item.mediaCollection,item.mediaType,item.mediaStoreId)
-            if(existing==null) dao.upsertDeviceMedia(listOf(item.copy(localStatus=LocalMediaItem.STATUS_PENDING)))
-            else dao.enqueueDeviceMedia(existing.accountUserId,existing.mediaCollection,existing.mediaType,existing.mediaStoreId,forceDuplicate)
+            if(existing==null) dao.upsertDeviceMedia(listOf(item.copy(localStatus=LocalMediaItem.STATUS_PENDING, detectedAt=queuedAt)))
+            else dao.enqueueDeviceMedia(existing.accountUserId,existing.mediaCollection,existing.mediaType,existing.mediaStoreId,forceDuplicate,queuedAt)
         }
     }
 }

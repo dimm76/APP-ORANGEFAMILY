@@ -75,8 +75,8 @@ interface CameraBackupDao {
     @Query("UPDATE local_media_items SET cloud_status='unknown', remote_verified_at=NULL WHERE account_user_id=:accountUserId AND bucket_id=:bucketId")
     suspend fun invalidateBucketVerification(accountUserId: String, bucketId: String)
 
-    @Query("UPDATE local_media_items SET local_status='pending', failure_code=CASE WHEN :forceDuplicate THEN 'FORCE_DUPLICATE' ELSE NULL END WHERE account_user_id=:accountUserId AND media_collection=:collection AND media_type=:mediaType AND media_store_id=:mediaStoreId AND local_status!='uploading'")
-    suspend fun enqueueDeviceMedia(accountUserId: String, collection: String, mediaType: String, mediaStoreId: Long, forceDuplicate: Boolean)
+    @Query("UPDATE local_media_items SET local_status='pending', failure_code=CASE WHEN :forceDuplicate THEN 'FORCE_DUPLICATE' ELSE NULL END, detected_at=:queuedAt WHERE account_user_id=:accountUserId AND media_collection=:collection AND media_type=:mediaType AND media_store_id=:mediaStoreId AND local_status!='uploading'")
+    suspend fun enqueueDeviceMedia(accountUserId: String, collection: String, mediaType: String, mediaStoreId: Long, forceDuplicate: Boolean, queuedAt: Long)
 
     @Query("DELETE FROM local_media_items WHERE account_user_id=:accountUserId AND media_collection=:collection AND media_type=:mediaType AND media_store_id=:mediaStoreId")
     suspend fun removeLocalItem(accountUserId: String, collection: String, mediaType: String, mediaStoreId: Long)
@@ -128,39 +128,6 @@ interface CameraBackupDao {
         LIMIT :limit
     """)
     suspend fun getSyncBatch(accountUserId: String, limit: Int): List<LocalMediaItem>
-
-    @Query(
-        """
-        SELECT *
-        FROM local_media_items
-        WHERE account_user_id = :accountUserId
-          AND id IN (:ids)
-          AND (
-            local_status = 'pending'
-            OR (
-              local_status = 'failed'
-              AND (
-                failure_code IS NULL
-                OR failure_code NOT IN (
-                  'LOCAL_FILE_UNAVAILABLE',
-                  'INVALID_METADATA',
-                  'UNSUPPORTED_FILE_TYPE',
-                  'FILE_TOO_LARGE',
-                  'UNSUPPORTED_MULTIPART',
-                  'UPLOAD_SUPPRESSED',
-                  'LARGE_UPLOAD_INTERRUPTED',
-                  'DUPLICATE_RECONCILIATION_REQUIRED'
-                )
-              )
-            )
-          )
-        ORDER BY detected_at ASC, id ASC
-    """,
-    )
-    suspend fun getSyncCandidatesByIds(
-        accountUserId: String,
-        ids: List<Long>,
-    ): List<LocalMediaItem>
 
     @Query("""
         SELECT COUNT(*)

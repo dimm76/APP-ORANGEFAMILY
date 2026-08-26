@@ -225,15 +225,9 @@ class MainActivity : ComponentActivity() {
         if (items.isEmpty()) return
         lifecycleScope.launch(Dispatchers.IO) {
             repository.enqueueDeviceMedia(items, forceDuplicate)
-            val itemIds = items.map { it.id }
-            if (itemIds.all { it > 0L }) {
-                scheduler.scheduleManualSelectionSync(
-                    accountUserId = items.first().accountUserId,
-                    localMediaItemIds = itemIds,
-                )
-            } else {
-                scheduler.scheduleManualSync(items.first().accountUserId)
-            }
+            scheduler.scheduleManualSync(
+                items.first().accountUserId,
+            )
         }
     }
 
