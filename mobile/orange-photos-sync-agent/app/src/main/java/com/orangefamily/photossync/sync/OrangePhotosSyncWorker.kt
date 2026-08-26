@@ -23,7 +23,9 @@ import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.UUID
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
@@ -191,10 +193,24 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
             OrangePhotosSyncNotifier(applicationContext).notifyResult(uploadedThisRun, repository.syncCounts(accountUserId).failed)
             return if (transientFailure) retry() else success()
         } finally {
-            if (databaseLockAcquired) {
-                repository.releaseSyncLock(accountUserId, lockToken)
-            }
             ACTIVE_SYNC_LOCK_TOKENS.remove(lockToken)
+
+            if (databaseLockAcquired) {
+                try {
+                    withContext(NonCancellable) {
+                        repository.releaseSyncLock(accountUserId, lockToken)
+                    }
+                } catch (error: Exception) {
+                    Log.e(
+                        TAG,
+                        "Failed to release sync lock " +
+                            "accountUserId=$accountUserId " +
+                            "exception=${error.javaClass.simpleName} " +
+                            "message=${error.message}",
+                        error,
+                    )
+                }
+            }
             OrangePhotosUploadProgress.update(OrangePhotosUploadProgress.state.value.copy(running=false,itemId=null,bytesSent=0,totalBytes=0))
         }
     }
