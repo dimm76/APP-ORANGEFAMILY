@@ -34,7 +34,7 @@ class OrangePhotosSyncScheduler(context: Context) {
 
         workManager.enqueueUniqueWork(
             manualName(accountUserId),
-            ExistingWorkPolicy.KEEP,
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
             request,
         )
     }
