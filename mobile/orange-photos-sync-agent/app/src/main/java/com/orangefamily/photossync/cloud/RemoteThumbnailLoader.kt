@@ -14,7 +14,8 @@ class RemoteThumbnailLoader {
     }
 
     suspend fun load(url: String): Bitmap? = withContext(Dispatchers.IO) {
-        cache.get(url)?.let { return@withContext it }
+        val cacheKey = url.substringBefore('?')
+        cache.get(cacheKey)?.let { return@withContext it }
         val connection = runCatching { URL(url).openConnection() as HttpURLConnection }.getOrNull()
             ?: return@withContext null
         try {
@@ -23,7 +24,7 @@ class RemoteThumbnailLoader {
             connection.readTimeout = 30_000
             connection.instanceFollowRedirects = true
             if (connection.responseCode !in 200..299) return@withContext null
-            connection.inputStream.use { BitmapFactory.decodeStream(it) }?.also { cache.put(url, it) }
+            connection.inputStream.use { BitmapFactory.decodeStream(it) }?.also { cache.put(cacheKey, it) }
         } catch (_: Exception) { null } finally { connection.disconnect() }
     }
 }

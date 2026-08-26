@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -165,6 +166,9 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
 
     fun activeAlbumId(): String? = if (cloudView == CloudView.ALBUM_DETAIL) selectedAlbum?.id else null
     suspend fun reload() {
+        val generation = timelineRequestGeneration + 1
+        timelineRequestGeneration = generation
+        timeline = emptyList()
         if (cloudView == CloudView.ALBUMS) { loading = false; return }
         loading = true; error = null
         if (cloudView == CloudView.TRASH) {
@@ -174,11 +178,19 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
             loading = false
             return
         }
+        val albumId = activeAlbumId()
         val sharedWithMe = cloudView == CloudView.SHARED_WITH_ME
-        runCatching { api.photos(albumId = activeAlbumId(), sharedWithMe = sharedWithMe) to api.timeline(activeAlbumId(), sharedWithMe) }
-            .onSuccess { (photos, periods) -> items = photos.items; page = photos.page; hasMore = photos.hasMore; hasNewer = false; newerCursor = null; hasOlder = false; olderCursor = null; pagingMode = CloudPagingMode.NORMAL; timeline = periods }
+        runCatching { api.photos(albumId = albumId, sharedWithMe = sharedWithMe) }
+            .onSuccess { photos ->
+                items = photos.items; page = photos.page; hasMore = photos.hasMore; hasNewer = false; newerCursor = null; hasOlder = false; olderCursor = null; pagingMode = CloudPagingMode.NORMAL
+                loading = false
+                scope.launch {
+                    runCatching { api.timeline(albumId, sharedWithMe) }
+                        .onSuccess { periods -> if (generation == timelineRequestGeneration) timeline = periods }
+                }
+            }
             .onFailure { error = it.message ?: "No se pudo cargar la biblioteca." }
-        loading = false
+        if (loading) loading = false
     }
     LaunchedEffect(Unit) { albums = runCatching { api.albums() }.getOrDefault(emptyList()) }
     LaunchedEffect(Unit) { members = runCatching { api.members() }.getOrDefault(emptyList()) }
@@ -259,7 +271,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     LaunchedEffect(listState, pagingMode, hasNewer, newerCursor) { var movedAwayFromWindowTop=false; snapshotFlow { CloudWindowScrollProbe(listState.firstVisibleItemIndex,listState.firstVisibleItemScrollOffset,listIsDragged,listState.lastScrolledBackward) }.distinctUntilChanged().collect { state -> if(state.index>0||state.offset>=300)movedAwayFromWindowTop=true;if(state.dragged&&movedAwayFromWindowTop&&state.scrollingBackward&&pagingMode==CloudPagingMode.WINDOW&&hasNewer&&state.index==0&&state.offset<300){movedAwayFromWindowTop=false;loadWindowNewer()} } }
     LaunchedEffect(listState,pagingMode,hasMore){snapshotFlow{val info=listState.layoutInfo;Pair(info.visibleItemsInfo.lastOrNull()?.index?:0,info.totalItemsCount)}.distinctUntilChanged().collect{(last,total)->if(pagingMode==CloudPagingMode.NORMAL&&hasMore&&last>=total-2)loadNextNormalPage()}}
 
-if(albumDialogOpen){val selectableAlbums=albums.filter{(it.isOwner||it.canContribute)&&(cloudView!=CloudView.ALBUM_DETAIL||it.id!=selectedAlbum?.id)};val filteredAlbums=selectableAlbums.filter{albumSearchQuery.isBlank()||it.title.contains(albumSearchQuery.trim(),ignoreCase=true)};AlertDialog(onDismissRequest={if(!bulkBusy&&!albumCreating)albumDialogOpen=false},title={Text("Añadir a álbum")},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){OutlinedTextField(value=albumSearchQuery,onValueChange={albumSearchQuery=it},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("Buscar álbum")});TextButton(enabled=!bulkBusy&&!albumCreating,onClick={newAlbumTitle="";createAlbumDialogOpen=true}){Icon(CloudAlbumActionIcon,null,Modifier.size(20.dp));Spacer(Modifier.width(6.dp));Text("Crear álbum")};if(selectableAlbums.isEmpty())Text("No hay álbumes disponibles para añadir contenido.") else if(filteredAlbums.isEmpty())Text("No hay álbumes que coincidan con la búsqueda.") else LazyColumn(modifier=Modifier.fillMaxWidth().heightIn(max=360.dp)){items(items=filteredAlbums,key={it.id}){album->Row(modifier=Modifier.fillMaxWidth().clickable{targetAlbumId=album.id}.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically){RadioButton(selected=targetAlbumId==album.id,onClick={targetAlbumId=album.id});Text(text=album.title,modifier=Modifier.weight(1f),maxLines=2,overflow=TextOverflow.Ellipsis)}}}}},confirmButton={TextButton(enabled=!bulkBusy&&!targetAlbumId.isNullOrBlank()&&selected.size<=MAX_CLOUD_BULK_SELECTION,onClick={runBulk{val id=targetAlbumId!!;selectedPhotos.forEach{api.addPhotoToAlbum(id,it.id)};albums=api.albums();albumDialogOpen=false}}){Text("Añadir")}},dismissButton={TextButton(onClick={if(!bulkBusy&&!albumCreating)albumDialogOpen=false}){Text("Cancelar")}})}
+if(albumDialogOpen){val selectableAlbums=albums.filter{(it.isOwner||it.canContribute)&&(cloudView!=CloudView.ALBUM_DETAIL||it.id!=selectedAlbum?.id)};val filteredAlbums=selectableAlbums.filter{albumSearchQuery.isBlank()||it.title.contains(albumSearchQuery.trim(),ignoreCase=true)};AlertDialog(onDismissRequest={if(!bulkBusy&&!albumCreating)albumDialogOpen=false},title={Text("Añadir a álbum")},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){OutlinedTextField(value=albumSearchQuery,onValueChange={albumSearchQuery=it},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("Buscar álbum")});TextButton(enabled=!bulkBusy&&!albumCreating,onClick={newAlbumTitle="";createAlbumDialogOpen=true}){Icon(CloudAlbumActionIcon,null,Modifier.size(20.dp));Spacer(Modifier.width(6.dp));Text("Crear álbum")};if(selectableAlbums.isEmpty())Text("No hay álbumes disponibles para añadir contenido.") else if(filteredAlbums.isEmpty())Text("No hay álbumes que coincidan con la búsqueda.") else LazyColumn(modifier=Modifier.fillMaxWidth().heightIn(max=360.dp)){items(items=filteredAlbums,key={it.id}){album->Row(modifier=Modifier.fillMaxWidth().clickable{targetAlbumId=album.id}.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically){RadioButton(selected=targetAlbumId==album.id,onClick={targetAlbumId=album.id});Text(text=album.title,modifier=Modifier.weight(1f),maxLines=2,overflow=TextOverflow.Ellipsis)}}}}},confirmButton={TextButton(enabled=!bulkBusy&&!targetAlbumId.isNullOrBlank()&&selected.size<=MAX_CLOUD_BULK_SELECTION,onClick={runBulk{val id=targetAlbumId!!;val snapshot=selectedPhotos.toList();val albumTitle=albums.firstOrNull{it.id==id}?.title?:"álbum";var addedCount=0;snapshot.forEach{if(api.addPhotoToAlbum(id,it.id))addedCount+=1};albums=api.albums();albumDialogOpen=false;val requestedCount=snapshot.size;val message=when{addedCount==requestedCount->if(addedCount==1)"1 elemento añadido a «${albumTitle}»." else "${addedCount} elementos añadidos a «${albumTitle}».";addedCount==0->"Los elementos seleccionados ya estaban en «${albumTitle}».";else->{val skippedCount=requestedCount-addedCount;if(addedCount==1)"1 elemento añadido a «${albumTitle}»; ${skippedCount} ya estaba en el álbum." else "${addedCount} elementos añadidos a «${albumTitle}»; ${skippedCount} ya estaban en el álbum."}};Toast.makeText(context,message,Toast.LENGTH_LONG).show()}}){Text("Añadir")}},dismissButton={TextButton(onClick={if(!bulkBusy&&!albumCreating)albumDialogOpen=false}){Text("Cancelar")}})}
 if(createAlbumDialogOpen)AlertDialog(onDismissRequest={if(!albumCreating)createAlbumDialogOpen=false},title={Text("Crear álbum")},text={OutlinedTextField(value=newAlbumTitle,onValueChange={newAlbumTitle=it.take(500)},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("Nombre del álbum")})},confirmButton={TextButton(enabled=!albumCreating&&newAlbumTitle.trim().isNotEmpty(),onClick={albumCreating=true;scope.launch{runCatching{val createdAlbumId=api.createAlbum(newAlbumTitle.trim());val refreshedAlbums=api.albums();createdAlbumId to refreshedAlbums}.onSuccess{(createdAlbumId,refreshedAlbums)->albums=refreshedAlbums;targetAlbumId=createdAlbumId;albumSearchQuery="";newAlbumTitle="";createAlbumDialogOpen=false}.onFailure{error->bulkMessage=error.message?:"No se pudo crear el álbum."};albumCreating=false}}){Text("Crear")}},dismissButton={TextButton(enabled=!albumCreating,onClick={createAlbumDialogOpen=false}){Text("Cancelar")}})
     if(shareDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)shareDialogOpen=false},title={Text("Compartir")},text={Column{listOf("private" to "Solo yo","family" to "Toda la familia","selected" to "Miembros concretos").forEach{(v,l)->Row(verticalAlignment=Alignment.CenterVertically){RadioButton(selected=shareVisibility==v,onClick={shareVisibility=v});Text(l)}};if(shareVisibility=="selected")members.filter{it.id!=accountUserId}.forEach{member->Row(verticalAlignment=Alignment.CenterVertically){Checkbox(checked=member.id in shareUserIds,onCheckedChange={shareUserIds=if(it)shareUserIds+member.id else shareUserIds-member.id});Text(member.displayName)}}}},confirmButton={TextButton(enabled=!bulkBusy&&(shareVisibility!="selected"||shareUserIds.isNotEmpty()),onClick={runBulk{selectedPhotos.forEach{api.sharePhoto(it.id,shareVisibility,shareUserIds.toList())};shareDialogOpen=false}}){Text("Compartir")}},dismissButton={TextButton(onClick={if(!bulkBusy)shareDialogOpen=false}){Text("Cancelar")}})
     if(locationDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)locationDialogOpen=false},title={Text("Ubicación")},text={OutlinedTextField(value=locationValue,onValueChange={locationValue=it},label={Text("Ubicación")},singleLine=true)},confirmButton={TextButton(enabled=!bulkBusy&&locationValue.trim().isNotEmpty(),onClick={runBulk{val value=locationValue.trim();selectedPhotos.forEach{api.setLocationName(it.id,value)};locationDialogOpen=false}}){Text("Guardar")}},dismissButton={TextButton(onClick={if(!bulkBusy)locationDialogOpen=false}){Text("Cancelar")}})
@@ -550,10 +562,45 @@ private fun CloudTimeline(years: List<CloudTimelineYear>, activePeriod: String?,
 }
 
 @Composable private fun CloudAlbumsView(albums: List<CloudAlbum>, thumbnailLoader: RemoteThumbnailLoader, onOpen: (CloudAlbum) -> Unit) {
+    var sortMode by remember { mutableStateOf("album_date_desc") }
+    var selectedCategoryIds by remember { mutableStateOf(emptySet<String>()) }
+    var sortMenuExpanded by remember { mutableStateOf(false) }
+    val categories = remember(albums) { albums.flatMap { it.categories }.distinctBy { it.id }.sortedBy { it.name.lowercase(Locale.ROOT) } }
+    fun compareAlbums(first: CloudAlbum, second: CloudAlbum): Int {
+        val titleCompare = first.title.compareTo(second.title, ignoreCase = true)
+        val idCompare = first.id.compareTo(second.id, ignoreCase = true)
+        if (sortMode == "title_asc") return titleCompare.takeIf { it != 0 } ?: idCompare
+        if (sortMode == "title_desc") return (-titleCompare).takeIf { it != 0 } ?: idCompare
+        val firstDate = first.dateStart?.take(10)
+        val secondDate = second.dateStart?.take(10)
+        if (firstDate == null && secondDate == null) return titleCompare.takeIf { it != 0 } ?: idCompare
+        if (firstDate == null) return 1
+        if (secondDate == null) return -1
+        val dateCompare = if (sortMode == "album_date_asc") firstDate.compareTo(secondDate) else secondDate.compareTo(firstDate)
+        return dateCompare.takeIf { it != 0 } ?: titleCompare.takeIf { it != 0 } ?: idCompare
+    }
+    val visibleAlbums = remember(albums, selectedCategoryIds, sortMode) {
+        albums.filter { album -> selectedCategoryIds.isEmpty() || album.categories.any { it.id in selectedCategoryIds } }.sortedWith(::compareAlbums)
+    }
     Column(Modifier.fillMaxSize()) {
-        Text(stringResource(R.string.cloud_albums), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(16.dp))
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.cloud_albums), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+            Box {
+                OutlinedButton(onClick = { sortMenuExpanded = true }) { Text(when (sortMode) { "album_date_asc" -> "Fecha · más antigua"; "title_asc" -> "Título · A–Z"; "title_desc" -> "Título · Z–A"; else -> "Fecha · más reciente" }) }
+                DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
+                    listOf("album_date_desc" to "Fecha · más reciente", "album_date_asc" to "Fecha · más antigua", "title_asc" to "Título · A–Z", "title_desc" to "Título · Z–A").forEach { (value, label) -> DropdownMenuItem(text = { Text(label) }, onClick = { sortMode = value; sortMenuExpanded = false }) }
+                }
+            }
+        }
+        if (categories.isNotEmpty()) {
+            LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                item { FilterChip(selected = selectedCategoryIds.isEmpty(), onClick = { selectedCategoryIds = emptySet() }, label = { Text("Todas") }) }
+                items(categories, key = { it.id }) { category -> FilterChip(selected = category.id in selectedCategoryIds, onClick = { selectedCategoryIds = if (category.id in selectedCategoryIds) selectedCategoryIds - category.id else selectedCategoryIds + category.id }, label = { Text(category.name) }) }
+            }
+        }
         if (albums.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.cloud_no_albums)) }
-        else LazyVerticalGrid(GridCells.Fixed(2), Modifier.fillMaxSize(), contentPadding = PaddingValues(10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(albums, key = { it.id }) { album ->
+        else if (visibleAlbums.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No hay álbumes para estos filtros.") }
+        else LazyVerticalGrid(GridCells.Fixed(2), Modifier.fillMaxSize(), contentPadding = PaddingValues(10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(visibleAlbums, key = { it.id }) { album ->
             Column(Modifier.clickable { onOpen(album) }) {
                 Box(Modifier.fillMaxWidth().aspectRatio(1.35f).background(Color.LightGray)) { RemoteBitmap(album.coverThumbnailUrl, thumbnailLoader, ContentScale.Crop, Modifier.fillMaxSize()) }
                 Text(album.title, style = MaterialTheme.typography.titleMedium)

@@ -76,6 +76,12 @@ data class CloudAlbum(
     val isOwner: Boolean,
     val sharedByDisplayName: String?,
     val canContribute: Boolean = false,
+    val categories: List<CloudAlbumCategory> = emptyList(),
+)
+
+data class CloudAlbumCategory(
+    val id: String,
+    val name: String,
 )
 
 data class CloudMember(val id:String,val displayName:String,val role:String?)

@@ -16,7 +16,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
         if (it.endsWith('/')) it else "$it/"
     }
 
-    suspend fun photos(page: Int = 1, perPage: Int = 100, albumId: String? = null, trashed: Boolean = false, sharedWithMe: Boolean = false): CloudPhotoPage = withContext(Dispatchers.IO) {
+    suspend fun photos(page: Int = 1, perPage: Int = 30, albumId: String? = null, trashed: Boolean = false, sharedWithMe: Boolean = false): CloudPhotoPage = withContext(Dispatchers.IO) {
         val albumQuery = albumId?.takeIf { it.isNotBlank() }?.let { "&album_id=${encode(it)}" }.orEmpty()
         val accessQuery = when {
             trashed -> "&trashed=true&library_scope=owned"
@@ -81,7 +81,17 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
                 for (i in 0 until values.length()) {
                     val item = values.optJSONObject(i) ?: continue
                     val id = item.optString("id").trim()
-                    if (id.isNotBlank()) add(CloudAlbum(id, item.optString("title").trim().ifBlank { "Álbum" }, item.optInt("photo_count"), item.optionalString("cover_thumbnail_url"), item.optionalString("date_mode"), item.optionalString("date_start"), item.optionalString("date_end"), item.optBoolean("is_owner"), item.optionalString("shared_by_display_name"), item.optBoolean("can_contribute")))
+                    if (id.isNotBlank()) {
+                        val categories = buildList {
+                            val categoryValues = item.optJSONArray("categories") ?: JSONArray()
+                            for (index in 0 until categoryValues.length()) {
+                                val category = categoryValues.optJSONObject(index) ?: continue
+                                val categoryId = category.optString("id").trim()
+                                if (categoryId.isNotBlank()) add(CloudAlbumCategory(categoryId, category.optString("name").trim().ifBlank { "Categoría" }))
+                            }
+                        }
+                        add(CloudAlbum(id, item.optString("title").trim().ifBlank { "Álbum" }, item.optInt("photo_count"), item.optionalString("cover_thumbnail_url"), item.optionalString("date_mode"), item.optionalString("date_start"), item.optionalString("date_end"), item.optBoolean("is_owner"), item.optionalString("shared_by_display_name"), item.optBoolean("can_contribute"), categories))
+                    }
                 }
             }
         }
@@ -97,7 +107,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
     suspend fun addToLibrary(photoId: String) = withContext(Dispatchers.IO) { request("${baseUrl}api/orange-photos/${encode(photoId)}/library", "No se pudo añadir la foto a mi biblioteca.", "POST") {} }
 
     suspend fun members(): List<CloudMember> = withContext(Dispatchers.IO) { request<List<CloudMember>>("${baseUrl}api/orange-photo-members", "No se pudieron cargar los miembros.") { json -> buildList { val values=json.optJSONArray("items")?:return@request emptyList<CloudMember>(); for(i in 0 until values.length()){val item=values.optJSONObject(i)?:continue;val id=item.optString("id").trim();if(id.isNotBlank())add(CloudMember(id,item.optString("display_name"),item.optionalString("role")))}} } }
-    suspend fun addPhotoToAlbum(albumId:String,photoId:String)=withContext(Dispatchers.IO){request("${baseUrl}api/orange-photo-albums/${encode(albumId)}/photos","No se pudo añadir la foto.","POST",JSONObject().put("photo_id",photoId)) {}}
+    suspend fun addPhotoToAlbum(albumId:String,photoId:String): Boolean = withContext(Dispatchers.IO){request("${baseUrl}api/orange-photo-albums/${encode(albumId)}/photos","No se pudo añadir la foto.","POST",JSONObject().put("photo_id",photoId)) { json -> json.optBoolean("added", false) }}
     suspend fun sharePhoto(photoId:String,visibility:String,userIds:List<String>)=withContext(Dispatchers.IO){require(visibility in setOf("private","family","selected"));request("${baseUrl}api/orange-photos/${encode(photoId)}/share","No se pudo compartir la foto.","POST",JSONObject().put("visibility",visibility).put("user_ids",JSONArray(userIds))) {}}
     suspend fun setFavorite(photoId:String,value:Boolean)=patchPhoto(photoId,JSONObject().put("is_favorite",value))
     suspend fun setCapturedAt(photoId:String,isoValue:String)=patchPhoto(photoId,JSONObject().put("captured_at",isoValue))
