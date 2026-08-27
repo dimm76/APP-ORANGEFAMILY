@@ -1,5 +1,7 @@
 package com.orangefamily.photossync.cloud
 
+import android.os.SystemClock
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -11,6 +13,10 @@ import java.net.URL
 import java.net.URLEncoder
 
 class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String) {
+    private companion object {
+        const val TAG = "OrangePhotosCloud"
+    }
+
     private val baseUrl = apiBaseUrl.trim().let {
         require(it.startsWith("http://") || it.startsWith("https://"))
         if (it.endsWith('/')) it else "$it/"
@@ -172,14 +178,21 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
     suspend fun purgePhoto(photoId: String) = withContext(Dispatchers.IO) { request("${baseUrl}api/orange-photos/${encode(photoId)}", "No se pudo eliminar definitivamente la foto.", "DELETE") {} }
     private suspend fun patchPhoto(photoId:String,body:JSONObject)=withContext(Dispatchers.IO){request("${baseUrl}api/orange-photos/${encode(photoId)}","No se pudo actualizar la foto.","PATCH",body) {}}
     private suspend fun <T> request(url: String, fallback: String, method:String="GET", body:JSONObject?=null, parse: (JSONObject) -> T): T {
+        val startedAt = SystemClock.elapsedRealtime()
+        val path = runCatching { URL(url).path }.getOrDefault("")
+        val measure = method == "GET" && path in setOf("/api/orange-photos", "/api/orange-photos/timeline", "/api/orange-photos/around-date")
         val connection = URL(url).openConnection() as HttpURLConnection
         try {
             connection.requestMethod = method; connection.connectTimeout = 15_000; connection.readTimeout = 30_000
             connection.setRequestProperty("Accept", "application/json"); connection.setRequestProperty("Cookie", "of_session=$sessionToken")
             if(body!=null){connection.doOutput=true;connection.setRequestProperty("Content-Type","application/json");connection.outputStream.use{it.write(body.toString().toByteArray(Charsets.UTF_8))}}
             val status = connection.responseCode
+            val responseAt = SystemClock.elapsedRealtime()
             val body = (if (status in 200..299) connection.inputStream else connection.errorStream)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+            val bodyReadAt = SystemClock.elapsedRealtime()
             val json = runCatching { JSONObject(body) }.getOrElse { throw CloudApiException(status, "Respuesta no válida del servidor.") }
+            val parsedAt = SystemClock.elapsedRealtime()
+            if (measure) Log.d(TAG, "path=$path status=$status response_ms=${responseAt - startedAt} body_ms=${bodyReadAt - responseAt} parse_ms=${parsedAt - bodyReadAt} total_ms=${parsedAt - startedAt}")
             if (status !in 200..299 || !json.optBoolean("ok", false)) throw CloudApiException(status, json.optString("message").takeIf { it.isNotBlank() } ?: fallback)
             return parse(json)
         } catch (error: CloudApiException) { throw error } catch (error: IOException) { throw CloudApiException(0, "No se pudo conectar con OrangeFamily.", error) } finally { connection.disconnect() }

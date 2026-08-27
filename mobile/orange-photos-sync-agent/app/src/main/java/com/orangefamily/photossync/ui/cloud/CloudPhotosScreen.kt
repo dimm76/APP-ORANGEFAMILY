@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -32,6 +31,10 @@ import androidx.compose.ui.graphics.vector.PathBuilder
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
@@ -72,7 +75,6 @@ import kotlin.math.max
 private data class CloudPhotoDay(val key: String, val label: String, val photos: List<CloudPhoto>)
 private data class CloudPhotoPeriod(val key: String, val label: String, val days: List<CloudPhotoDay>)
 private data class CloudJustifiedRow(val photos: List<CloudPhoto>, val height: Float)
-private data class CloudWindowScrollProbe(val index: Int, val offset: Int, val dragged: Boolean, val scrollingBackward: Boolean)
 private data class WeightedTimelinePeriod(val item: CloudTimelineMonth, val start: Float, val end: Float, val center: Float)
 private enum class CloudView { LIBRARY, ALBUMS, ALBUM_DETAIL, TRASH, SHARED_WITH_ME }
 private enum class CloudPagingMode { NORMAL, WINDOW }
@@ -123,7 +125,6 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val listState = rememberLazyListState()
-    val listIsDragged by listState.interactionSource.collectIsDraggedAsState()
     var items by remember { mutableStateOf(emptyList<CloudPhoto>()) }
     var albums by remember { mutableStateOf(emptyList<CloudAlbum>()) }
     var albumCategories by remember { mutableStateOf(emptyList<CloudAlbumCategory>()) }
@@ -287,7 +288,16 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
         }
     }
     suspend fun loadNextNormalPage(){if(pagingMode!=CloudPagingMode.NORMAL||!hasMore||loadingMoreNormal)return;loadingMoreNormal=true;try{val result=api.photos(page+1,perPage=CLOUD_PAGE_SIZE,albumId=activeAlbumId(),trashed=cloudView==CloudView.TRASH,sharedWithMe=cloudView==CloudView.SHARED_WITH_ME,includeTotal=false);items=(items+result.items).distinctBy{it.id};page=result.page;hasMore=result.hasMore}finally{loadingMoreNormal=false}}
-    LaunchedEffect(listState, pagingMode, hasNewer, newerCursor) { var movedAwayFromWindowTop=false; snapshotFlow { CloudWindowScrollProbe(listState.firstVisibleItemIndex,listState.firstVisibleItemScrollOffset,listIsDragged,listState.lastScrolledBackward) }.distinctUntilChanged().collect { state -> if(state.index>0||state.offset>=300)movedAwayFromWindowTop=true;if(state.dragged&&movedAwayFromWindowTop&&state.scrollingBackward&&pagingMode==CloudPagingMode.WINDOW&&hasNewer&&state.index==0&&state.offset<300){movedAwayFromWindowTop=false;loadWindowNewer()} } }
+    val windowNewerNestedScroll = remember(pagingMode, hasNewer, newerCursor, loadingWindowNewer) {
+        object : NestedScrollConnection {
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (source == NestedScrollSource.UserInput && available.y > 0f && pagingMode == CloudPagingMode.WINDOW && hasNewer && newerCursor != null && !loadingWindowNewer && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
+                    scope.launch { loadWindowNewer() }
+                }
+                return Offset.Zero
+            }
+        }
+    }
     LaunchedEffect(listState,pagingMode,hasMore){snapshotFlow{val info=listState.layoutInfo;Pair(info.visibleItemsInfo.lastOrNull()?.index?:0,info.totalItemsCount)}.distinctUntilChanged().collect{(last,total)->if(pagingMode==CloudPagingMode.NORMAL&&hasMore&&last>=(total-CLOUD_PREFETCH_LAZY_ITEMS).coerceAtLeast(0))loadNextNormalPage()}}
     LaunchedEffect(listState,pagingMode,hasOlder,olderCursor){snapshotFlow{val info=listState.layoutInfo;Pair(info.visibleItemsInfo.lastOrNull()?.index?:0,info.totalItemsCount)}.distinctUntilChanged().collect{(last,total)->if(pagingMode==CloudPagingMode.WINDOW&&hasOlder&&olderCursor!=null&&last>=(total-CLOUD_PREFETCH_LAZY_ITEMS).coerceAtLeast(0))loadWindowOlder()}}
 
@@ -371,7 +381,7 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                 else BoxWithConstraints(Modifier.fillMaxSize().padding(top = if (selectedAlbum != null || cloudView == CloudView.TRASH) 52.dp else 0.dp)) {
                     val availableWidth = maxWidth.value
                     val justifiedRowsByDay = remember(groups, availableWidth) { buildMap { groups.forEach { period -> period.days.forEach { day -> put("${period.key}:${day.key}", buildJustifiedRows(day.photos, availableWidth)) } } } }
-                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 2.dp)) {
+                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize().nestedScroll(windowNewerNestedScroll), contentPadding = PaddingValues(vertical = 2.dp)) {
                         groups.forEachIndexed { periodIndex, period ->
                             item(key = "period:${period.key}", contentType = "period-header") { Text(period.label, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = if (periodIndex == 0) 10.dp else 20.dp, bottom = 6.dp)) }
                             period.days.forEach { day ->
@@ -594,6 +604,14 @@ private fun CloudTimeline(years: List<CloudTimelineYear>, activePeriod: String?,
             periods.minByOrNull { abs(it.center - progress) }?.let { scrubProgress = progress; previewPeriod = it }
         }
         Box(Modifier.fillMaxSize()) {
+            Box(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(44.dp).pointerInput(periods) {
+                detectVerticalDragGestures(
+                    onDragStart = { offset -> dragging = true; update(offset.y) },
+                    onVerticalDrag = { change, _ -> change.consume(); update(change.position.y) },
+                    onDragEnd = { onSelected(previewPeriod.item); dragging = false },
+                    onDragCancel = { dragging = false },
+                )
+            })
             if (dragging) {
             Box(Modifier.align(Alignment.CenterEnd).padding(end = 14.dp).width(1.dp).fillMaxHeight().padding(vertical = 10.dp).background(MaterialTheme.colorScheme.outlineVariant))
             periods.forEach { period -> val activeDot = period.item.key == activePeriod; Box(Modifier.align(Alignment.TopEnd).padding(end = if (activeDot) 11.dp else 12.dp).offset(y = trackHeight * period.center + 10.dp - if (activeDot) 3.dp else 2.dp).size(if (activeDot) 6.dp else 4.dp).background(if (activeDot) MaterialTheme.colorScheme.primary else Color(0x7A475569), CircleShape)) }
@@ -602,7 +620,7 @@ private fun CloudTimeline(years: List<CloudTimelineYear>, activePeriod: String?,
                 Text(yearItem.year.toString(), fontSize = 11.sp, lineHeight = 12.sp, style = MaterialTheme.typography.labelMedium, fontWeight = if (activeYear) FontWeight.Bold else FontWeight.SemiBold, color = if (activeYear) MaterialTheme.colorScheme.primary else Color(0xFF334155), modifier = Modifier.align(Alignment.TopEnd).padding(end = 30.dp).offset(y = trackHeight * yearItem.center + 10.dp - 7.dp).background(Color.White.copy(alpha = .96f), RoundedCornerShape(9.dp)).border(1.dp, Color(0xFFDCE3F5), RoundedCornerShape(9.dp)).padding(horizontal = 4.dp, vertical = 1.dp))
             }
             }
-            if (thumbVisible || dragging) Box(Modifier.align(Alignment.TopEnd).offset(y = trackHeight * scrubProgress + 10.dp - 32.dp).size(width = 44.dp, height = 64.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp, topEnd = 0.dp, bottomEnd = 0.dp)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp, topEnd = 0.dp, bottomEnd = 0.dp)).pointerInput(periods) { detectVerticalDragGestures(onDragStart = { dragging = true }, onVerticalDrag = { change, dragAmount -> change.consume(); val nextProgress = (scrubProgress + dragAmount / maxHeightPx).coerceIn(0f, 1f); periods.minByOrNull { abs(it.center - nextProgress) }?.let { scrubProgress = nextProgress; previewPeriod = it } }, onDragEnd = { onSelected(previewPeriod.item); dragging = false }, onDragCancel = { dragging = false }) }, contentAlignment = Alignment.CenterStart) { Column(Modifier.padding(start = 13.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { repeat(3) { Box(Modifier.width(12.dp).height(2.dp).background(Color(0xFF64748B))) } } }
+            if (thumbVisible || dragging) Box(Modifier.align(Alignment.TopEnd).offset(y = trackHeight * scrubProgress + 10.dp - 32.dp).size(width = 44.dp, height = 64.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp, topEnd = 0.dp, bottomEnd = 0.dp)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp, topEnd = 0.dp, bottomEnd = 0.dp)), contentAlignment = Alignment.CenterStart) { Column(Modifier.padding(start = 13.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { repeat(3) { Box(Modifier.width(12.dp).height(2.dp).background(Color(0xFF64748B))) } } }
             if (dragging) Text(timelineMonthLabel(previewPeriod.item), style = MaterialTheme.typography.titleSmall, modifier = Modifier.align(Alignment.TopEnd).offset(x = (-52).dp, y = trackHeight * scrubProgress + 10.dp - 22.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(22.dp)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(22.dp)).padding(horizontal = 13.dp, vertical = 10.dp))
         }
     }
