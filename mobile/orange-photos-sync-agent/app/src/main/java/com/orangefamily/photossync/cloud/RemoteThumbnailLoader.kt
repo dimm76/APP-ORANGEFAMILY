@@ -49,9 +49,12 @@ class RemoteThumbnailLoader {
                 val status = connection.responseCode
                 val responseAt = SystemClock.elapsedRealtime()
                 if (status !in 200..299) return@withPermit null
-                val bitmap = connection.inputStream.use { BitmapFactory.decodeStream(it) }
+                val bodyStartedAt = SystemClock.elapsedRealtime()
+                val bytes = connection.inputStream.use { it.readBytes() }
+                val bodyReadAt = SystemClock.elapsedRealtime()
+                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                 val decodedAt = SystemClock.elapsedRealtime()
-                Log.d(TAG, "source=network status=$status queue_ms=${startedAt - queuedAt} response_ms=${responseAt - startedAt} decode_ms=${decodedAt - responseAt} total_ms=${decodedAt - startedAt}")
+                Log.d(TAG, "source=network status=$status queue_ms=${startedAt - queuedAt} response_ms=${responseAt - startedAt} body_ms=${bodyReadAt - bodyStartedAt} decode_ms=${decodedAt - bodyReadAt} body_bytes=${bytes.size} total_ms=${decodedAt - startedAt}")
                 bitmap?.also { cache.put(key, it) }
             } catch (_: Exception) { null } finally { connection.disconnect() }
         }
