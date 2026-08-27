@@ -16,7 +16,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
         if (it.endsWith('/')) it else "$it/"
     }
 
-    suspend fun photos(page: Int = 1, perPage: Int = 100, albumId: String? = null, trashed: Boolean = false, sharedWithMe: Boolean = false): CloudPhotoPage = withContext(Dispatchers.IO) {
+    suspend fun photos(page: Int = 1, perPage: Int = 100, albumId: String? = null, trashed: Boolean = false, sharedWithMe: Boolean = false, includeTotal: Boolean = true): CloudPhotoPage = withContext(Dispatchers.IO) {
         val albumQuery = albumId?.takeIf { it.isNotBlank() }?.let { "&album_id=${encode(it)}" }.orEmpty()
         val accessQuery = when {
             trashed -> "&trashed=true&library_scope=owned"
@@ -24,7 +24,8 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
             sharedWithMe -> "&access_sources=direct,album&library_scope=shared_with_me"
             else -> "&access_sources=owned,library"
         }
-        request("${baseUrl}api/orange-photos?page=$page&per_page=$perPage$albumQuery$accessQuery", "No se pudo cargar la biblioteca.") { json ->
+        val totalQuery = if (includeTotal) "" else "&include_total=false"
+        request("${baseUrl}api/orange-photos?page=$page&per_page=$perPage$albumQuery$accessQuery$totalQuery", "No se pudo cargar la biblioteca.") { json ->
             val values = json.optJSONArray("items") ?: throw CloudApiException(200, "La respuesta no contiene elementos.")
             val items = buildList { for (index in 0 until values.length()) values.optJSONObject(index)?.let(::parsePhoto)?.let(::add) }
             CloudPhotoPage(items, json.optInt("page", page), json.optInt("per_page", perPage), json.optInt("total", items.size), json.optBoolean("has_more", false))

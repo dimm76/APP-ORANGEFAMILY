@@ -85,6 +85,7 @@ private enum class CloudAlbumSortMode {
 private fun cloudPeriodKeyFromLazyItemKey(key: Any?): String? { val value=key as? String ?: return null; val payload=when { value.startsWith("period:")->value.removePrefix("period:");value.startsWith("day:")->value.removePrefix("day:");value.startsWith("row:")->value.removePrefix("row:");else->return null };val periodKey=payload.substringBefore(":");return periodKey.takeIf{it.length==7&&it.getOrNull(4)=='-'} }
 private const val MAX_CLOUD_BULK_SELECTION=500
 private const val CLOUD_PAGE_SIZE=30
+private const val CLOUD_PREFETCH_LAZY_ITEMS=8
 private fun cloudActionIcon(name: String, draw: PathBuilder.() -> Unit): ImageVector = ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).apply { path(fill = SolidColor(Color.Transparent), stroke = SolidColor(Color.Black), strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) { draw() } }.build()
 private val CloudAlbumActionIcon = cloudActionIcon("CloudAlbum") { moveTo(3f, 6f); horizontalLineTo(10f); lineTo(12f, 8f); horizontalLineTo(21f); verticalLineTo(19f); horizontalLineTo(3f); close() }
 private val CloudDownloadActionIcon = cloudActionIcon("CloudDownload") { moveTo(12f, 3f); verticalLineTo(15f); moveTo(7f, 10f); lineTo(12f, 15f); lineTo(17f, 10f); moveTo(4f, 19f); horizontalLineTo(20f) }
@@ -140,6 +141,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     var activePeriod by remember { mutableStateOf<String?>(null) }
     var timelineRequestGeneration by remember { mutableIntStateOf(0) }
     var loadingWindowNewer by remember { mutableStateOf(false) }
+    var loadingWindowOlder by remember { mutableStateOf(false) }
     var loadingMoreNormal by remember { mutableStateOf(false) }
     var pagingMode by remember { mutableStateOf(CloudPagingMode.NORMAL) }
     var timelineThumbVisible by remember { mutableStateOf(false) }
@@ -178,7 +180,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
         if (cloudView == CloudView.ALBUMS) { loading = false; return }
         loading = true; error = null
         if (cloudView == CloudView.TRASH) {
-            runCatching { api.photos(perPage = CLOUD_PAGE_SIZE, trashed = true) }
+            runCatching { api.photos(perPage = CLOUD_PAGE_SIZE, trashed = true, includeTotal = false) }
                 .onSuccess { photos -> items = photos.items; page = photos.page; hasMore = photos.hasMore; hasNewer = false; newerCursor = null; hasOlder = false; olderCursor = null; pagingMode = CloudPagingMode.NORMAL; timeline = emptyList() }
                 .onFailure { error = it.message ?: "No se pudo cargar la papelera." }
             loading = false
@@ -192,6 +194,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
                 perPage = CLOUD_PAGE_SIZE,
                 albumId = albumId,
                 sharedWithMe = sharedWithMe,
+                includeTotal = false,
             )
         }
         photosResult
@@ -250,12 +253,14 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
         val cursor = period.cursor ?: return
         val generation = timelineRequestGeneration + 1
         timelineRequestGeneration = generation
+        val previousActivePeriod = activePeriod
+        activePeriod = period.key
         try {
-            val result = api.aroundDate(cursor, activeAlbumId(), sharedWithMe = cloudView == CloudView.SHARED_WITH_ME)
+            val result = api.aroundDate(cursor, activeAlbumId(), perPage = CLOUD_PAGE_SIZE, sharedWithMe = cloudView == CloudView.SHARED_WITH_ME)
             if (generation != timelineRequestGeneration) return
             items = result.items; page = 1; pagingMode = CloudPagingMode.WINDOW; hasMore = false; hasNewer = result.hasNewer; newerCursor = result.newerCursor; hasOlder = result.hasOlder; olderCursor = result.olderCursor; activePeriod = period.key; listState.scrollToItem(0)
         } catch (error: Exception) {
-            bulkMessage = error.message ?: "No se pudo cargar el periodo."
+            if (generation == timelineRequestGeneration) { activePeriod = previousActivePeriod; bulkMessage = error.message ?: "No se pudo cargar el periodo." }
         }
     }
 
@@ -263,24 +268,28 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
         if (pagingMode != CloudPagingMode.WINDOW || !hasNewer || loadingWindowNewer) return
         val cursor = newerCursor ?: return
         loadingWindowNewer = true
-        try { val result = api.aroundDate(cursor, activeAlbumId(), "newer", sharedWithMe = cloudView == CloudView.SHARED_WITH_ME); if (result.items.isEmpty()) { hasNewer = false; return }; items = (result.items + items).distinctBy { it.id }; hasNewer = result.hasNewer; newerCursor = result.newerCursor } catch (error: Exception) { bulkMessage = error.message ?: "No se pudo cargar el periodo." } finally { loadingWindowNewer = false }
+        try { val result = api.aroundDate(cursor, activeAlbumId(), "newer", perPage = CLOUD_PAGE_SIZE, sharedWithMe = cloudView == CloudView.SHARED_WITH_ME); if (result.items.isEmpty()) { hasNewer = false; return }; items = (result.items + items).distinctBy { it.id }; hasNewer = result.hasNewer; newerCursor = result.newerCursor } catch (error: Exception) { bulkMessage = error.message ?: "No se pudo cargar el periodo." } finally { loadingWindowNewer = false }
     }
 
     suspend fun loadWindowOlder() {
-        if (pagingMode != CloudPagingMode.WINDOW || !hasOlder) return
+        if (pagingMode != CloudPagingMode.WINDOW || !hasOlder || loadingWindowOlder) return
         val cursor = olderCursor ?: return
+        loadingWindowOlder = true
         try {
-            val result = api.aroundDate(cursor, activeAlbumId(), "older", sharedWithMe = cloudView == CloudView.SHARED_WITH_ME)
+            val result = api.aroundDate(cursor, activeAlbumId(), "older", perPage = CLOUD_PAGE_SIZE, sharedWithMe = cloudView == CloudView.SHARED_WITH_ME)
             items = (items + result.items).distinctBy { it.id }
             hasOlder = result.hasOlder
             olderCursor = result.olderCursor
         } catch (error: Exception) {
             bulkMessage = error.message ?: "No se pudo cargar el periodo."
+        } finally {
+            loadingWindowOlder = false
         }
     }
-    suspend fun loadNextNormalPage(){if(pagingMode!=CloudPagingMode.NORMAL||!hasMore||loadingMoreNormal)return;loadingMoreNormal=true;try{val result=api.photos(page+1,perPage=CLOUD_PAGE_SIZE,albumId=activeAlbumId(),trashed=cloudView==CloudView.TRASH,sharedWithMe=cloudView==CloudView.SHARED_WITH_ME);items=(items+result.items).distinctBy{it.id};page=result.page;hasMore=result.hasMore}finally{loadingMoreNormal=false}}
+    suspend fun loadNextNormalPage(){if(pagingMode!=CloudPagingMode.NORMAL||!hasMore||loadingMoreNormal)return;loadingMoreNormal=true;try{val result=api.photos(page+1,perPage=CLOUD_PAGE_SIZE,albumId=activeAlbumId(),trashed=cloudView==CloudView.TRASH,sharedWithMe=cloudView==CloudView.SHARED_WITH_ME,includeTotal=false);items=(items+result.items).distinctBy{it.id};page=result.page;hasMore=result.hasMore}finally{loadingMoreNormal=false}}
     LaunchedEffect(listState, pagingMode, hasNewer, newerCursor) { var movedAwayFromWindowTop=false; snapshotFlow { CloudWindowScrollProbe(listState.firstVisibleItemIndex,listState.firstVisibleItemScrollOffset,listIsDragged,listState.lastScrolledBackward) }.distinctUntilChanged().collect { state -> if(state.index>0||state.offset>=300)movedAwayFromWindowTop=true;if(state.dragged&&movedAwayFromWindowTop&&state.scrollingBackward&&pagingMode==CloudPagingMode.WINDOW&&hasNewer&&state.index==0&&state.offset<300){movedAwayFromWindowTop=false;loadWindowNewer()} } }
-    LaunchedEffect(listState,pagingMode,hasMore){snapshotFlow{val info=listState.layoutInfo;Pair(info.visibleItemsInfo.lastOrNull()?.index?:0,info.totalItemsCount)}.distinctUntilChanged().collect{(last,total)->if(pagingMode==CloudPagingMode.NORMAL&&hasMore&&last>=total-2)loadNextNormalPage()}}
+    LaunchedEffect(listState,pagingMode,hasMore){snapshotFlow{val info=listState.layoutInfo;Pair(info.visibleItemsInfo.lastOrNull()?.index?:0,info.totalItemsCount)}.distinctUntilChanged().collect{(last,total)->if(pagingMode==CloudPagingMode.NORMAL&&hasMore&&last>=(total-CLOUD_PREFETCH_LAZY_ITEMS).coerceAtLeast(0))loadNextNormalPage()}}
+    LaunchedEffect(listState,pagingMode,hasOlder,olderCursor){snapshotFlow{val info=listState.layoutInfo;Pair(info.visibleItemsInfo.lastOrNull()?.index?:0,info.totalItemsCount)}.distinctUntilChanged().collect{(last,total)->if(pagingMode==CloudPagingMode.WINDOW&&hasOlder&&olderCursor!=null&&last>=(total-CLOUD_PREFETCH_LAZY_ITEMS).coerceAtLeast(0))loadWindowOlder()}}
 
 if(albumDialogOpen){val selectableAlbums=albums.filter{(it.isOwner||it.canContribute)&&(cloudView!=CloudView.ALBUM_DETAIL||it.id!=selectedAlbum?.id)};val filteredAlbums=selectableAlbums.filter{albumSearchQuery.isBlank()||it.title.contains(albumSearchQuery.trim(),ignoreCase=true)};AlertDialog(onDismissRequest={if(!bulkBusy&&!albumCreating)albumDialogOpen=false},title={Text("Añadir a álbum")},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){OutlinedTextField(value=albumSearchQuery,onValueChange={albumSearchQuery=it},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("Buscar álbum")});TextButton(enabled=!bulkBusy&&!albumCreating,onClick={newAlbumTitle="";createAlbumDialogOpen=true}){Icon(CloudAlbumActionIcon,null,Modifier.size(20.dp));Spacer(Modifier.width(6.dp));Text("Crear álbum")};if(selectableAlbums.isEmpty())Text("No hay álbumes disponibles para añadir contenido.") else if(filteredAlbums.isEmpty())Text("No hay álbumes que coincidan con la búsqueda.") else LazyColumn(modifier=Modifier.fillMaxWidth().heightIn(max=360.dp)){items(items=filteredAlbums,key={it.id}){album->Row(modifier=Modifier.fillMaxWidth().clickable{targetAlbumId=album.id}.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically){RadioButton(selected=targetAlbumId==album.id,onClick={targetAlbumId=album.id});Text(text=album.title,modifier=Modifier.weight(1f),maxLines=2,overflow=TextOverflow.Ellipsis)}}}}},confirmButton={TextButton(enabled=!bulkBusy&&!targetAlbumId.isNullOrBlank()&&selected.size<=MAX_CLOUD_BULK_SELECTION,onClick={runBulk{val id=targetAlbumId!!;val targetAlbum=albums.firstOrNull{it.id==id};val targetAlbumTitle=targetAlbum?.title?.takeIf{it.isNotBlank()}?:"el álbum";var addedCount=0;selectedPhotos.forEach{photo->if(api.addPhotoToAlbum(id,photo.id))addedCount+=1};albums=api.albums();albumDialogOpen=false;val message=when{addedCount==0->"Los elementos seleccionados ya estaban en «$targetAlbumTitle».";addedCount==selectedPhotos.size&&addedCount==1->"1 elemento añadido a «$targetAlbumTitle».";addedCount==selectedPhotos.size->"$addedCount elementos añadidos a «$targetAlbumTitle».";else->"$addedCount de ${selectedPhotos.size} elementos añadidos a «$targetAlbumTitle»."};Toast.makeText(context,message,Toast.LENGTH_LONG).show()}}){Text("Añadir")}},dismissButton={TextButton(onClick={if(!bulkBusy&&!albumCreating)albumDialogOpen=false}){Text("Cancelar")}})}
 if(createAlbumDialogOpen)AlertDialog(onDismissRequest={if(!albumCreating)createAlbumDialogOpen=false},title={Text("Crear álbum")},text={OutlinedTextField(value=newAlbumTitle,onValueChange={newAlbumTitle=it.take(500)},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("Nombre del álbum")})},confirmButton={TextButton(enabled=!albumCreating&&newAlbumTitle.trim().isNotEmpty(),onClick={albumCreating=true;scope.launch{runCatching{val createdAlbumId=api.createAlbum(newAlbumTitle.trim());val refreshedAlbums=api.albums();createdAlbumId to refreshedAlbums}.onSuccess{(createdAlbumId,refreshedAlbums)->albums=refreshedAlbums;targetAlbumId=createdAlbumId;albumSearchQuery="";newAlbumTitle="";createAlbumDialogOpen=false}.onFailure{error->bulkMessage=error.message?:"No se pudo crear el álbum."};albumCreating=false}}){Text("Crear")}},dismissButton={TextButton(enabled=!albumCreating,onClick={createAlbumDialogOpen=false}){Text("Cancelar")}})
@@ -390,7 +399,7 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                                         }
                                     }
                         }
-                        if (pagingMode == CloudPagingMode.WINDOW && hasOlder && olderCursor != null) item(key = "window-load-older") { LaunchedEffect(olderCursor) { loadWindowOlder() } }
+                        if (pagingMode == CloudPagingMode.WINDOW && loadingWindowOlder) item(key = "window-loading-older") { Text("Cargando…") }
                     }
                 if (cloudView != CloudView.TRASH && timeline.isNotEmpty()) Box(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(68.dp)) { CloudTimeline(timeline, activePeriod, timelineThumbVisible) { scope.launch { jumpToPeriod(it) } } }
                 }
@@ -572,16 +581,10 @@ private fun CloudTimeline(years: List<CloudTimelineYear>, activePeriod: String?,
     val timelineYears = remember(periods) { weightedTimelineYears(periods) }
     val active = periods.firstOrNull { it.item.key == activePeriod }
     var dragging by remember { mutableStateOf(false) }
-    var scrubRequestVersion by remember { mutableIntStateOf(0) }
     var scrubProgress by remember { mutableStateOf(active?.center ?: periods.first().center) }
     var previewPeriod by remember { mutableStateOf(active ?: periods.first()) }
     LaunchedEffect(activePeriod, periods, dragging) {
         if (!dragging) periods.firstOrNull { it.item.key == activePeriod }?.let { scrubProgress = it.center; previewPeriod = it }
-    }
-    LaunchedEffect(scrubRequestVersion) {
-        if (scrubRequestVersion <= 0) return@LaunchedEffect
-        delay(140)
-        if (dragging) onSelected(previewPeriod.item)
     }
     BoxWithConstraints(Modifier.fillMaxHeight().width(68.dp)) {
         val trackHeight = maxHeight - 20.dp
@@ -599,7 +602,7 @@ private fun CloudTimeline(years: List<CloudTimelineYear>, activePeriod: String?,
                 Text(yearItem.year.toString(), fontSize = 11.sp, lineHeight = 12.sp, style = MaterialTheme.typography.labelMedium, fontWeight = if (activeYear) FontWeight.Bold else FontWeight.SemiBold, color = if (activeYear) MaterialTheme.colorScheme.primary else Color(0xFF334155), modifier = Modifier.align(Alignment.TopEnd).padding(end = 30.dp).offset(y = trackHeight * yearItem.center + 10.dp - 7.dp).background(Color.White.copy(alpha = .96f), RoundedCornerShape(9.dp)).border(1.dp, Color(0xFFDCE3F5), RoundedCornerShape(9.dp)).padding(horizontal = 4.dp, vertical = 1.dp))
             }
             }
-            if (thumbVisible || dragging) Box(Modifier.align(Alignment.TopEnd).offset(y = trackHeight * scrubProgress + 10.dp - 32.dp).size(width = 44.dp, height = 64.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp, topEnd = 0.dp, bottomEnd = 0.dp)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp, topEnd = 0.dp, bottomEnd = 0.dp)).pointerInput(periods) { detectVerticalDragGestures(onDragStart = { dragging = true }, onVerticalDrag = { change, dragAmount -> change.consume(); val nextProgress = (scrubProgress + dragAmount / maxHeightPx).coerceIn(0f, 1f); periods.minByOrNull { abs(it.center - nextProgress) }?.let { scrubProgress = nextProgress; previewPeriod = it }; scrubRequestVersion += 1 }, onDragEnd = { onSelected(previewPeriod.item); dragging = false }, onDragCancel = { dragging = false }) }, contentAlignment = Alignment.CenterStart) { Column(Modifier.padding(start = 13.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { repeat(3) { Box(Modifier.width(12.dp).height(2.dp).background(Color(0xFF64748B))) } } }
+            if (thumbVisible || dragging) Box(Modifier.align(Alignment.TopEnd).offset(y = trackHeight * scrubProgress + 10.dp - 32.dp).size(width = 44.dp, height = 64.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp, topEnd = 0.dp, bottomEnd = 0.dp)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp, topEnd = 0.dp, bottomEnd = 0.dp)).pointerInput(periods) { detectVerticalDragGestures(onDragStart = { dragging = true }, onVerticalDrag = { change, dragAmount -> change.consume(); val nextProgress = (scrubProgress + dragAmount / maxHeightPx).coerceIn(0f, 1f); periods.minByOrNull { abs(it.center - nextProgress) }?.let { scrubProgress = nextProgress; previewPeriod = it } }, onDragEnd = { onSelected(previewPeriod.item); dragging = false }, onDragCancel = { dragging = false }) }, contentAlignment = Alignment.CenterStart) { Column(Modifier.padding(start = 13.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { repeat(3) { Box(Modifier.width(12.dp).height(2.dp).background(Color(0xFF64748B))) } } }
             if (dragging) Text(timelineMonthLabel(previewPeriod.item), style = MaterialTheme.typography.titleSmall, modifier = Modifier.align(Alignment.TopEnd).offset(x = (-52).dp, y = trackHeight * scrubProgress + 10.dp - 22.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(22.dp)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(22.dp)).padding(horizontal = 13.dp, vertical = 10.dp))
         }
     }
