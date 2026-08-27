@@ -31,6 +31,41 @@ gzip_types application/json;
 gzip_vary on;
 ```
 
+`gzip on;` está habilitado a nivel global de Nginx. Estas directivas
+permiten que las respuestas `application/json` de `/api/` se entreguen
+comprimidas cuando el cliente admite gzip.
+
+La configuración puede validarse con:
+
+```bash
+curl -sS -D - -o /dev/null \
+  -H 'Accept-Encoding: gzip' \
+  https://family.orangedesk.net/api/health
+```
+
+La respuesta debe incluir:
+
+```text
+Vary: Accept-Encoding
+Content-Encoding: gzip
+```
+
+El workflow de despliegue de OrangeFamily no gestiona esta configuración
+de Nginx. Si se modifica o recrea el virtual host, estas directivas deben
+conservarse.
+
+Antes de aplicar cambios en Nginx:
+
+```bash
+sudo nginx -t
+```
+
+Después de una validación correcta:
+
+```bash
+sudo systemctl reload nginx
+```
+
 El DNS del dominio debe mantener un registro `A` hacia `141.95.179.205`. No se
 documenta una dirección IPv6 concreta porque no se ha proporcionado ninguna.
 Solo debe existir un registro `AAAA` si el VPS tiene una IPv6 asignada y
