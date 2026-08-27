@@ -191,9 +191,10 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
             val responseAt = SystemClock.elapsedRealtime()
             val body = (if (status in 200..299) connection.inputStream else connection.errorStream)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
             val bodyReadAt = SystemClock.elapsedRealtime()
+            val bodyBytes = body.toByteArray(Charsets.UTF_8).size
             val json = runCatching { JSONObject(body) }.getOrElse { throw CloudApiException(status, "Respuesta no válida del servidor.") }
             val parsedAt = SystemClock.elapsedRealtime()
-            if (measure) Log.d(TAG, "path=$path status=$status response_ms=${responseAt - startedAt} body_ms=${bodyReadAt - responseAt} parse_ms=${parsedAt - bodyReadAt} total_ms=${parsedAt - startedAt}")
+            if (measure) Log.d(TAG, "path=$path status=$status response_ms=${responseAt - startedAt} body_ms=${bodyReadAt - responseAt} parse_ms=${parsedAt - bodyReadAt} body_bytes=$bodyBytes total_ms=${parsedAt - startedAt}")
             if (status !in 200..299 || !json.optBoolean("ok", false)) throw CloudApiException(status, json.optString("message").takeIf { it.isNotBlank() } ?: fallback)
             return parse(json)
         } catch (error: CloudApiException) { throw error } catch (error: IOException) { throw CloudApiException(0, "No se pudo conectar con OrangeFamily.", error) } finally { connection.disconnect() }
