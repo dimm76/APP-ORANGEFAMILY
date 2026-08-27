@@ -210,8 +210,9 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
                         error,
                     )
                 }
+
+                OrangePhotosUploadProgress.update(OrangePhotosUploadProgress.state.value.copy(running=false,itemId=null,bytesSent=0,totalBytes=0))
             }
-            OrangePhotosUploadProgress.update(OrangePhotosUploadProgress.state.value.copy(running=false,itemId=null,bytesSent=0,totalBytes=0))
         }
     }
 
