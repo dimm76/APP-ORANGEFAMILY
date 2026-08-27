@@ -31,7 +31,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
             else -> "&access_sources=owned,library"
         }
         val totalQuery = if (includeTotal) "" else "&include_total=false"
-        request("${baseUrl}api/orange-photos?page=$page&per_page=$perPage$albumQuery$accessQuery$totalQuery", "No se pudo cargar la biblioteca.") { json ->
+        request("${baseUrl}api/orange-photos?page=$page&per_page=$perPage$albumQuery$accessQuery$totalQuery&compact=true", "No se pudo cargar la biblioteca.") { json ->
             val values = json.optJSONArray("items") ?: throw CloudApiException(200, "La respuesta no contiene elementos.")
             val items = buildList { for (index in 0 until values.length()) values.optJSONObject(index)?.let(::parsePhoto)?.let(::add) }
             CloudPhotoPage(items, json.optInt("page", page), json.optInt("per_page", perPage), json.optInt("total", items.size), json.optBoolean("has_more", false))
@@ -73,6 +73,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
                 else -> append("&access_sources=owned,library")
             }
             direction?.takeIf { it == "newer" || it == "older" }?.let { append("&direction=$it") }
+            append("&compact=true")
         }
         request("${baseUrl}api/orange-photos/around-date?$query", "No se pudo cargar el periodo.") { json ->
             val values = json.optJSONArray("items")

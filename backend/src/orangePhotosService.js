@@ -518,11 +518,40 @@ async function buildPhotoQuery(req, queryOverride = null) {
   return ok({ auth, q, values, joins, condition: `WHERE ${where.join(" AND ")}` });
 }
 
-async function signPhotoFiles(rows) {
+async function signPhotoFiles(rows, options = {}) {
   const files = rows.length ? (await pool.query(`SELECT photo_id,variant,bucket,object_key,width,height FROM public.orange_photo_files WHERE photo_id=ANY($1::uuid[]) AND variant IN ('thumbnail','preview','original','poster','playback')`, [rows.map(row => row.id)])).rows : [], by = new Map();
+  const compact = options.compact === true;
   const shares = rows.length ? (await pool.query(`SELECT photo_id,owner_user_id,array_agg(user_id) user_ids FROM public.orange_photo_shares WHERE photo_id=ANY($1::uuid[]) GROUP BY photo_id,owner_user_id`, [rows.map(row => row.id)])).rows : [], sharedBy = new Map(shares.map(row => [`${row.photo_id}:${row.owner_user_id}`, row.user_ids]));
   for (const file of files) { const key = String(file.photo_id); if (!by.has(key)) by.set(key, {}); by.get(key)[file.variant] = file; }
-  await Promise.all(rows.map(async row => { const variants=by.get(String(row.id))||{},thumbnail=variants.thumbnail,preview=variants.preview,poster=variants.poster,playback=variants.playback;row.thumbnail_url=thumbnail?await getSignedOrangePhotoUrl(thumbnail):null;row.thumbnail_width=thumbnail?.width??null;row.thumbnail_height=thumbnail?.height??null;row.preview_url=row.media_type==="image"&&preview?await getSignedOrangePhotoUrl(preview):null;row.poster_url=row.media_type==="video"&&poster?await getSignedOrangePhotoUrl(poster):null;row.video_preview_url=row.media_type==="video"&&preview?await getSignedOrangePhotoUrl(preview):null;row.video_playback_url=row.media_type==="video"&&playback?await getSignedOrangePhotoUrl(playback):null;row.original_url=variants.original?await getSignedOrangePhotoUrl(variants.original):null;const copyOwner=row.copy_owner_user_id||row.owner_user_id;row.shared_user_ids=sharedBy.get(`${row.id}:${copyOwner}`)||[];row.albums=row.albums||[];row.tags=row.tags||[];}));
+  await Promise.all(rows.map(async row => { const variants=by.get(String(row.id))||{},thumbnail=variants.thumbnail,preview=variants.preview,poster=variants.poster,playback=variants.playback;row.thumbnail_url=thumbnail?await getSignedOrangePhotoUrl(thumbnail):null;row.thumbnail_width=thumbnail?.width??null;row.thumbnail_height=thumbnail?.height??null;if(compact){if(row.media_type==="image"){row.preview_url=preview?await getSignedOrangePhotoUrl(preview):row.original_url=variants.original?await getSignedOrangePhotoUrl(variants.original):null;}else{row.thumbnail_url=thumbnail?await getSignedOrangePhotoUrl(thumbnail):poster?await getSignedOrangePhotoUrl(poster):null;row.video_playback_url=playback?await getSignedOrangePhotoUrl(playback):row.original_url=variants.original?await getSignedOrangePhotoUrl(variants.original):null;}}else{row.preview_url=row.media_type==="image"&&preview?await getSignedOrangePhotoUrl(preview):null;row.poster_url=row.media_type==="video"&&poster?await getSignedOrangePhotoUrl(poster):null;row.video_preview_url=row.media_type==="video"&&preview?await getSignedOrangePhotoUrl(preview):null;row.video_playback_url=row.media_type==="video"&&playback?await getSignedOrangePhotoUrl(playback):null;row.original_url=variants.original?await getSignedOrangePhotoUrl(variants.original):null;}const copyOwner=row.copy_owner_user_id||row.owner_user_id;row.shared_user_ids=sharedBy.get(`${row.id}:${copyOwner}`)||[];row.albums=row.albums||[];row.tags=row.tags||[];}));
+}
+
+function compactPhotoListItem(row) {
+  return {
+    id: row.id,
+    media_type: row.media_type,
+    title: row.title ?? null,
+    original_filename: row.original_filename ?? null,
+    captured_at: row.captured_at ?? null,
+    width: row.width ?? null,
+    height: row.height ?? null,
+    duration_seconds: row.duration_seconds ?? null,
+    thumbnail_url: row.thumbnail_url ?? null,
+    preview_url: row.preview_url ?? null,
+    poster_url: row.poster_url ?? null,
+    video_playback_url: row.video_playback_url ?? null,
+    original_url: row.original_url ?? null,
+    owner_user_id: row.owner_user_id ?? null,
+    is_original_owner: row.is_original_owner === true,
+    is_owner: row.is_owner === true,
+    is_in_library: row.is_in_library === true,
+    access_source: row.access_source ?? null,
+    visibility: row.visibility ?? "private",
+    is_shared_effectively: row.is_shared_effectively === true,
+    shared_by_display_name: row.shared_by_display_name ?? null,
+    is_favorite: row.is_favorite === true,
+    mime_type: row.mime_type ?? null,
+  };
 }
 
 async function listSafe(req, queryOverride = null, options = {}) {
@@ -530,6 +559,7 @@ async function listSafe(req, queryOverride = null, options = {}) {
   const context = await buildPhotoQuery(req, queryOverride); if (!context.ok) return context;
   const queryBuiltAt = Date.now();
   const { q, values, joins, condition } = context.payload, page = Math.max(1, Number(q.page) || 1), per = Math.min(100, Math.max(1, Number(q.per_page) || 30));
+  const compact = ["true", "1"].includes(String(q.compact ?? "").toLowerCase());
   const includeTotal = options.includeTotal !== false && !["false", "0"].includes(String(q.include_total ?? "").toLowerCase());
   const total = includeTotal ? Number((await pool.query(`SELECT count(*)::int total ${joins} ${condition}`, values)).rows[0].total) : null;
   const pagedValues = [...values, includeTotal ? per : per + 1, (page - 1) * per];
@@ -539,7 +569,7 @@ async function listSafe(req, queryOverride = null, options = {}) {
   const resultRows = includeTotal || rows.length <= per ? rows : rows.slice(0, per);
   const hasMore = includeTotal ? page * per < total : rows.length > per;
   if (options.ascending) resultRows.reverse();
-  for(const row of resultRows)applyEffectiveCopyFields(row);await signPhotoFiles(resultRows);const signedAt = Date.now();for(const row of resultRows){if(!row.is_owner&&row.visibility==='selected')row.is_shared_directly=row.shared_user_ids.map(String).includes(String(context.payload.auth.userId));augmentAuthenticatedPhoto(row,context.payload.auth.userId);}console.info("OrangePhotos list performance",{access_sources:String(q.access_sources||""),page,per_page:per,include_total:includeTotal,build_ms:queryBuiltAt-startedAt,query_ms:rowsLoadedAt-queryBuiltAt,signing_ms:signedAt-rowsLoadedAt,total_ms:signedAt-startedAt});const payload={items:resultRows,page,per_page:per,has_more:hasMore};if(includeTotal)payload.total=total;return ok(payload);
+  for(const row of resultRows)applyEffectiveCopyFields(row);await signPhotoFiles(resultRows,{compact});const signedAt = Date.now();for(const row of resultRows){if(!row.is_owner&&row.visibility==='selected')row.is_shared_directly=row.shared_user_ids.map(String).includes(String(context.payload.auth.userId));augmentAuthenticatedPhoto(row,context.payload.auth.userId);}console.info("OrangePhotos list performance",{access_sources:String(q.access_sources||""),page,per_page:per,include_total:includeTotal,build_ms:queryBuiltAt-startedAt,query_ms:rowsLoadedAt-queryBuiltAt,signing_ms:signedAt-rowsLoadedAt,total_ms:signedAt-startedAt});const responseRows=compact?resultRows.map(compactPhotoListItem):resultRows;const payload={items:responseRows,page,per_page:per,has_more:hasMore};if(includeTotal)payload.total=total;return ok(payload);
 }
 
 async function timeline(req) {
