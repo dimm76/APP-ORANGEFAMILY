@@ -19,6 +19,18 @@ Nginx sirve los archivos estáticos del frontend y reenvía las peticiones a
 `/api/` al backend en `127.0.0.1:4200`. El despliegue no modifica la
 configuración de Nginx ni reinicia ese servicio.
 
+### Compresión de la API
+
+La configuración activa de OrangeFamily está en:
+`/etc/nginx/sites-enabled/family.orangedesk.net`
+
+Dentro de `location /api/` se mantienen:
+
+```nginx
+gzip_types application/json;
+gzip_vary on;
+```
+
 El DNS del dominio debe mantener un registro `A` hacia `141.95.179.205`. No se
 documenta una dirección IPv6 concreta porque no se ha proporcionado ninguna.
 Solo debe existir un registro `AAAA` si el VPS tiene una IPv6 asignada y
