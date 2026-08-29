@@ -315,6 +315,7 @@ export default function OrangePhotosPage() {
     previousAlbumDisplayContextRef.current = albumDisplayContext;
     skipPersistRef.current = true;
     loadAbortRef.current?.abort();
+    loadRequestRef.current += 1;
     loadMoreLock.current = false;
     setItems([]);
     setTotal(0);
