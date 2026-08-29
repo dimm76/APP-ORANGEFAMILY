@@ -545,6 +545,7 @@ function compactPhotoListItem(row) {
     original_url: row.original_url ?? null,
     owner_user_id: row.owner_user_id ?? null,
     owner_display_name: row.owner_display_name ?? null,
+    owner_first_name: row.owner_first_name ?? null,
     is_original_owner: row.is_original_owner === true,
     is_owner: row.is_owner === true,
     is_in_library: row.is_in_library === true,
@@ -552,6 +553,7 @@ function compactPhotoListItem(row) {
     visibility: row.visibility ?? "private",
     is_shared_effectively: row.is_shared_effectively === true,
     shared_by_display_name: row.shared_by_display_name ?? null,
+    shared_by_first_name: row.shared_by_first_name ?? null,
     is_favorite: row.is_favorite === true,
     mime_type: row.mime_type ?? null,
   };
