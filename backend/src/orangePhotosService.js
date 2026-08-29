@@ -544,6 +544,7 @@ function compactPhotoListItem(row) {
     video_playback_url: row.video_playback_url ?? null,
     original_url: row.original_url ?? null,
     owner_user_id: row.owner_user_id ?? null,
+    owner_display_name: row.owner_display_name ?? null,
     is_original_owner: row.is_original_owner === true,
     is_owner: row.is_owner === true,
     is_in_library: row.is_in_library === true,

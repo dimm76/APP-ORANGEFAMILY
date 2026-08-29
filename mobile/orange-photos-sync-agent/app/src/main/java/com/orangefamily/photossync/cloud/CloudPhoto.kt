@@ -16,6 +16,7 @@ data class CloudPhoto(
     val videoPlaybackUrl: String?,
     val originalUrl: String?,
     val ownerUserId: String? = null,
+    val ownerDisplayName: String? = null,
     val isOriginalOwner: Boolean = false,
     val isOwner: Boolean = true,
     val isInLibrary: Boolean = false,

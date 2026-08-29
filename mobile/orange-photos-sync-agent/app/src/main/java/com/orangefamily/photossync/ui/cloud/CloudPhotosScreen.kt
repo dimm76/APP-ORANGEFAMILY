@@ -85,6 +85,11 @@ private enum class CloudAlbumSortMode {
     TITLE_ASC,
     TITLE_DESC,
 }
+private enum class CloudAlbumScope {
+    ALL,
+    MINE,
+    SHARED,
+}
 private fun cloudPeriodKeyFromLazyItemKey(key: Any?): String? { val value=key as? String ?: return null; val payload=when { value.startsWith("period:")->value.removePrefix("period:");value.startsWith("day:")->value.removePrefix("day:");value.startsWith("row:")->value.removePrefix("row:");else->return null };val periodKey=payload.substringBefore(":");return periodKey.takeIf{it.length==7&&it.getOrNull(4)=='-'} }
 private const val MAX_CLOUD_BULK_SELECTION=500
 private const val CLOUD_PAGE_SIZE=30
@@ -444,8 +449,16 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                                                 row.photos.forEach { photo ->
                                                     val photoSelected=photo.id in selected
                                                     Box(Modifier.width((cloudAspectRatio(photo) * row.height).dp).fillMaxHeight().background(if(photoSelected)OrangePrimary.copy(alpha=.18f) else Color.Transparent).padding(if(photoSelected)5.dp else 0.dp).clip(if(photoSelected)RoundedCornerShape(10.dp) else RoundedCornerShape(0.dp)).combinedClickable(onClick={handlePhotoClick(photo)},onLongClick={extendSelection(photo)})) {
+                                                        val ownerLabel = if (!photo.isOwner) {
+                                                            photo.sharedByDisplayName ?: photo.ownerDisplayName
+                                                        } else {
+                                                            photo.ownerDisplayName
+                                                        }
                                                         RemoteBitmap(photo.gridUrl, thumbnailLoader, ContentScale.Crop, Modifier.fillMaxSize())
-                                                        if (photo.mediaType == "video") Text(stringResource(R.string.cloud_video), color = Color.White, modifier = Modifier.align(Alignment.BottomStart).background(Color.Black.copy(alpha = .6f)).padding(4.dp))
+                                                        if (photo.mediaType == "video" || ownerLabel != null) Column(Modifier.align(Alignment.BottomStart).background(Color.Black.copy(alpha = .6f)).padding(4.dp)) {
+                                                            if (photo.mediaType == "video") Text(stringResource(R.string.cloud_video), color = Color.White)
+                                                            ownerLabel?.takeIf { it.isNotBlank() }?.let { Text(it, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                                                        }
                                                         if(selected.isNotEmpty()||photoSelected)Box(Modifier.align(Alignment.TopStart).padding(6.dp).size(24.dp).background(if(photoSelected)OrangePrimary else Color.Transparent,CircleShape).border(2.dp,if(photoSelected)OrangePrimary else Color.White,CircleShape),contentAlignment=Alignment.Center){if(photoSelected)Text("✓",color=Color.White,fontWeight=FontWeight.Bold)}
                                                         if(photo.isSharedEffectively)CloudSharedBadge(photo.isOwner,Modifier.align(Alignment.TopEnd).padding(6.dp))
                                                         if(localByRemoteId.containsKey(photo.id))CloudLocalCopyBadge(Modifier.align(Alignment.BottomEnd).padding(6.dp))
@@ -672,12 +685,18 @@ private fun CloudAlbumsView(
 ) {
     var sortMode by remember { mutableStateOf(CloudAlbumSortMode.ALBUM_DATE_DESC) }
     var sortMenuOpen by remember { mutableStateOf(false) }
+    var albumScope by remember { mutableStateOf(CloudAlbumScope.ALL) }
     var selectedCategoryIds by remember { mutableStateOf(emptySet<String>()) }
-    val visibleAlbums = remember(albums, selectedCategoryIds, sortMode) {
+    val visibleAlbums = remember(albums, albumScope, selectedCategoryIds, sortMode) {
+        val scoped = when (albumScope) {
+            CloudAlbumScope.ALL -> albums
+            CloudAlbumScope.MINE -> albums.filter { it.isOwner }
+            CloudAlbumScope.SHARED -> albums.filter { !it.isOwner }
+        }
         val filtered = if (selectedCategoryIds.isEmpty()) {
-            albums
+            scoped
         } else {
-            albums.filter { album -> album.categories.any { it.id in selectedCategoryIds } }
+            scoped.filter { album -> album.categories.any { it.id in selectedCategoryIds } }
         }
         sortCloudAlbums(filtered, sortMode)
     }
@@ -698,18 +717,27 @@ private fun CloudAlbumsView(
                 }
             }
         }
-        if (categories.isNotEmpty()) {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                item {
-                    FilterChip(
-                        selected = selectedCategoryIds.isEmpty(),
-                        onClick = { selectedCategoryIds = emptySet() },
-                        label = { Text("Todos") },
-                    )
-                }
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            item {
+                FilterChip(selected = albumScope == CloudAlbumScope.ALL, onClick = { albumScope = CloudAlbumScope.ALL }, label = { Text("Todos") })
+            }
+            item {
+                FilterChip(selected = albumScope == CloudAlbumScope.MINE, onClick = { albumScope = CloudAlbumScope.MINE }, label = { Text("Mis álbumes") })
+            }
+            item {
+                FilterChip(selected = albumScope == CloudAlbumScope.SHARED, onClick = { albumScope = CloudAlbumScope.SHARED }, label = { Text("Compartidos conmigo") })
+            }
+            item {
+                FilterChip(
+                    selected = selectedCategoryIds.isEmpty(),
+                    onClick = { selectedCategoryIds = emptySet() },
+                    label = { Text("Todos") },
+                )
+            }
+            if (categories.isNotEmpty()) {
                 items(categories, key = { it.id }) { category ->
                     FilterChip(
                         selected = category.id in selectedCategoryIds,
