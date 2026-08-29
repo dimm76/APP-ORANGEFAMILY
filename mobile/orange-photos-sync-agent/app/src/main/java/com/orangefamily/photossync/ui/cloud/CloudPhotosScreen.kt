@@ -56,6 +56,7 @@ import com.orangefamily.photossync.ui.device.OrangeFilledCloudIcon
 import com.orangefamily.photossync.ui.device.OrangeCloudShapeIcon
 import com.orangefamily.photossync.ui.device.OrangeShareIcon
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import com.orangefamily.photossync.ui.theme.OrangeBorder
 import kotlinx.coroutines.launch
@@ -260,6 +261,8 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
             val result = api.aroundDate(cursor, activeAlbumId(), perPage = CLOUD_PAGE_SIZE, sharedWithMe = cloudView == CloudView.SHARED_WITH_ME)
             if (generation != timelineRequestGeneration) return
             items = result.items; page = 1; pagingMode = CloudPagingMode.WINDOW; hasMore = false; hasNewer = result.hasNewer; newerCursor = result.newerCursor; hasOlder = result.hasOlder; olderCursor = result.olderCursor; activePeriod = period.key; listState.scrollToItem(0)
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: Exception) {
             if (generation == timelineRequestGeneration) { activePeriod = previousActivePeriod; bulkMessage = error.message ?: "No se pudo cargar el periodo." }
         }
@@ -269,7 +272,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
         if (pagingMode != CloudPagingMode.WINDOW || !hasNewer || loadingWindowNewer) return
         val cursor = newerCursor ?: return
         loadingWindowNewer = true
-        try { val result = api.aroundDate(cursor, activeAlbumId(), "newer", perPage = CLOUD_PAGE_SIZE, sharedWithMe = cloudView == CloudView.SHARED_WITH_ME); if (result.items.isEmpty()) { hasNewer = false; return }; items = (result.items + items).distinctBy { it.id }; hasNewer = result.hasNewer; newerCursor = result.newerCursor } catch (error: Exception) { bulkMessage = error.message ?: "No se pudo cargar el periodo." } finally { loadingWindowNewer = false }
+        try { val result = api.aroundDate(cursor, activeAlbumId(), "newer", perPage = CLOUD_PAGE_SIZE, sharedWithMe = cloudView == CloudView.SHARED_WITH_ME); if (result.items.isEmpty()) { hasNewer = false; return }; items = (result.items + items).distinctBy { it.id }; hasNewer = result.hasNewer; newerCursor = result.newerCursor } catch (error: CancellationException) { throw error } catch (error: Exception) { bulkMessage = error.message ?: "No se pudo cargar el periodo." } finally { loadingWindowNewer = false }
     }
 
     suspend fun loadWindowOlder() {
@@ -281,6 +284,8 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
             items = (items + result.items).distinctBy { it.id }
             hasOlder = result.hasOlder
             olderCursor = result.olderCursor
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: Exception) {
             bulkMessage = error.message ?: "No se pudo cargar el periodo."
         } finally {
