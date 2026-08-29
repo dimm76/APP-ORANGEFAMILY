@@ -217,6 +217,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
 
     val groups = remember(items) { groupCloudPhotos(items) }
     val selectedPhotos=items.filter{it.id in selected}
+    suspend fun addSelectedPhotosToAlbum(albumId:String):Int{var addedCount=0;selectedPhotos.forEach{photo->if(api.addPhotoToAlbum(albumId,photo.id))addedCount+=1};return addedCount}
     val addableToLibrary=selectedPhotos.filter{!it.isOriginalOwner&&!it.isInLibrary}
     val selectedLocalItems=selectedPhotos.flatMap{localByRemoteId[it.id].orEmpty()}.distinctBy{"${it.mediaCollection}:${it.mediaType}:${it.mediaStoreId}"}
     val downloadCandidates=selectedPhotos.filter{localByRemoteId[it.id].isNullOrEmpty()}
@@ -306,8 +307,51 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     LaunchedEffect(listState,pagingMode,hasMore){snapshotFlow{val info=listState.layoutInfo;Pair(info.visibleItemsInfo.lastOrNull()?.index?:0,info.totalItemsCount)}.distinctUntilChanged().collect{(last,total)->if(pagingMode==CloudPagingMode.NORMAL&&hasMore&&last>=(total-CLOUD_PREFETCH_LAZY_ITEMS).coerceAtLeast(0))loadNextNormalPage()}}
     LaunchedEffect(listState,pagingMode,hasOlder,olderCursor){snapshotFlow{val info=listState.layoutInfo;Pair(info.visibleItemsInfo.lastOrNull()?.index?:0,info.totalItemsCount)}.distinctUntilChanged().collect{(last,total)->if(pagingMode==CloudPagingMode.WINDOW&&hasOlder&&olderCursor!=null&&last>=(total-CLOUD_PREFETCH_LAZY_ITEMS).coerceAtLeast(0))loadWindowOlder()}}
 
-if(albumDialogOpen){val selectableAlbums=albums.filter{(it.isOwner||it.canContribute)&&(cloudView!=CloudView.ALBUM_DETAIL||it.id!=selectedAlbum?.id)};val filteredAlbums=selectableAlbums.filter{albumSearchQuery.isBlank()||it.title.contains(albumSearchQuery.trim(),ignoreCase=true)};AlertDialog(onDismissRequest={if(!bulkBusy&&!albumCreating)albumDialogOpen=false},title={Text("Añadir a álbum")},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){OutlinedTextField(value=albumSearchQuery,onValueChange={albumSearchQuery=it},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("Buscar álbum")});TextButton(enabled=!bulkBusy&&!albumCreating,onClick={newAlbumTitle="";createAlbumDialogOpen=true}){Icon(CloudAlbumActionIcon,null,Modifier.size(20.dp));Spacer(Modifier.width(6.dp));Text("Crear álbum")};if(selectableAlbums.isEmpty())Text("No hay álbumes disponibles para añadir contenido.") else if(filteredAlbums.isEmpty())Text("No hay álbumes que coincidan con la búsqueda.") else LazyColumn(modifier=Modifier.fillMaxWidth().heightIn(max=360.dp)){items(items=filteredAlbums,key={it.id}){album->Row(modifier=Modifier.fillMaxWidth().clickable{targetAlbumId=album.id}.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically){RadioButton(selected=targetAlbumId==album.id,onClick={targetAlbumId=album.id});Text(text=album.title,modifier=Modifier.weight(1f),maxLines=2,overflow=TextOverflow.Ellipsis)}}}}},confirmButton={TextButton(enabled=!bulkBusy&&!targetAlbumId.isNullOrBlank()&&selected.size<=MAX_CLOUD_BULK_SELECTION,onClick={runBulk{val id=targetAlbumId!!;val targetAlbum=albums.firstOrNull{it.id==id};val targetAlbumTitle=targetAlbum?.title?.takeIf{it.isNotBlank()}?:"el álbum";var addedCount=0;selectedPhotos.forEach{photo->if(api.addPhotoToAlbum(id,photo.id))addedCount+=1};albums=api.albums();albumDialogOpen=false;val message=when{addedCount==0->"Los elementos seleccionados ya estaban en «$targetAlbumTitle».";addedCount==selectedPhotos.size&&addedCount==1->"1 elemento añadido a «$targetAlbumTitle».";addedCount==selectedPhotos.size->"$addedCount elementos añadidos a «$targetAlbumTitle».";else->"$addedCount de ${selectedPhotos.size} elementos añadidos a «$targetAlbumTitle»."};Toast.makeText(context,message,Toast.LENGTH_LONG).show()}}){Text("Añadir")}},dismissButton={TextButton(onClick={if(!bulkBusy&&!albumCreating)albumDialogOpen=false}){Text("Cancelar")}})}
-if(createAlbumDialogOpen)AlertDialog(onDismissRequest={if(!albumCreating)createAlbumDialogOpen=false},title={Text("Crear álbum")},text={OutlinedTextField(value=newAlbumTitle,onValueChange={newAlbumTitle=it.take(500)},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("Nombre del álbum")})},confirmButton={TextButton(enabled=!albumCreating&&newAlbumTitle.trim().isNotEmpty(),onClick={albumCreating=true;scope.launch{runCatching{val createdAlbumId=api.createAlbum(newAlbumTitle.trim());val refreshedAlbums=api.albums();createdAlbumId to refreshedAlbums}.onSuccess{(createdAlbumId,refreshedAlbums)->albums=refreshedAlbums;targetAlbumId=createdAlbumId;albumSearchQuery="";newAlbumTitle="";createAlbumDialogOpen=false}.onFailure{error->bulkMessage=error.message?:"No se pudo crear el álbum."};albumCreating=false}}){Text("Crear")}},dismissButton={TextButton(enabled=!albumCreating,onClick={createAlbumDialogOpen=false}){Text("Cancelar")}})
+if(albumDialogOpen){val selectableAlbums=albums.filter{(it.isOwner||it.canContribute)&&(cloudView!=CloudView.ALBUM_DETAIL||it.id!=selectedAlbum?.id)};val filteredAlbums=selectableAlbums.filter{albumSearchQuery.isBlank()||it.title.contains(albumSearchQuery.trim(),ignoreCase=true)};AlertDialog(onDismissRequest={if(!bulkBusy&&!albumCreating)albumDialogOpen=false},title={Text("Añadir a álbum")},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){OutlinedTextField(value=albumSearchQuery,onValueChange={albumSearchQuery=it},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("Buscar álbum")});TextButton(enabled=!bulkBusy&&!albumCreating,onClick={newAlbumTitle="";createAlbumDialogOpen=true}){Icon(CloudAlbumActionIcon,null,Modifier.size(20.dp));Spacer(Modifier.width(6.dp));Text("Crear álbum")};if(selectableAlbums.isEmpty())Text("No hay álbumes disponibles para añadir contenido.") else if(filteredAlbums.isEmpty())Text("No hay álbumes que coincidan con la búsqueda.") else LazyColumn(modifier=Modifier.fillMaxWidth().heightIn(max=360.dp)){items(items=filteredAlbums,key={it.id}){album->Row(modifier=Modifier.fillMaxWidth().clickable{targetAlbumId=album.id}.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically){RadioButton(selected=targetAlbumId==album.id,onClick={targetAlbumId=album.id});Text(text=album.title,modifier=Modifier.weight(1f),maxLines=2,overflow=TextOverflow.Ellipsis)}}}}},confirmButton={TextButton(enabled=!bulkBusy&&!targetAlbumId.isNullOrBlank()&&selected.size<=MAX_CLOUD_BULK_SELECTION,onClick={runBulk{val id=targetAlbumId!!;val targetAlbum=albums.firstOrNull{it.id==id};val targetAlbumTitle=targetAlbum?.title?.takeIf{it.isNotBlank()}?:"el álbum";val addedCount=addSelectedPhotosToAlbum(id);albums=api.albums();albumDialogOpen=false;val message=when{addedCount==0->"Los elementos seleccionados ya estaban en «$targetAlbumTitle».";addedCount==selectedPhotos.size&&addedCount==1->"1 elemento añadido a «$targetAlbumTitle».";addedCount==selectedPhotos.size->"$addedCount elementos añadidos a «$targetAlbumTitle».";else->"$addedCount de ${selectedPhotos.size} elementos añadidos a «$targetAlbumTitle»."};Toast.makeText(context,message,Toast.LENGTH_LONG).show()}}){Text("Añadir")}},dismissButton={TextButton(onClick={if(!bulkBusy&&!albumCreating)albumDialogOpen=false}){Text("Cancelar")}})}
+if(createAlbumDialogOpen)AlertDialog(
+    onDismissRequest={if(!albumCreating)createAlbumDialogOpen=false},
+    title={Text("Crear álbum")},
+    text={OutlinedTextField(value=newAlbumTitle,onValueChange={newAlbumTitle=it.take(500)},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("Nombre del álbum")})},
+    confirmButton={
+        TextButton(
+            enabled=!albumCreating&&newAlbumTitle.trim().isNotEmpty(),
+            onClick={
+                albumCreating=true
+                val title=newAlbumTitle.trim()
+                scope.launch{
+                    var createdAlbumId:String?=null
+                    try{
+                        createdAlbumId=api.createAlbum(title)
+                        val addedCount=addSelectedPhotosToAlbum(createdAlbumId!!)
+                        albums=api.albums()
+                        targetAlbumId=null
+                        albumSearchQuery=""
+                        newAlbumTitle=""
+                        createAlbumDialogOpen=false
+                        albumDialogOpen=false
+                        clearSelection()
+                        val message=if(addedCount==selectedPhotos.size&&addedCount==1)"1 elemento añadido a «$title»." else if(addedCount==selectedPhotos.size)"$addedCount elementos añadidos a «$title»." else "$addedCount de ${selectedPhotos.size} elementos añadidos a «$title»."
+                        Toast.makeText(context,message,Toast.LENGTH_LONG).show()
+                    }catch(error:Exception){
+                        if(createdAlbumId==null){
+                            bulkMessage=error.message?:"No se pudo crear el álbum."
+                        }else{
+                            runCatching{albums=api.albums()}
+                            targetAlbumId=createdAlbumId
+                            albumSearchQuery=""
+                            createAlbumDialogOpen=false
+                            albumDialogOpen=true
+                            bulkMessage="El álbum se ha creado, pero no se pudieron añadir todos los elementos. Puedes volver a intentar añadirlos."
+                        }
+                    }finally{
+                        albumCreating=false
+                    }
+                }
+            },
+        ){Text("Crear")}
+    },
+    dismissButton={TextButton(enabled=!albumCreating,onClick={createAlbumDialogOpen=false}){Text("Cancelar")}},
+)
     if(shareDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)shareDialogOpen=false},title={Text("Compartir")},text={Column{listOf("private" to "Solo yo","family" to "Toda la familia","selected" to "Miembros concretos").forEach{(v,l)->Row(verticalAlignment=Alignment.CenterVertically){RadioButton(selected=shareVisibility==v,onClick={shareVisibility=v});Text(l)}};if(shareVisibility=="selected")members.filter{it.id!=accountUserId}.forEach{member->Row(verticalAlignment=Alignment.CenterVertically){Checkbox(checked=member.id in shareUserIds,onCheckedChange={shareUserIds=if(it)shareUserIds+member.id else shareUserIds-member.id});Text(member.displayName)}}}},confirmButton={TextButton(enabled=!bulkBusy&&(shareVisibility!="selected"||shareUserIds.isNotEmpty()),onClick={runBulk{selectedPhotos.forEach{api.sharePhoto(it.id,shareVisibility,shareUserIds.toList())};shareDialogOpen=false}}){Text("Compartir")}},dismissButton={TextButton(onClick={if(!bulkBusy)shareDialogOpen=false}){Text("Cancelar")}})
     if(locationDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)locationDialogOpen=false},title={Text("Ubicación")},text={OutlinedTextField(value=locationValue,onValueChange={locationValue=it},label={Text("Ubicación")},singleLine=true)},confirmButton={TextButton(enabled=!bulkBusy&&locationValue.trim().isNotEmpty(),onClick={runBulk{val value=locationValue.trim();selectedPhotos.forEach{api.setLocationName(it.id,value)};locationDialogOpen=false}}){Text("Guardar")}},dismissButton={TextButton(onClick={if(!bulkBusy)locationDialogOpen=false}){Text("Cancelar")}})
     if(bulkMessage!=null)AlertDialog(onDismissRequest={bulkMessage=null},title={Text("Error")},text={Text(bulkMessage!!)},confirmButton={TextButton(onClick={bulkMessage=null}){Text("Aceptar")}})
