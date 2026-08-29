@@ -201,14 +201,15 @@ export default function OrangePhotoViewer({
     }
   };
 
+  const viewerMediaUrl = photo.media_type === "video"
+    ? photo.video_playback_url || photo.original_url
+    : photo.preview_url || photo.original_url || photo.thumbnail_url;
+
   return (
     <>
       <AttachmentsImageLightbox
         viewer={{
-          url:
-            photo.preview_url ||
-            photo.original_url ||
-            photo.thumbnail_url,
+          url: viewerMediaUrl,
           poster: photo.poster_url || photo.thumbnail_url,
           mediaType: photo.media_type,
           title: displayTitle,
