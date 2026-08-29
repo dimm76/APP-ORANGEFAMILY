@@ -730,13 +730,6 @@ private fun CloudAlbumsView(
             item {
                 FilterChip(selected = albumScope == CloudAlbumScope.SHARED, onClick = { albumScope = CloudAlbumScope.SHARED }, label = { Text("Compartidos conmigo") })
             }
-            item {
-                FilterChip(
-                    selected = selectedCategoryIds.isEmpty(),
-                    onClick = { selectedCategoryIds = emptySet() },
-                    label = { Text("Todos") },
-                )
-            }
             if (categories.isNotEmpty()) {
                 items(categories, key = { it.id }) { category ->
                     FilterChip(
