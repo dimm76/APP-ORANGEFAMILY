@@ -2,6 +2,7 @@ package com.orangefamily.photossync.ui.cloud
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,6 +33,7 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -449,16 +451,13 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                                                 row.photos.forEach { photo ->
                                                     val photoSelected=photo.id in selected
                                                     Box(Modifier.width((cloudAspectRatio(photo) * row.height).dp).fillMaxHeight().background(if(photoSelected)OrangePrimary.copy(alpha=.18f) else Color.Transparent).padding(if(photoSelected)5.dp else 0.dp).clip(if(photoSelected)RoundedCornerShape(10.dp) else RoundedCornerShape(0.dp)).combinedClickable(onClick={handlePhotoClick(photo)},onLongClick={extendSelection(photo)})) {
-                                                        val ownerLabel = if (!photo.isOwner) {
-                                                            photo.sharedByDisplayName ?: photo.ownerDisplayName
-                                                        } else {
-                                                            photo.ownerDisplayName
-                                                        }
+                                                        val showOwnerLabel = cloudView == CloudView.SHARED_WITH_ME || cloudView == CloudView.ALBUM_DETAIL
+                                                        val ownerLabel = if (showOwnerLabel) {
+                                                            if (!photo.isOwner) photo.sharedByFirstName ?: photo.ownerFirstName else photo.ownerFirstName
+                                                        } else null
                                                         RemoteBitmap(photo.gridUrl, thumbnailLoader, ContentScale.Crop, Modifier.fillMaxSize())
-                                                        if (photo.mediaType == "video" || ownerLabel != null) Column(Modifier.align(Alignment.BottomStart).background(Color.Black.copy(alpha = .6f)).padding(4.dp)) {
-                                                            if (photo.mediaType == "video") Text(stringResource(R.string.cloud_video), color = Color.White)
-                                                            ownerLabel?.takeIf { it.isNotBlank() }?.let { Text(it, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                                                        }
+                                                        if (photo.mediaType == "video") CloudVideoFilmOverlay(Modifier.matchParentSize())
+                                                        ownerLabel?.takeIf { it.isNotBlank() }?.let { Text(it, color = Color.White, fontSize = 10.sp, lineHeight = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart).padding(start = if (photo.mediaType == "video") 8.dp else 3.dp, bottom = 3.dp).background(Color.Black.copy(alpha = .48f), RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 2.dp)) }
                                                         if(selected.isNotEmpty()||photoSelected)Box(Modifier.align(Alignment.TopStart).padding(6.dp).size(24.dp).background(if(photoSelected)OrangePrimary else Color.Transparent,CircleShape).border(2.dp,if(photoSelected)OrangePrimary else Color.White,CircleShape),contentAlignment=Alignment.Center){if(photoSelected)Text("✓",color=Color.White,fontWeight=FontWeight.Bold)}
                                                         if(photo.isSharedEffectively)CloudSharedBadge(photo.isOwner,Modifier.align(Alignment.TopEnd).padding(6.dp))
                                                         if(localByRemoteId.containsKey(photo.id))CloudLocalCopyBadge(Modifier.align(Alignment.BottomEnd).padding(6.dp))
@@ -644,6 +643,40 @@ private fun timelineMonthLabel(item: CloudTimelineMonth): String {
     val date = java.time.LocalDate.of(item.year, item.month, 1)
     return date.format(DateTimeFormatter.ofPattern("MMM yyyy", spanishLocale))
         .replace(".", "").replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+}
+
+@Composable
+private fun CloudVideoFilmOverlay(
+    modifier: Modifier = Modifier,
+) {
+    Canvas(modifier) {
+        val stripWidth = 6.dp.toPx()
+        val holeWidth = 2.dp.toPx()
+        val holeHeight = 3.dp.toPx()
+        val gap = 2.dp.toPx()
+        val inset = 2.dp.toPx()
+        val stripColor = Color.Black.copy(alpha = .48f)
+        val holeColor = Color.White.copy(alpha = .60f)
+
+        drawRect(
+            color = stripColor,
+            topLeft = Offset.Zero,
+            size = Size(stripWidth, size.height),
+        )
+        drawRect(
+            color = stripColor,
+            topLeft = Offset(size.width - stripWidth, 0f),
+            size = Size(stripWidth, size.height),
+        )
+
+        var y = inset
+        while (y + holeHeight <= size.height - inset) {
+            val holeX = (stripWidth - holeWidth) / 2f
+            drawRect(color = holeColor, topLeft = Offset(holeX, y), size = Size(holeWidth, holeHeight))
+            drawRect(color = holeColor, topLeft = Offset(size.width - stripWidth + holeX, y), size = Size(holeWidth, holeHeight))
+            y += holeHeight + gap
+        }
+    }
 }
 
 @Composable

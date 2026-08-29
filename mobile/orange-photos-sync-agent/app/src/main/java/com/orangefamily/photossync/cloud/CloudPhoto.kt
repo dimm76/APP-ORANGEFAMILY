@@ -17,6 +17,7 @@ data class CloudPhoto(
     val originalUrl: String?,
     val ownerUserId: String? = null,
     val ownerDisplayName: String? = null,
+    val ownerFirstName: String? = null,
     val isOriginalOwner: Boolean = false,
     val isOwner: Boolean = true,
     val isInLibrary: Boolean = false,
@@ -24,6 +25,7 @@ data class CloudPhoto(
     val visibility: String = "private",
     val isSharedEffectively: Boolean = false,
     val sharedByDisplayName: String? = null,
+    val sharedByFirstName: String? = null,
     val isFavorite: Boolean = false,
     val mimeType: String? = null,
 ) {
