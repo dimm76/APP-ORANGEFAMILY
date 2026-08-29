@@ -599,19 +599,7 @@ private fun CloudTimeline(years: List<CloudTimelineYear>, activePeriod: String?,
     BoxWithConstraints(Modifier.fillMaxHeight().width(68.dp)) {
         val trackHeight = maxHeight - 20.dp
         val maxHeightPx = constraints.maxHeight.toFloat()
-        fun update(y: Float) {
-            val progress = (y / constraints.maxHeight.toFloat()).coerceIn(0f, 1f)
-            periods.minByOrNull { abs(it.center - progress) }?.let { scrubProgress = progress; previewPeriod = it }
-        }
         Box(Modifier.fillMaxSize()) {
-            Box(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(44.dp).pointerInput(periods) {
-                detectVerticalDragGestures(
-                    onDragStart = { offset -> dragging = true; update(offset.y) },
-                    onVerticalDrag = { change, _ -> change.consume(); update(change.position.y) },
-                    onDragEnd = { onSelected(previewPeriod.item); dragging = false },
-                    onDragCancel = { dragging = false },
-                )
-            })
             if (dragging) {
             Box(Modifier.align(Alignment.CenterEnd).padding(end = 14.dp).width(1.dp).fillMaxHeight().padding(vertical = 10.dp).background(MaterialTheme.colorScheme.outlineVariant))
             periods.forEach { period -> val activeDot = period.item.key == activePeriod; Box(Modifier.align(Alignment.TopEnd).padding(end = if (activeDot) 11.dp else 12.dp).offset(y = trackHeight * period.center + 10.dp - if (activeDot) 3.dp else 2.dp).size(if (activeDot) 6.dp else 4.dp).background(if (activeDot) MaterialTheme.colorScheme.primary else Color(0x7A475569), CircleShape)) }
@@ -620,7 +608,7 @@ private fun CloudTimeline(years: List<CloudTimelineYear>, activePeriod: String?,
                 Text(yearItem.year.toString(), fontSize = 11.sp, lineHeight = 12.sp, style = MaterialTheme.typography.labelMedium, fontWeight = if (activeYear) FontWeight.Bold else FontWeight.SemiBold, color = if (activeYear) MaterialTheme.colorScheme.primary else Color(0xFF334155), modifier = Modifier.align(Alignment.TopEnd).padding(end = 30.dp).offset(y = trackHeight * yearItem.center + 10.dp - 7.dp).background(Color.White.copy(alpha = .96f), RoundedCornerShape(9.dp)).border(1.dp, Color(0xFFDCE3F5), RoundedCornerShape(9.dp)).padding(horizontal = 4.dp, vertical = 1.dp))
             }
             }
-            if (thumbVisible || dragging) Box(Modifier.align(Alignment.TopEnd).offset(y = trackHeight * scrubProgress + 10.dp - 32.dp).size(width = 44.dp, height = 64.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp, topEnd = 0.dp, bottomEnd = 0.dp)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp, topEnd = 0.dp, bottomEnd = 0.dp)), contentAlignment = Alignment.CenterStart) { Column(Modifier.padding(start = 13.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { repeat(3) { Box(Modifier.width(12.dp).height(2.dp).background(Color(0xFF64748B))) } } }
+            if (thumbVisible || dragging) Box(Modifier.align(Alignment.TopEnd).offset(y = trackHeight * scrubProgress + 10.dp - 32.dp).size(width = 44.dp, height = 64.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp, topEnd = 0.dp, bottomEnd = 0.dp)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp, topEnd = 0.dp, bottomEnd = 0.dp)).pointerInput(periods) { detectVerticalDragGestures(onDragStart = { dragging = true }, onVerticalDrag = { change, dragAmount -> change.consume(); val nextProgress = (scrubProgress + dragAmount / maxHeightPx).coerceIn(0f, 1f); periods.minByOrNull { abs(it.center - nextProgress) }?.let { scrubProgress = nextProgress; previewPeriod = it } }, onDragEnd = { onSelected(previewPeriod.item); dragging = false }, onDragCancel = { dragging = false }) }, contentAlignment = Alignment.CenterStart) { Column(Modifier.padding(start = 13.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { repeat(3) { Box(Modifier.width(12.dp).height(2.dp).background(Color(0xFF64748B))) } } }
             if (dragging) Text(timelineMonthLabel(previewPeriod.item), style = MaterialTheme.typography.titleSmall, modifier = Modifier.align(Alignment.TopEnd).offset(x = (-52).dp, y = trackHeight * scrubProgress + 10.dp - 22.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(22.dp)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(22.dp)).padding(horizontal = 13.dp, vertical = 10.dp))
         }
     }
