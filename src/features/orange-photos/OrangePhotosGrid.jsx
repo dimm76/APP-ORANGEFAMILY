@@ -169,6 +169,7 @@ function OrangePhotosGrid({
   albumMode = false,
   publicMode = false,
   selectable = true,
+  showOwnerLabel = false,
 }) {
   const contentRef = useRef(null);
   const measuredWidthRef = useRef(0);
@@ -282,6 +283,7 @@ function OrangePhotosGrid({
                         onSelect={selectable?onSelect:()=>{}}
                         onOpen={onOpen}
                         eager={globalIndex < 8}
+                        showOwnerLabel={showOwnerLabel}
                       />
                     </div>
                   ))}

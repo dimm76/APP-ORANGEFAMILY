@@ -204,6 +204,15 @@ eliminar definitivamente.
 La vista Compartidas conmigo excluye los elementos propios aunque estén
 compartidos.
 
+Álbumes usa el menú «Opciones» para sus ajustes de visualización; dentro de un
+álbum, «Ajustes de visualización» abre el mismo panel. El contexto de un álbum
+integra por defecto todos los elementos accesibles y permite refinar Origen
+entre «Mis elementos» y «Añadidos a mi biblioteca». Los elementos de otros
+usuarios aún no integrados también son visibles por defecto. Compartidas
+conmigo y los álbumes muestran discretamente el propietario o proveedor de
+cada elemento, y el icono de álbum compartido informa mediante tooltip de quién
+lo comparte o proporciona.
+
 Visor
 
 El visor permite:
