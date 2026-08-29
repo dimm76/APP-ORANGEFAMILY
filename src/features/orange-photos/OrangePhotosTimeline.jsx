@@ -135,6 +135,11 @@ export default function OrangePhotosTimeline({
     setPreviewPeriod(current || null);
   }, [activePeriod, periods, progress]);
 
+  useEffect(() => {
+    if (draggingRef.current) return;
+    lastRequestedKeyRef.current = activePeriod || "";
+  }, [activePeriod]);
+
   useEffect(
     () => () => {
       window.clearTimeout(scrubTimerRef.current);

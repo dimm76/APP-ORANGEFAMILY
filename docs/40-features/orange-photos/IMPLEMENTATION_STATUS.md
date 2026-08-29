@@ -213,6 +213,17 @@ conmigo y los álbumes muestran discretamente el propietario o proveedor de
 cada elemento, y el icono de álbum compartido informa mediante tooltip de quién
 lo comparte o proporciona.
 
+En la vista de álbumes, el origen inicial incluye «Mis elementos» y «Añadidos
+a mi biblioteca»; el filtro conserva esa selección al pasar de la lista al
+interior del álbum y permite refinarla sin mostrar elementos directos o de
+álbum como opciones independientes. La ocultación personal no está disponible
+en álbumes.
+
+En «Compartidas conmigo», cada usuario puede ocultar o mostrar personalmente
+los elementos recibidos. Esta acción no elimina ni revoca la pertenencia o la
+compartición; los elementos ocultos pueden recuperarse mediante «Mostrar
+elementos ocultos». Solo afecta a esa vista y no modifica Galería ni Álbumes.
+
 Visor
 
 El visor permite:

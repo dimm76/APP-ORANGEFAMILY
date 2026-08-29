@@ -5,6 +5,8 @@ import {
   arrowUndoOutline,
   checkboxOutline,
   ellipsisVerticalOutline,
+  eyeOffOutline,
+  eyeOutline,
   heart,
   heartOutline,
   imageOutline,
@@ -18,7 +20,7 @@ import { OD_ICONS } from "../../shared/ui/odIcons.js";
 import OrangePhotoDetailsPanel from "./OrangePhotoDetailsPanel.jsx";
 import OrangePhotoShareModal from "./OrangePhotoShareModal.jsx";
 import OrangePhotoEventsModal from "./OrangePhotoEventsModal.jsx";
-const DEFAULT_CAPABILITIES = Object.freeze({select:true,favorite:true,share:true,download:true,editDetails:true,history:true,generatePoster:true,trash:true,restore:true,purge:true,addToLibrary:false,removeFromLibrary:false});
+const DEFAULT_CAPABILITIES = Object.freeze({select:true,favorite:true,share:true,download:true,editDetails:true,history:true,generatePoster:true,trash:true,restore:true,purge:true,addToLibrary:false,removeFromLibrary:false,hide:false});
 
 export default function OrangePhotoViewer({
   photo,
@@ -36,6 +38,7 @@ export default function OrangePhotoViewer({
   onPurge,
   onAddToLibrary,
   onRemoveFromLibrary,
+  onSetHidden,
   onPrevious,
   onNext,
   hasPrevious,
@@ -56,6 +59,8 @@ export default function OrangePhotoViewer({
   const [posterError,setPosterError]=useState("");
   const [libraryBusy, setLibraryBusy] = useState(false);
   const [libraryError, setLibraryError] = useState("");
+  const [hiddenBusy, setHiddenBusy] = useState(false);
+  const [hiddenError, setHiddenError] = useState("");
 
   const shareButtonRef = useRef(null);
   const moreButtonRef = useRef(null);
@@ -182,6 +187,20 @@ export default function OrangePhotoViewer({
     }
   };
 
+  const handleSetHidden = async () => {
+    if (hiddenBusy) return;
+    setHiddenBusy(true);
+    setHiddenError("");
+    try {
+      await onSetHidden?.(!photo.is_hidden);
+      closeMore();
+    } catch (error) {
+      setHiddenError(error?.message || "No se pudo actualizar la visibilidad personal de la foto.");
+    } finally {
+      setHiddenBusy(false);
+    }
+  };
+
   return (
     <>
       <AttachmentsImageLightbox
@@ -298,6 +317,13 @@ export default function OrangePhotoViewer({
                         <span>{libraryBusy ? "Quitando de tu biblioteca…" : "Quitar de mi biblioteca"}</span>
                       </button>
                       {libraryError ? <small className="od-status-line od-status-line--error">{libraryError}</small> : null}
+                    </> : null}
+                    {!trashMode&&allowed.hide&&photo.is_original_owner===false ? <>
+                      <button className="od-attachments-lightbox__more-item" type="button" role="menuitem" disabled={hiddenBusy} onClick={handleSetHidden}>
+                        <IonIcon icon={photo.is_hidden===true ? eyeOutline : eyeOffOutline} />
+                        <span>{photo.is_hidden===true ? "Mostrar imagen" : "Ocultar imagen"}</span>
+                      </button>
+                      {hiddenError ? <small className="od-status-line od-status-line--error">{hiddenError}</small> : null}
                     </> : null}
                     {!trashMode&&allowed.download ? (
                       <a

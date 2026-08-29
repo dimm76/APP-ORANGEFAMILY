@@ -15,6 +15,7 @@ export const getOrangePhoto=(id,options={})=>request(`/api/orange-photos/${encod
 export async function generateOrangePhotoPoster(id,replaceExisting=false,options={}){const controller=options.signal?null:new AbortController(),timeout=controller?window.setTimeout(()=>controller.abort(),180000):null;try{return await request(`/api/orange-photos/${encodeURIComponent(id)}/poster`,{method:'POST',body:JSON.stringify({replace_existing:replaceExisting}),signal:options.signal||controller.signal});}catch(error){if(error.name==="AbortError")throw new Error("La generación está tardando demasiado. Comprueba el estado dentro de unos minutos o vuelve a intentarlo.",{cause:error});throw error;}finally{if(timeout)window.clearTimeout(timeout);}}
 export function getOrangePhotoEvents(photoId,options={}){return request(`/api/orange-photos/${encodeURIComponent(photoId)}/events`,{signal:options.signal});}
 export const updateOrangePhoto=(id,body)=>request(`/api/orange-photos/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify(body)});
+export const setOrangePhotoHidden=(id,isHidden)=>request(`/api/orange-photos/${encodeURIComponent(id)}/hidden`,{method:'PATCH',body:JSON.stringify({is_hidden:isHidden})});
 export const trashOrangePhoto=id=>request(`/api/orange-photos/${encodeURIComponent(id)}/trash`,{method:'POST',body:'{}'});
 export const restoreOrangePhoto=id=>request(`/api/orange-photos/${encodeURIComponent(id)}/restore`,{method:'POST',body:'{}'});
 export const purgeOrangePhoto=id=>request(`/api/orange-photos/${encodeURIComponent(id)}`,{method:'DELETE'});

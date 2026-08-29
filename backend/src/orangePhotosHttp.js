@@ -121,6 +121,7 @@ function handleOrangePhotosRoutes(app) {
   app.post("/api/orange-photos/:id/poster", safe(req => service.generateVideoPoster(req, req.params.id, req.body || {}), "No se pudo generar la miniatura del vídeo."));
   app.post("/api/orange-photos", async (req, res) => { try { if (String(req.headers["content-type"] || "").startsWith("multipart/form-data")) { const parsed = await multipart(req, service.SIMPLE_VIDEO_MAX_BYTES); return send(res, await service.upload(req, parsed.file, parsed.fields, parsed.poster), 201); } return send(res, await service.createFromExisting(req, req.body || {}), 201); } catch (error) { console.error("OrangePhotos upload",{message:error.message}); return res.status(error.status||400).json({ok:false,code:error.orangePhotosCode||"INVALID_MULTIPART",message:error.orangePhotosCode?error.message:"Subida no válida.",details:null}); } });
   app.patch("/api/orange-photos/:id", safe(req => service.update(req, req.params.id, req.body || {}), "No se pudo actualizar la foto."));
+  app.patch("/api/orange-photos/:id/hidden", safe(req => service.setHidden(req, req.params.id, req.body || {}), "No se pudo actualizar la visibilidad personal de la foto."));
   app.delete("/api/orange-photos/:id", safe(req => service.purge(req, req.params.id), "No se pudo eliminar definitivamente la foto."));
   app.post("/api/orange-photos/:id/trash", safe(req => service.trash(req, req.params.id), "No se pudo mover a la papelera."));
   app.post("/api/orange-photos/:id/restore", safe(req => service.trash(req, req.params.id, true), "No se pudo restaurar la foto."));

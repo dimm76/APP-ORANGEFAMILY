@@ -26,11 +26,12 @@ export default function OrangePhotosBulkActions({
   onTrash,
   onFavorite,
   onEdit,
+  onSetHidden,
   capabilities = {},
   trashEligibleCount = photos.length,
   trashSkippedCount = 0,
 }) {
-  const can = { share: capabilities.share !== false, album: capabilities.album !== false, download: capabilities.download !== false, trash: capabilities.trash !== false, favorite: capabilities.favorite !== false, edit: capabilities.edit !== false, addToLibrary: capabilities.addToLibrary === true };
+  const can = { share: capabilities.share !== false, album: capabilities.album !== false, download: capabilities.download !== false, trash: capabilities.trash !== false, favorite: capabilities.favorite !== false, edit: capabilities.edit !== false, addToLibrary: capabilities.addToLibrary === true, hide: capabilities.hide === true };
   const [modal, setModal] = useState("");
   const [albumId, setAlbumId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,6 +39,7 @@ export default function OrangePhotosBulkActions({
   const shareRef = useRef(null);
   const allFavorite =
     photos.length > 0 && photos.every(photo => photo.is_favorite);
+  const allHidden = photos.length > 0 && photos.every(photo => photo.is_hidden === true);
   const writableAlbums = albums.filter(
     album => album.is_owner || album.can_contribute,
   );
@@ -159,7 +161,7 @@ export default function OrangePhotosBulkActions({
         >
           <IonIcon icon={OD_ICONS.delete} />
         </button> : null}
-        {(can.favorite || can.edit) ? <button
+        {(can.favorite || can.edit || (can.hide && onSetHidden)) ? <button
           className="od-orangephotos-header-icon"
           type="button"
           aria-label="Más acciones"
@@ -183,6 +185,13 @@ export default function OrangePhotosBulkActions({
               onClick={() => open("date")}
             >
               Cambiar fecha y hora
+            </button> : null}
+            {can.hide && onSetHidden ? <button
+              className="od-action-menu-item"
+              type="button"
+              onClick={() => void run(() => onSetHidden(!allHidden))}
+            >
+              {allHidden ? "Mostrar imágenes" : "Ocultar imágenes"}
             </button> : null}
             {can.edit ? <button
               className="od-action-menu-item"
