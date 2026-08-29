@@ -503,6 +503,7 @@ async function buildPhotoQuery(req, queryOverride = null) {
     where.push("li.user_id=$2::uuid AND (li.visibility IN ('family','selected') OR EXISTS(SELECT 1 FROM public.orange_photo_album_items lbi JOIN public.orange_photo_albums lb ON lb.id=lbi.album_id AND lb.is_archived=false AND lb.visibility IN ('family','selected') WHERE lbi.photo_id=p.id AND lbi.source_user_id=li.user_id))");
   }
   if (libraryScope==="shared_by_me"&&shareScope!=="all") add("(li.visibility=? OR EXISTS(SELECT 1 FROM public.orange_photo_album_items lsi JOIN public.orange_photo_albums lsa ON lsa.id=lsi.album_id AND lsa.is_archived=false AND lsa.visibility=? WHERE lsi.photo_id=p.id AND lsi.source_user_id=li.user_id))",shareScope);
+  if (libraryScope==="shared_with_me" && bool(q.exclude_in_library)) where.push("NOT EXISTS(SELECT 1 FROM public.orange_photo_library_items own_li WHERE own_li.photo_id=p.id AND own_li.user_id=$2::uuid AND own_li.is_trashed=false)");
   if (uuid(q.owner_user_id)) add("p.owner_user_id=?::uuid", q.owner_user_id);
   if (VISIBILITIES.has(q.visibility)) add("li.visibility=?", q.visibility);
   if (q.ids) { const ids=String(q.ids).split(",").filter(uuid).slice(0,100); if(!ids.length)return bad(400,"Identificadores no válidos."); add("p.id=ANY(?::uuid[])",ids); }

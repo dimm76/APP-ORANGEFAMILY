@@ -166,6 +166,14 @@ Biblioteca
 
 La web es el gestor y visor principal de Orange Photos.
 
+La entrada principal de Fotos se denomina «Galería» en la navegación. Galería
+y Compartidas conmigo disponen de un menú de Opciones centrado. Compartidas
+conmigo reúne contenido recibido directamente y mediante álbumes compartidos;
+por defecto también muestra los elementos recibidos que ya se hayan integrado
+en la biblioteca propia. La opción «Mostrar elementos ya integrados en mi
+biblioteca» permite ocultarlos. Ocultarlos no elimina ni modifica ninguna copia
+lógica: es únicamente un filtro de consulta.
+
 La biblioteca permite:
 
 consultar fotos y vídeos;
