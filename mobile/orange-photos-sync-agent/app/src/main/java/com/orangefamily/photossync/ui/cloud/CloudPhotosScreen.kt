@@ -18,6 +18,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -183,6 +185,18 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     var albumActionBusy by remember { mutableStateOf(false) }
     var albumActionError by remember { mutableStateOf<String?>(null) }
     var coverSelectionMode by remember { mutableStateOf(false) }
+    var albumShareTarget by remember { mutableStateOf<CloudAlbum?>(null) }
+    var albumShareData by remember { mutableStateOf<CloudAlbumRecipients?>(null) }
+    var albumShareSelectedFamilyIds by remember { mutableStateOf(emptySet<String>()) }
+    var albumShareLoading by remember { mutableStateOf(false) }
+    var albumOptionsTarget by remember { mutableStateOf<CloudAlbum?>(null) }
+    var albumOptionsCategoryIds by remember { mutableStateOf(emptySet<String>()) }
+    var albumOptionsAllowContributions by remember { mutableStateOf(false) }
+    var albumOptionsAllowComments by remember { mutableStateOf(false) }
+    var albumOptionsAssociateDate by remember { mutableStateOf(false) }
+    var albumOptionsDateMode by remember { mutableStateOf("single") }
+    var albumOptionsDateStart by remember { mutableStateOf("") }
+    var albumOptionsDateEnd by remember { mutableStateOf("") }
     val context=LocalContext.current
 
     fun clearSelection(){selected=emptySet();selectedDays=emptySet();selectionAnchor=null}
@@ -196,6 +210,29 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     }
     fun requestAlbumRename(album: CloudAlbum) { if (!album.isOwner) return; albumDetailMenuOpen = false; albumActionError = null; albumRenameTarget = album; albumRenameTitle = album.title }
     fun requestAlbumDelete(album: CloudAlbum) { if (!album.isOwner) return; albumDetailMenuOpen = false; albumActionError = null; albumDeleteTarget = album }
+    fun activeAlbumRecipients(data: CloudAlbumRecipients, selectedFamilyIds: Set<String>): List<CloudAlbumRecipient> = buildList {
+        data.family.filter { it.userId in selectedFamilyIds }.forEach { add(it.copy(subjectType = "family", status = "active", invitationId = null, selected = true)) }
+        data.external.filter { it.selected && it.status in setOf("active", "pending") }.forEach { add(it) }
+    }
+    fun requestAlbumShare(album: CloudAlbum) {
+        if (!album.isOwner) return
+        albumDetailMenuOpen = false; albumActionError = null; albumShareTarget = album; albumShareData = null; albumShareSelectedFamilyIds = emptySet()
+        scope.launch {
+            albumShareLoading = true
+            try { val data = api.albumRecipients(album.id); albumShareData = data; albumShareSelectedFamilyIds = data.family.filter { it.selected }.map { it.userId }.toSet() }
+            catch (error: Exception) { albumActionError = error.message ?: "No se pudieron cargar los destinatarios." }
+            finally { albumShareLoading = false }
+        }
+    }
+    fun requestAlbumOptions(album: CloudAlbum) {
+        albumDetailMenuOpen = false; albumActionError = null; albumOptionsTarget = album
+        albumOptionsCategoryIds = album.categories.map { it.id }.toSet(); albumOptionsAllowContributions = album.allowContributions; albumOptionsAllowComments = album.allowComments
+        albumOptionsAssociateDate = !album.dateMode.isNullOrBlank(); albumOptionsDateMode = album.dateMode?.takeIf { it in setOf("single", "range") } ?: "single"; albumOptionsDateStart = album.dateStart?.take(10).orEmpty(); albumOptionsDateEnd = album.dateEnd?.take(10).orEmpty()
+    }
+    fun showAlbumDatePicker(current: String, onSelected: (String) -> Unit) {
+        val initial = parseCloudAlbumDate(current) ?: java.time.LocalDate.now()
+        android.app.DatePickerDialog(context, { _, year, month, day -> onSelected(java.time.LocalDate.of(year, month + 1, day).toString()) }, initial.year, initial.monthValue - 1, initial.dayOfMonth).show()
+    }
     fun handlePhotoClick(photo:CloudPhoto){
         if (coverSelectionMode) {
             val album = selectedAlbum ?: return
@@ -252,7 +289,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     LaunchedEffect(Unit) { albumCategories = runCatching { api.albumCategories() }.getOrDefault(emptyList()) }
     LaunchedEffect(Unit) { members = runCatching { api.members() }.getOrDefault(emptyList()) }
     LaunchedEffect(api, cloudView, selectedAlbum?.id) { reload() }
-    LaunchedEffect(cloudView, selectedAlbum?.id){coverSelectionMode=false;albumDetailMenuOpen=false;clearSelection()}
+    LaunchedEffect(cloudView, selectedAlbum?.id){coverSelectionMode=false;albumDetailMenuOpen=false;albumShareTarget=null;albumShareData=null;albumOptionsTarget=null;albumActionError=null;clearSelection()}
     LaunchedEffect(items,mediaRefreshVersion){val ids=items.map{it.id}.distinct();localByRemoteId=if(ids.isEmpty())emptyMap()else withContext(Dispatchers.IO){repository.remoteLinkedItems(accountUserId,ids)}.filter{deviceScanner.isActive(it)}.mapNotNull{item->item.remotePhotoId?.trim()?.takeIf{it.isNotBlank()}?.let{it to item}}.groupBy({it.first},{it.second})}
     LaunchedEffect(listState.isScrollInProgress) { if (listState.isScrollInProgress) timelineThumbVisible = true else { delay(1500); timelineThumbVisible = false } }
 
@@ -457,6 +494,100 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
             dismissButton = { TextButton(enabled = !albumActionBusy, onClick = { albumDeleteTarget = null }) { Text("Cancelar") } },
         )
     }
+    if (albumShareTarget != null) {
+        val target = albumShareTarget!!
+        AlertDialog(
+            onDismissRequest = { if (!albumActionBusy && !albumShareLoading) { albumShareTarget = null; albumShareData = null } },
+            title = { Text("Compartir álbum") },
+            text = {
+                if (albumShareLoading) CircularProgressIndicator()
+                else if (albumShareData == null) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    albumActionError?.let { Text(it) }
+                    TextButton(onClick = { requestAlbumShare(target) }) { Text("Reintentar") }
+                } else {
+                    val data = albumShareData!!
+                    val family = data.family
+                    val allFamilySelected = family.isNotEmpty() && family.all { it.userId in albumShareSelectedFamilyIds }
+                    Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                        Text("PERSONAS", style = MaterialTheme.typography.labelLarge)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = allFamilySelected, onCheckedChange = { albumShareSelectedFamilyIds = if (it) family.map { member -> member.userId }.toSet() else emptySet() })
+                            Text("Toda la familia")
+                        }
+                        family.forEach { member ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = member.userId in albumShareSelectedFamilyIds, onCheckedChange = { checked -> albumShareSelectedFamilyIds = if (checked) albumShareSelectedFamilyIds + member.userId else albumShareSelectedFamilyIds - member.userId })
+                                Text(member.displayName + (if (member.role == "guest") " · Invitado" else " · Familiar") + (member.email?.let { " · $it" } ?: ""))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = !albumActionBusy && albumShareData != null, onClick = {
+                    val data = albumShareData!!
+                    albumActionBusy = true; albumActionError = null
+                    scope.launch {
+                        try { api.syncAlbumRecipients(target.id, activeAlbumRecipients(data, albumShareSelectedFamilyIds), data.allowContributions, data.allowComments); refreshAlbumsPreservingSelection(); albumShareTarget = null; albumShareData = null; Toast.makeText(context, "Acceso al álbum actualizado.", Toast.LENGTH_LONG).show() }
+                        catch (error: Exception) { albumActionError = error.message }
+                        finally { albumActionBusy = false }
+                    }
+                }) { Text("Guardar") }
+            },
+            dismissButton = { TextButton(enabled = !albumActionBusy, onClick = { albumShareTarget = null; albumShareData = null }) { Text("Cancelar") } },
+        )
+    }
+    if (albumOptionsTarget != null) {
+        val target = albumOptionsTarget!!
+        val invalidDates = albumOptionsAssociateDate && (albumOptionsDateStart.isBlank() || (albumOptionsDateMode == "range" && (albumOptionsDateEnd.isBlank() || albumOptionsDateEnd < albumOptionsDateStart)))
+        AlertDialog(
+            onDismissRequest = { if (!albumActionBusy) albumOptionsTarget = null },
+            title = { Text("Opciones del álbum") },
+            text = {
+                Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("CATEGORÍAS", style = MaterialTheme.typography.labelLarge)
+                    if (albumCategories.isEmpty()) Text("Todavía no has creado categorías.")
+                    albumCategories.forEach { category -> Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = category.id in albumOptionsCategoryIds, onCheckedChange = { checked -> albumOptionsCategoryIds = if (checked) albumOptionsCategoryIds + category.id else albumOptionsCategoryIds - category.id }); Text(category.name) } }
+                    if (target.isOwner) {
+                        Text("PERMISOS", style = MaterialTheme.typography.labelLarge)
+                        Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = albumOptionsAllowContributions, onCheckedChange = { albumOptionsAllowContributions = it }); Text("Permitir añadir fotos y vídeos") }
+                        Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = albumOptionsAllowComments, onCheckedChange = { albumOptionsAllowComments = it }); Text("Permitir comentarios") }
+                        Text("Los comentarios se habilitarán cuando esta función esté disponible.")
+                        Text("FECHA", style = MaterialTheme.typography.labelLarge)
+                        Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = albumOptionsAssociateDate, onCheckedChange = { albumOptionsAssociateDate = it }); Text("Asociar fecha") }
+                        if (albumOptionsAssociateDate) {
+                            Row(verticalAlignment = Alignment.CenterVertically) { RadioButton(selected = albumOptionsDateMode == "single", onClick = { albumOptionsDateMode = "single" }); Text("Fecha única"); RadioButton(selected = albumOptionsDateMode == "range", onClick = { albumOptionsDateMode = "range" }); Text("Intervalo") }
+                            TextButton(onClick = { showAlbumDatePicker(albumOptionsDateStart) { albumOptionsDateStart = it } }) { Text(if (albumOptionsDateStart.isBlank()) "Fecha" else albumOptionsDateStart) }
+                            if (albumOptionsDateMode == "range") { TextButton(onClick = { showAlbumDatePicker(albumOptionsDateEnd) { albumOptionsDateEnd = it } }) { Text(if (albumOptionsDateEnd.isBlank()) "Hasta" else albumOptionsDateEnd) } }
+                        }
+                    }
+                    albumActionError?.let { Text(it) }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = !albumActionBusy && !invalidDates, onClick = {
+                    albumActionBusy = true; albumActionError = null
+                    scope.launch {
+                        try {
+                            if (target.isOwner) {
+                                val permissionsChanged = albumOptionsAllowContributions != target.allowContributions || albumOptionsAllowComments != target.allowComments
+                                val recipientData = if (permissionsChanged) api.albumRecipients(target.id) else null
+                                val dateMode = if (albumOptionsAssociateDate) albumOptionsDateMode else null
+                                val dateStart = if (albumOptionsAssociateDate) albumOptionsDateStart else null
+                                val dateEnd = if (!albumOptionsAssociateDate) null else if (albumOptionsDateMode == "single") albumOptionsDateStart else albumOptionsDateEnd
+                                api.updateAlbumDates(target.id, dateMode, dateStart, dateEnd)
+                                if (recipientData != null) api.syncAlbumRecipients(target.id, activeAlbumRecipients(recipientData, recipientData.family.filter { it.selected }.map { it.userId }.toSet()), albumOptionsAllowContributions, albumOptionsAllowComments)
+                            }
+                            api.setAlbumCategories(target.id, albumOptionsCategoryIds)
+                            refreshAlbumsPreservingSelection(); albumOptionsTarget = null; Toast.makeText(context, "Opciones del álbum actualizadas.", Toast.LENGTH_LONG).show()
+                        } catch (error: Exception) { albumActionError = error.message; runCatching { refreshAlbumsPreservingSelection() } }
+                        finally { albumActionBusy = false }
+                    }
+                }) { Text("Guardar") }
+            },
+            dismissButton = { TextButton(enabled = !albumActionBusy, onClick = { albumOptionsTarget = null }) { Text("Cancelar") } },
+        )
+    }
     ModalNavigationDrawer(drawerState = drawerState, drawerContent = {
         ModalDrawerSheet {
             Spacer(Modifier.height(20.dp))
@@ -518,7 +649,7 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
                 if (cloudView == CloudView.ALBUMS) {
-                    CloudAlbumsView(albums = albums, categories = albumCategories, thumbnailLoader = thumbnailLoader, onOpen = { selectedAlbum = it; cloudView = CloudView.ALBUM_DETAIL }, onRename = { requestAlbumRename(it) }, onDelete = { requestAlbumDelete(it) })
+                    CloudAlbumsView(albums = albums, categories = albumCategories, thumbnailLoader = thumbnailLoader, onOpen = { selectedAlbum = it; cloudView = CloudView.ALBUM_DETAIL }, onRename = { requestAlbumRename(it) }, onShare = { requestAlbumShare(it) }, onOptions = { requestAlbumOptions(it) }, onDelete = { requestAlbumDelete(it) })
                 } else {
                 if (selectedAlbum != null) {
                     Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -527,12 +658,18 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                             TextButton(onClick = { coverSelectionMode = false }) { Text("Cancelar") }
                         } else {
                             Text(selectedAlbum!!.title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                            if (selectedAlbum!!.isOwner) Box {
+                            if (selectedAlbum!!.isOwner) IconButton(onClick = { requestAlbumShare(selectedAlbum!!) }) { Icon(OrangeShareIcon, null) }
+                            Box {
                                 IconButton(onClick = { albumDetailMenuOpen = true }) { Text("⋮") }
                                 DropdownMenu(expanded = albumDetailMenuOpen, onDismissRequest = { albumDetailMenuOpen = false }) {
-                                    DropdownMenuItem(text = { Text("Cambiar nombre") }, onClick = { requestAlbumRename(selectedAlbum!!) })
-                                    DropdownMenuItem(text = { Text("Elegir imagen de portada") }, onClick = { albumDetailMenuOpen = false; clearSelection(); coverSelectionMode = true })
-                                    DropdownMenuItem(text = { Text("Eliminar álbum") }, onClick = { requestAlbumDelete(selectedAlbum!!) })
+                                    if (selectedAlbum!!.isOwner) {
+                                        DropdownMenuItem(text = { Text("Cambiar nombre") }, onClick = { requestAlbumRename(selectedAlbum!!) })
+                                        DropdownMenuItem(text = { Text("Elegir imagen de portada") }, onClick = { albumDetailMenuOpen = false; clearSelection(); coverSelectionMode = true })
+                                        DropdownMenuItem(text = { Text("Opciones") }, onClick = { requestAlbumOptions(selectedAlbum!!) })
+                                        DropdownMenuItem(text = { Text("Eliminar álbum") }, onClick = { requestAlbumDelete(selectedAlbum!!) })
+                                    } else {
+                                        DropdownMenuItem(text = { Text("Opciones") }, onClick = { requestAlbumOptions(selectedAlbum!!) })
+                                    }
                                 }
                             }
                         }
@@ -838,6 +975,8 @@ private fun CloudAlbumsView(
     thumbnailLoader: RemoteThumbnailLoader,
     onOpen: (CloudAlbum) -> Unit,
     onRename: (CloudAlbum) -> Unit,
+    onShare: (CloudAlbum) -> Unit,
+    onOptions: (CloudAlbum) -> Unit,
     onDelete: (CloudAlbum) -> Unit,
 ) {
     var sortMode by remember { mutableStateOf(CloudAlbumSortMode.ALBUM_DATE_DESC) }
@@ -932,11 +1071,17 @@ private fun CloudAlbumsView(
                                 }
                                 album.sharedByDisplayName?.let { Text("Compartido por $it", style = MaterialTheme.typography.labelSmall) }
                             }
-                            if (album.isOwner) Box {
+                            Box {
                                 IconButton(onClick = { activeMenuAlbumId = album.id }) { Text("⋮") }
                                 DropdownMenu(expanded = activeMenuAlbumId == album.id, onDismissRequest = { activeMenuAlbumId = null }) {
-                                    DropdownMenuItem(text = { Text("Cambiar nombre") }, onClick = { activeMenuAlbumId = null; onRename(album) })
-                                    DropdownMenuItem(text = { Text("Eliminar álbum") }, onClick = { activeMenuAlbumId = null; onDelete(album) })
+                                    if (album.isOwner) {
+                                        DropdownMenuItem(text = { Text("Cambiar nombre") }, onClick = { activeMenuAlbumId = null; onRename(album) })
+                                        DropdownMenuItem(text = { Text("Compartir álbum") }, onClick = { activeMenuAlbumId = null; onShare(album) })
+                                        DropdownMenuItem(text = { Text("Opciones") }, onClick = { activeMenuAlbumId = null; onOptions(album) })
+                                        DropdownMenuItem(text = { Text("Eliminar álbum") }, onClick = { activeMenuAlbumId = null; onDelete(album) })
+                                    } else {
+                                        DropdownMenuItem(text = { Text("Opciones") }, onClick = { activeMenuAlbumId = null; onOptions(album) })
+                                    }
                                 }
                             }
                         }

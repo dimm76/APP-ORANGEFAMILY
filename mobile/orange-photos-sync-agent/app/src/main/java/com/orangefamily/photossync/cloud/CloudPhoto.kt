@@ -79,6 +79,8 @@ data class CloudAlbum(
     val isOwner: Boolean,
     val sharedByDisplayName: String?,
     val canContribute: Boolean = false,
+    val allowContributions: Boolean = false,
+    val allowComments: Boolean = false,
     val categories: List<CloudAlbumCategory> = emptyList(),
 )
 
@@ -86,6 +88,24 @@ data class CloudAlbumCategory(
     val id: String,
     val name: String,
     val sortOrder: Int,
+)
+
+data class CloudAlbumRecipient(
+    val userId: String,
+    val subjectType: String,
+    val displayName: String,
+    val role: String?,
+    val email: String?,
+    val selected: Boolean,
+    val status: String,
+    val invitationId: String?,
+)
+
+data class CloudAlbumRecipients(
+    val allowContributions: Boolean,
+    val allowComments: Boolean,
+    val family: List<CloudAlbumRecipient>,
+    val external: List<CloudAlbumRecipient>,
 )
 
 data class CloudMember(val id:String,val displayName:String,val role:String?)

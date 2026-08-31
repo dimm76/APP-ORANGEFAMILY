@@ -111,6 +111,8 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
                             isOwner = item.optBoolean("is_owner"),
                             sharedByDisplayName = item.optionalString("shared_by_display_name"),
                             canContribute = item.optBoolean("can_contribute"),
+                            allowContributions = item.optBoolean("allow_contributions"),
+                            allowComments = item.optBoolean("allow_comments"),
                             categories = categories,
                         ),
                     )
@@ -150,6 +152,39 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
         )
     }
 
+    private fun parseAlbumRecipient(item: JSONObject): CloudAlbumRecipient? {
+        val userId = item.optString("user_id").trim()
+        val subjectType = item.optString("type").trim()
+        if (userId.isBlank() || subjectType !in setOf("family", "external")) return null
+        return CloudAlbumRecipient(
+            userId = userId,
+            subjectType = subjectType,
+            displayName = item.optString("display_name").trim().ifBlank { item.optString("email").trim().ifBlank { "Usuario" } },
+            role = item.optionalString("role"),
+            email = item.optionalString("email"),
+            selected = item.optBoolean("selected"),
+            status = item.optString("status").trim().ifBlank { "available" },
+            invitationId = item.optionalString("invitation_id"),
+        )
+    }
+
+    suspend fun albumRecipients(albumId: String): CloudAlbumRecipients = withContext(Dispatchers.IO) {
+        request("${baseUrl}api/orange-photo-albums/${encode(albumId)}/recipients", "No se pudieron cargar los destinatarios.") { json ->
+            val album = json.optJSONObject("album")
+            fun parseRecipients(name: String) = buildList {
+                val values = json.optJSONArray(name) ?: return@buildList
+                for (index in 0 until values.length()) values.optJSONObject(index)?.let(::parseAlbumRecipient)?.let(::add)
+            }
+            CloudAlbumRecipients(album?.optBoolean("allow_contributions") == true, album?.optBoolean("allow_comments") == true, parseRecipients("family"), parseRecipients("external"))
+        }
+    }
+
+    suspend fun syncAlbumRecipients(albumId: String, recipients: List<CloudAlbumRecipient>, allowContributions: Boolean, allowComments: Boolean) = withContext(Dispatchers.IO) {
+        val values = JSONArray()
+        recipients.forEach { recipient -> values.put(JSONObject().put("user_id", recipient.userId).put("subject_type", recipient.subjectType).put("status", recipient.status).put("invitation_id", recipient.invitationId ?: JSONObject.NULL)) }
+        request("${baseUrl}api/orange-photo-albums/${encode(albumId)}/recipients", "No se pudo guardar el acceso al álbum.", "PUT", JSONObject().put("recipients", values).put("allow_contributions", allowContributions).put("allow_comments", allowComments)) {}
+    }
+
     private fun parsePhoto(item: JSONObject): CloudPhoto? {
         val id = item.optString("id").trim()
         val mediaType = item.optString("media_type").trim()
@@ -183,6 +218,15 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
 
     suspend fun archiveAlbum(albumId: String) {
         patchAlbum(albumId, JSONObject().put("is_archived", true))
+    }
+
+    suspend fun updateAlbumDates(albumId: String, dateMode: String?, dateStart: String?, dateEnd: String?) {
+        require(dateMode == null || dateMode in setOf("single", "range"))
+        patchAlbum(albumId, JSONObject().put("date_mode", dateMode ?: JSONObject.NULL).put("date_start", dateStart ?: JSONObject.NULL).put("date_end", dateEnd ?: JSONObject.NULL))
+    }
+
+    suspend fun setAlbumCategories(albumId: String, categoryIds: Collection<String>) = withContext(Dispatchers.IO) {
+        request("${baseUrl}api/orange-photo-albums/${encode(albumId)}/categories", "No se pudieron guardar las categorías del álbum.", "PUT", JSONObject().put("category_ids", JSONArray(categoryIds.toList()))) {}
     }
 
     suspend fun members(): List<CloudMember> = withContext(Dispatchers.IO) { request<List<CloudMember>>("${baseUrl}api/orange-photo-members", "No se pudieron cargar los miembros.") { json -> buildList { val values=json.optJSONArray("items")?:return@request emptyList<CloudMember>(); for(i in 0 until values.length()){val item=values.optJSONObject(i)?:continue;val id=item.optString("id").trim();if(id.isNotBlank())add(CloudMember(id,item.optString("display_name"),item.optionalString("role")))}} } }
