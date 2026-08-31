@@ -559,7 +559,7 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                                                 row.photos.forEach { photo ->
                                                     val photoSelected=photo.id in selected
                                                     Box(Modifier.width((cloudAspectRatio(photo) * row.height).dp).fillMaxHeight().background(if(photoSelected)OrangePrimary.copy(alpha=.18f) else Color.Transparent).padding(if(photoSelected)5.dp else 0.dp).clip(if(photoSelected)RoundedCornerShape(10.dp) else RoundedCornerShape(0.dp)).combinedClickable(onClick={handlePhotoClick(photo)},onLongClick={if(!coverSelectionMode){extendSelection(photo)}})) {
-                                                        val showOwnerLabel = cloudView == CloudView.SHARED_WITH_ME || cloudView == CloudView.ALBUM_DETAIL
+                                                        val showOwnerLabel = !coverSelectionMode && (cloudView == CloudView.SHARED_WITH_ME || cloudView == CloudView.ALBUM_DETAIL)
                                                         val ownerLabel = if (showOwnerLabel) {
                                                             if (!photo.isOwner) photo.sharedByFirstName ?: photo.ownerFirstName else photo.ownerFirstName
                                                         } else null
