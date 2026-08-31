@@ -373,10 +373,13 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
 
     fun activeAlbumId(): String? = if (cloudView == CloudView.ALBUM_DETAIL) selectedAlbum?.id else null
     suspend fun reload() {
+        val generation = timelineRequestGeneration
         if (cloudView == CloudView.ALBUMS) { loading = false; return }
         loading = true; error = null
         if (cloudView == CloudView.TRASH) {
-            runCatching { api.photos(perPage = CLOUD_PAGE_SIZE, trashed = true, includeTotal = false) }
+            val trashResult = runCatching { api.photos(perPage = CLOUD_PAGE_SIZE, trashed = true, includeTotal = false) }
+            if (generation != timelineRequestGeneration) return
+            trashResult
                 .onSuccess { photos -> items = photos.items; page = photos.page; hasMore = photos.hasMore; hasNewer = false; newerCursor = null; hasOlder = false; olderCursor = null; pagingMode = CloudPagingMode.NORMAL; timeline = emptyList() }
                 .onFailure { error = it.message ?: "No se pudo cargar la papelera." }
             loading = false
@@ -394,12 +397,15 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
                 filters = activePhotoFilters,
             )
         }
+        if (generation != timelineRequestGeneration) return
         photosResult
             .onSuccess { photos -> items = photos.items; page = photos.page; hasMore = photos.hasMore; hasNewer = false; newerCursor = null; hasOlder = false; olderCursor = null; pagingMode = CloudPagingMode.NORMAL }
             .onFailure { error = it.message ?: "No se pudo cargar la biblioteca." }
         loading = false
         if (photosResult.isFailure) return
-        runCatching { api.timeline(albumId, sharedWithMe, activePhotoFilters) }
+        val timelineResult = runCatching { api.timeline(albumId, sharedWithMe, activePhotoFilters) }
+        if (generation != timelineRequestGeneration) return
+        timelineResult
             .onSuccess { timeline = it }
     }
     LaunchedEffect(Unit) { albums = runCatching { api.albums() }.getOrDefault(emptyList()) }
