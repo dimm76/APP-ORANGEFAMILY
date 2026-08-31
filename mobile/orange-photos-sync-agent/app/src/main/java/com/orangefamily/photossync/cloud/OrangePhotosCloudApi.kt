@@ -159,6 +159,32 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
 
     suspend fun addToLibrary(photoId: String) = withContext(Dispatchers.IO) { request("${baseUrl}api/orange-photos/${encode(photoId)}/library", "No se pudo añadir la foto a mi biblioteca.", "POST") {} }
 
+    private suspend fun patchAlbum(
+        albumId: String,
+        body: JSONObject,
+    ) = withContext(Dispatchers.IO) {
+        request(
+            "${baseUrl}api/orange-photo-albums/${encode(albumId)}",
+            "No se pudo actualizar el álbum.",
+            "PATCH",
+            body,
+        ) {}
+    }
+
+    suspend fun renameAlbum(albumId: String, title: String) {
+        val normalizedTitle = title.trim()
+        require(normalizedTitle.isNotBlank()) { "El nombre del álbum es obligatorio." }
+        patchAlbum(albumId, JSONObject().put("title", normalizedTitle))
+    }
+
+    suspend fun setAlbumCover(albumId: String, photoId: String) {
+        patchAlbum(albumId, JSONObject().put("cover_photo_id", photoId))
+    }
+
+    suspend fun archiveAlbum(albumId: String) {
+        patchAlbum(albumId, JSONObject().put("is_archived", true))
+    }
+
     suspend fun members(): List<CloudMember> = withContext(Dispatchers.IO) { request<List<CloudMember>>("${baseUrl}api/orange-photo-members", "No se pudieron cargar los miembros.") { json -> buildList { val values=json.optJSONArray("items")?:return@request emptyList<CloudMember>(); for(i in 0 until values.length()){val item=values.optJSONObject(i)?:continue;val id=item.optString("id").trim();if(id.isNotBlank())add(CloudMember(id,item.optString("display_name"),item.optionalString("role")))}} } }
     suspend fun addPhotoToAlbum(albumId: String, photoId: String): Boolean = withContext(Dispatchers.IO) {
         request(

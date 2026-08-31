@@ -176,12 +176,46 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     var trashDialogOpen by remember { mutableStateOf(false) }
     var deleteLocalDialogOpen by remember { mutableStateOf(false) }
     var deleteBothDialogOpen by remember { mutableStateOf(false) }
+    var albumDetailMenuOpen by remember { mutableStateOf(false) }
+    var albumRenameTarget by remember { mutableStateOf<CloudAlbum?>(null) }
+    var albumRenameTitle by remember { mutableStateOf("") }
+    var albumDeleteTarget by remember { mutableStateOf<CloudAlbum?>(null) }
+    var albumActionBusy by remember { mutableStateOf(false) }
+    var albumActionError by remember { mutableStateOf<String?>(null) }
+    var coverSelectionMode by remember { mutableStateOf(false) }
     val context=LocalContext.current
 
     fun clearSelection(){selected=emptySet();selectedDays=emptySet();selectionAnchor=null}
     fun toggleSelection(photo:CloudPhoto){val next=selected.toMutableSet();if(!next.add(photo.id))next.remove(photo.id);selected=next;selectionAnchor=photo.id}
     fun extendSelection(photo:CloudPhoto){val anchor=selectionAnchor;if(anchor==null||selected.isEmpty()){selected=selected+photo.id;selectionAnchor=photo.id;return};val start=items.indexOfFirst{it.id==anchor};val end=items.indexOfFirst{it.id==photo.id};if(start<0||end<0){selected=selected+photo.id;selectionAnchor=photo.id;return};selected=selected+items.subList(minOf(start,end),maxOf(start,end)+1).map{it.id};selectionAnchor=photo.id}
-    fun handlePhotoClick(photo:CloudPhoto){if(selected.isEmpty())onOpen(photo)else toggleSelection(photo)}
+    suspend fun refreshAlbumsPreservingSelection() {
+        val selectedId = selectedAlbum?.id
+        val refreshed = api.albums()
+        albums = refreshed
+        if (selectedId != null) selectedAlbum = refreshed.firstOrNull { it.id == selectedId }
+    }
+    fun requestAlbumRename(album: CloudAlbum) { if (!album.isOwner) return; albumDetailMenuOpen = false; albumActionError = null; albumRenameTarget = album; albumRenameTitle = album.title }
+    fun requestAlbumDelete(album: CloudAlbum) { if (!album.isOwner) return; albumDetailMenuOpen = false; albumActionError = null; albumDeleteTarget = album }
+    fun handlePhotoClick(photo:CloudPhoto){
+        if (coverSelectionMode) {
+            val album = selectedAlbum ?: return
+            if (photo.mediaType != "image") { Toast.makeText(context, "La portada debe ser una imagen.", Toast.LENGTH_LONG).show(); return }
+            if (albumActionBusy) return
+            albumActionBusy = true
+            scope.launch {
+                try {
+                    api.setAlbumCover(album.id, photo.id)
+                    refreshAlbumsPreservingSelection()
+                    coverSelectionMode = false
+                    Toast.makeText(context, "Portada actualizada.", Toast.LENGTH_LONG).show()
+                } catch (error: Exception) {
+                    bulkMessage = error.message ?: "No se pudo actualizar la portada."
+                } finally { albumActionBusy = false }
+            }
+            return
+        }
+        if(selected.isEmpty())onOpen(photo)else toggleSelection(photo)
+    }
     fun toggleDay(day:CloudPhotoDay){val ids=day.photos.map{it.id}.toSet();val all=ids.isNotEmpty()&&ids.all{it in selected};selected=selected.toMutableSet().apply{if(all)removeAll(ids)else addAll(ids)};selectedDays=selectedDays.toMutableSet().apply{if(all)remove(day.key)else add(day.key)};if(!all)selectionAnchor=day.photos.lastOrNull()?.id}
 
     fun activeAlbumId(): String? = if (cloudView == CloudView.ALBUM_DETAIL) selectedAlbum?.id else null
@@ -218,7 +252,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     LaunchedEffect(Unit) { albumCategories = runCatching { api.albumCategories() }.getOrDefault(emptyList()) }
     LaunchedEffect(Unit) { members = runCatching { api.members() }.getOrDefault(emptyList()) }
     LaunchedEffect(api, cloudView, selectedAlbum?.id) { reload() }
-    LaunchedEffect(cloudView, selectedAlbum?.id){clearSelection()}
+    LaunchedEffect(cloudView, selectedAlbum?.id){coverSelectionMode=false;albumDetailMenuOpen=false;clearSelection()}
     LaunchedEffect(items,mediaRefreshVersion){val ids=items.map{it.id}.distinct();localByRemoteId=if(ids.isEmpty())emptyMap()else withContext(Dispatchers.IO){repository.remoteLinkedItems(accountUserId,ids)}.filter{deviceScanner.isActive(it)}.mapNotNull{item->item.remotePhotoId?.trim()?.takeIf{it.isNotBlank()}?.let{it to item}}.groupBy({it.first},{it.second})}
     LaunchedEffect(listState.isScrollInProgress) { if (listState.isScrollInProgress) timelineThumbVisible = true else { delay(1500); timelineThumbVisible = false } }
 
@@ -366,6 +400,63 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
     if(trashDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)trashDialogOpen=false},title={Text("Papelera nube")},text={Text(if(selectedPhotos.size==1)"Se moverá 1 elemento de OrangeFamily a su papelera. La copia del dispositivo no se modificará." else "Se moverán ${selectedPhotos.size} elementos de OrangeFamily a su papelera. Las copias del dispositivo no se modificarán.")},confirmButton={TextButton(enabled=!bulkBusy,onClick={runBulk{selectedPhotos.forEach{api.trashPhoto(it.id)};trashDialogOpen=false}}){Text("Mover")}},dismissButton={TextButton(onClick={if(!bulkBusy)trashDialogOpen=false}){Text("Cancelar")}})
     if(deleteLocalDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)deleteLocalDialogOpen=false},title={Text("Eliminar copia local")},text={Text(if(selectedLocalItems.size==1)"Se moverá 1 copia del dispositivo a su papelera. OrangeFamily no se modificará." else "Se moverán ${selectedLocalItems.size} copias del dispositivo a su papelera. OrangeFamily no se modificará.")},confirmButton={TextButton(enabled=!bulkBusy,onClick={bulkBusy=true;onDeleteLocalCopies(selectedLocalItems){success,message->bulkBusy=false;deleteLocalDialogOpen=false;if(success)clearSelection() else if(!message.isNullOrBlank())bulkMessage=message}}){Text("Eliminar local")}},dismissButton={TextButton(onClick={if(!bulkBusy)deleteLocalDialogOpen=false}){Text("Cancelar")}})
     if(deleteBothDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)deleteBothDialogOpen=false},title={Text("Eliminar de ambos")},text={Text(if(android.os.Build.VERSION.SDK_INT>=android.os.Build.VERSION_CODES.R)if(selectedPhotos.size==1)"Se moverá 1 elemento de OrangeFamily a su papelera. Si existe una copia en el dispositivo, también se moverá a la papelera del dispositivo." else "Se moverán ${selectedPhotos.size} elementos de OrangeFamily a su papelera. Las copias existentes en el dispositivo también se moverán a la papelera del dispositivo." else if(selectedPhotos.size==1)"Se moverá 1 elemento de OrangeFamily a su papelera. No hay una copia local detectada en el dispositivo." else "Se moverán ${selectedPhotos.size} elementos de OrangeFamily a su papelera. No hay copias locales detectadas en el dispositivo.")},confirmButton={TextButton(enabled=!bulkBusy,onClick={bulkBusy=true;onDeleteCloudAndLocal(selectedPhotos.map{it.id}.distinct(),selectedLocalItems){success,message->bulkBusy=false;deleteBothDialogOpen=false;if(success)scope.launch{reload();clearSelection()} else if(!message.isNullOrBlank())bulkMessage=message}}){Text("Eliminar de ambos")}},dismissButton={TextButton(onClick={if(!bulkBusy)deleteBothDialogOpen=false}){Text("Cancelar")}})
+    if (albumRenameTarget != null) {
+        val target = albumRenameTarget!!
+        AlertDialog(
+            onDismissRequest = { if (!albumActionBusy) albumRenameTarget = null },
+            title = { Text("Cambiar nombre") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = albumRenameTitle, onValueChange = { albumRenameTitle = it.take(500) }, singleLine = true)
+                    albumActionError?.let { Text(it) }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = !albumActionBusy && albumRenameTitle.trim().isNotEmpty(), onClick = {
+                    albumActionBusy = true
+                    albumActionError = null
+                    scope.launch {
+                        try {
+                            api.renameAlbum(target.id, albumRenameTitle)
+                            refreshAlbumsPreservingSelection()
+                            albumRenameTarget = null
+                            Toast.makeText(context, "Nombre del álbum actualizado.", Toast.LENGTH_LONG).show()
+                        } catch (error: Exception) {
+                            albumActionError = error.message
+                        } finally { albumActionBusy = false }
+                    }
+                }) { Text("Guardar") }
+            },
+            dismissButton = { TextButton(enabled = !albumActionBusy, onClick = { albumRenameTarget = null }) { Text("Cancelar") } },
+        )
+    }
+    if (albumDeleteTarget != null) {
+        val target = albumDeleteTarget!!
+        AlertDialog(
+            onDismissRequest = { if (!albumActionBusy) albumDeleteTarget = null },
+            title = { Text("Eliminar álbum") },
+            text = { Column { Text("Se eliminará el álbum, pero sus fotos permanecerán en tu biblioteca."); albumActionError?.let { Text(it) } } },
+            confirmButton = {
+                TextButton(enabled = !albumActionBusy, onClick = {
+                    if (!target.isOwner) return@TextButton
+                    albumActionBusy = true
+                    albumActionError = null
+                    scope.launch {
+                        try {
+                            api.archiveAlbum(target.id)
+                            albums = api.albums()
+                            if (selectedAlbum?.id == target.id) { selectedAlbum = null; coverSelectionMode = false; cloudView = CloudView.ALBUMS }
+                            albumDeleteTarget = null
+                            Toast.makeText(context, "Álbum eliminado.", Toast.LENGTH_LONG).show()
+                        } catch (error: Exception) {
+                            albumActionError = error.message
+                        } finally { albumActionBusy = false }
+                    }
+                }) { Text("Eliminar álbum") }
+            },
+            dismissButton = { TextButton(enabled = !albumActionBusy, onClick = { albumDeleteTarget = null }) { Text("Cancelar") } },
+        )
+    }
     ModalNavigationDrawer(drawerState = drawerState, drawerContent = {
         ModalDrawerSheet {
             Spacer(Modifier.height(20.dp))
@@ -423,13 +514,30 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                     )
                 }
             },
-            bottomBar = { if(selectedPhotos.isNotEmpty()){Column{if(selected.size>MAX_CLOUD_BULK_SELECTION)Text("Puedes realizar acciones sobre un máximo de 500 elementos a la vez.",modifier=Modifier.padding(8.dp));SelectionActionTray(actions=if(cloudView==CloudView.TRASH)listOf(restoreCloudAction,purgeCloudAction) else listOf(selectionActions.first(),addToLibraryAction,downloadAction,selectionActions[1],selectionActions[5],deleteLocalAction,deleteBothAction,selectionActions[2],selectionActions[3],selectionActions[4]),reopenKey=selected)}}},
+            bottomBar = { if(!coverSelectionMode&&selectedPhotos.isNotEmpty()){Column{if(selected.size>MAX_CLOUD_BULK_SELECTION)Text("Puedes realizar acciones sobre un máximo de 500 elementos a la vez.",modifier=Modifier.padding(8.dp));SelectionActionTray(actions=if(cloudView==CloudView.TRASH)listOf(restoreCloudAction,purgeCloudAction) else listOf(selectionActions.first(),addToLibraryAction,downloadAction,selectionActions[1],selectionActions[5],deleteLocalAction,deleteBothAction,selectionActions[2],selectionActions[3],selectionActions[4]),reopenKey=selected)}}},
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
                 if (cloudView == CloudView.ALBUMS) {
-                    CloudAlbumsView(albums, albumCategories, thumbnailLoader) { selectedAlbum = it; cloudView = CloudView.ALBUM_DETAIL }
+                    CloudAlbumsView(albums = albums, categories = albumCategories, thumbnailLoader = thumbnailLoader, onOpen = { selectedAlbum = it; cloudView = CloudView.ALBUM_DETAIL }, onRename = { requestAlbumRename(it) }, onDelete = { requestAlbumDelete(it) })
                 } else {
-                if (selectedAlbum != null) Text(selectedAlbum!!.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(12.dp))
+                if (selectedAlbum != null) {
+                    Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (coverSelectionMode) {
+                            Text("Selecciona una imagen de portada", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                            TextButton(onClick = { coverSelectionMode = false }) { Text("Cancelar") }
+                        } else {
+                            Text(selectedAlbum!!.title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                            if (selectedAlbum!!.isOwner) Box {
+                                IconButton(onClick = { albumDetailMenuOpen = true }) { Text("⋮") }
+                                DropdownMenu(expanded = albumDetailMenuOpen, onDismissRequest = { albumDetailMenuOpen = false }) {
+                                    DropdownMenuItem(text = { Text("Cambiar nombre") }, onClick = { requestAlbumRename(selectedAlbum!!) })
+                                    DropdownMenuItem(text = { Text("Elegir imagen de portada") }, onClick = { albumDetailMenuOpen = false; clearSelection(); coverSelectionMode = true })
+                                    DropdownMenuItem(text = { Text("Eliminar álbum") }, onClick = { requestAlbumDelete(selectedAlbum!!) })
+                                }
+                            }
+                        }
+                    }
+                }
            if (cloudView == CloudView.TRASH) Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal=12.dp),verticalAlignment=Alignment.CenterVertically) { Text("Papelera nube",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f));TextButton(enabled=!bulkBusy&&items.isNotEmpty()&&(hasMore||selected.size!=items.size),onClick={selectAllTrash()}){Text("Seleccionar todo")} }
                 if (loading) CircularProgressIndicator(Modifier.align(Alignment.Center))
                 else if (error != null) Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) { Text(error!!); OutlinedButton({ scope.launch { reload() } }) { Text(stringResource(R.string.cloud_retry)) } }
@@ -442,7 +550,7 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                             item(key = "period:${period.key}", contentType = "period-header") { Text(period.label, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = if (periodIndex == 0) 10.dp else 20.dp, bottom = 6.dp)) }
                             period.days.forEach { day ->
                                         item(key = "day:${period.key}:${day.key}", contentType = "day-header") {
-                                        Row(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=7.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){val ids=day.photos.map{it.id};val all=ids.isNotEmpty()&&ids.all{it in selected};Box(Modifier.size(24.dp).background(if(all)OrangePrimary else Color.Transparent,CircleShape).border(2.dp,if(all)OrangePrimary else MaterialTheme.colorScheme.outline,CircleShape).clickable{toggleDay(day)},contentAlignment=Alignment.Center){if(ids.any{it in selected})Text("✓",color=if(all)Color.White else OrangePrimary,fontWeight=FontWeight.Bold)};Text(day.label,style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                                                Row(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=7.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){val ids=day.photos.map{it.id};val all=ids.isNotEmpty()&&ids.all{it in selected};if(!coverSelectionMode)Box(Modifier.size(24.dp).background(if(all)OrangePrimary else Color.Transparent,CircleShape).border(2.dp,if(all)OrangePrimary else MaterialTheme.colorScheme.outline,CircleShape).clickable{toggleDay(day)},contentAlignment=Alignment.Center){if(ids.any{it in selected})Text("✓",color=if(all)Color.White else OrangePrimary,fontWeight=FontWeight.Bold)};Text(day.label,style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
                                         }
                                         justifiedRowsByDay["${period.key}:${day.key}"].orEmpty().forEach { row ->
                                             item(key = "row:${period.key}:${day.key}:${row.photos.joinToString(","){it.id}}", contentType = "photo-row") {
@@ -450,7 +558,7 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                                             Row(Modifier.fillMaxWidth().height(row.height.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                                 row.photos.forEach { photo ->
                                                     val photoSelected=photo.id in selected
-                                                    Box(Modifier.width((cloudAspectRatio(photo) * row.height).dp).fillMaxHeight().background(if(photoSelected)OrangePrimary.copy(alpha=.18f) else Color.Transparent).padding(if(photoSelected)5.dp else 0.dp).clip(if(photoSelected)RoundedCornerShape(10.dp) else RoundedCornerShape(0.dp)).combinedClickable(onClick={handlePhotoClick(photo)},onLongClick={extendSelection(photo)})) {
+                                                    Box(Modifier.width((cloudAspectRatio(photo) * row.height).dp).fillMaxHeight().background(if(photoSelected)OrangePrimary.copy(alpha=.18f) else Color.Transparent).padding(if(photoSelected)5.dp else 0.dp).clip(if(photoSelected)RoundedCornerShape(10.dp) else RoundedCornerShape(0.dp)).combinedClickable(onClick={handlePhotoClick(photo)},onLongClick={if(!coverSelectionMode){extendSelection(photo)}})) {
                                                         val showOwnerLabel = cloudView == CloudView.SHARED_WITH_ME || cloudView == CloudView.ALBUM_DETAIL
                                                         val ownerLabel = if (showOwnerLabel) {
                                                             if (!photo.isOwner) photo.sharedByFirstName ?: photo.ownerFirstName else photo.ownerFirstName
@@ -715,9 +823,12 @@ private fun CloudAlbumsView(
     categories: List<CloudAlbumCategory>,
     thumbnailLoader: RemoteThumbnailLoader,
     onOpen: (CloudAlbum) -> Unit,
+    onRename: (CloudAlbum) -> Unit,
+    onDelete: (CloudAlbum) -> Unit,
 ) {
     var sortMode by remember { mutableStateOf(CloudAlbumSortMode.ALBUM_DATE_DESC) }
     var sortMenuOpen by remember { mutableStateOf(false) }
+    var activeMenuAlbumId by remember { mutableStateOf<String?>(null) }
     var albumScope by remember { mutableStateOf(CloudAlbumScope.ALL) }
     var selectedCategoryIds by remember { mutableStateOf(emptySet<String>()) }
     val visibleAlbums = remember(albums, albumScope, selectedCategoryIds, sortMode) {
@@ -797,7 +908,16 @@ private fun CloudAlbumsView(
                         Text(album.title, style = MaterialTheme.typography.titleMedium)
                         Text(stringResource(R.string.cloud_album_items, album.photoCount), style = MaterialTheme.typography.labelSmall)
                         album.sharedByDisplayName?.let { Text("Compartido por $it", style = MaterialTheme.typography.labelSmall) }
-                        album.dateStart?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            album.dateStart?.let { Text(it, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f)) }
+                            if (album.isOwner) Box {
+                                IconButton(onClick = { activeMenuAlbumId = album.id }) { Text("⋮") }
+                                DropdownMenu(expanded = activeMenuAlbumId == album.id, onDismissRequest = { activeMenuAlbumId = null }) {
+                                    DropdownMenuItem(text = { Text("Cambiar nombre") }, onClick = { activeMenuAlbumId = null; onRename(album) })
+                                    DropdownMenuItem(text = { Text("Eliminar álbum") }, onClick = { activeMenuAlbumId = null; onDelete(album) })
+                                }
+                            }
+                        }
                     }
                 }
             }
