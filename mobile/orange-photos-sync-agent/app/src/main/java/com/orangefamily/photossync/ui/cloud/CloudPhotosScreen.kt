@@ -871,7 +871,7 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                                                         } else null
                                                         RemoteBitmap(photo.gridUrl, thumbnailLoader, ContentScale.Crop, Modifier.fillMaxSize())
                                                         if (photo.mediaType == "video") CloudVideoFilmOverlay(Modifier.matchParentSize())
-                                                        ownerLabel?.takeIf { it.isNotBlank() }?.let { Text(it, color = Color.White, fontSize = 10.sp, lineHeight = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart).padding(start = if (photo.mediaType == "video") 8.dp else 3.dp, bottom = 3.dp).background(Color.Black.copy(alpha = .48f), RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 2.dp)) }
+                                                        ownerLabel?.takeIf { it.isNotBlank() }?.let { Text(it, color = Color.White, fontSize = 10.sp, lineHeight = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart).padding(start = if (photo.mediaType == "video") 11.dp else 3.dp, bottom = 3.dp).background(Color.Black.copy(alpha = .48f), RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 2.dp)) }
                                                         if(selected.isNotEmpty()||photoSelected)Box(Modifier.align(Alignment.TopStart).padding(6.dp).size(24.dp).background(if(photoSelected)OrangePrimary else Color.Transparent,CircleShape).border(2.dp,if(photoSelected)OrangePrimary else Color.White,CircleShape),contentAlignment=Alignment.Center){if(photoSelected)Text("✓",color=Color.White,fontWeight=FontWeight.Bold)}
                                                         if(photo.isSharedEffectively)CloudSharedBadge(photo.isOwner,Modifier.align(Alignment.TopEnd).padding(6.dp))
                                                         if(localByRemoteId.containsKey(photo.id))CloudLocalCopyBadge(Modifier.align(Alignment.BottomEnd).padding(6.dp))
@@ -1078,10 +1078,10 @@ private fun CloudVideoFilmOverlay(
     modifier: Modifier = Modifier,
 ) {
     Canvas(modifier) {
-        val stripWidth = 6.dp.toPx()
-        val holeWidth = 2.dp.toPx()
-        val holeHeight = 3.dp.toPx()
-        val gap = 2.dp.toPx()
+        val stripWidth = 9.dp.toPx()
+        val holeWidth = 3.dp.toPx()
+        val holeHeight = 4.dp.toPx()
+        val gap = 2.5.dp.toPx()
         val inset = 2.dp.toPx()
         val stripColor = Color.Black.copy(alpha = .48f)
         val holeColor = Color.White.copy(alpha = .60f)
