@@ -702,10 +702,24 @@ private val spanishLocale = Locale.forLanguageTag("es-ES")
 private val spanishAlbumCollator = Collator.getInstance(spanishLocale).apply { strength = Collator.PRIMARY }
 private val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", spanishLocale)
 private val dayFormatter = DateTimeFormatter.ofPattern("EEE d MMM", spanishLocale)
+private val albumDateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", spanishLocale)
 
 private fun parseCloudAlbumDate(value: String?): java.time.LocalDate? {
     val normalized = value?.trim()?.take(10)?.takeIf { it.isNotBlank() } ?: return null
     return runCatching { java.time.LocalDate.parse(normalized) }.getOrNull()
+}
+
+private fun formatCloudAlbumDate(album: CloudAlbum): String {
+    val start = parseCloudAlbumDate(album.dateStart) ?: return ""
+    fun format(date: java.time.LocalDate): String = date.format(albumDateFormatter).replace(".", "")
+    return when (album.dateMode) {
+        "single" -> format(start)
+        "range" -> {
+            val end = parseCloudAlbumDate(album.dateEnd) ?: return format(start)
+            "${format(start)}–${format(end)}"
+        }
+        else -> ""
+    }
 }
 
 private fun sortCloudAlbums(items: List<CloudAlbum>, mode: CloudAlbumSortMode): List<CloudAlbum> {
@@ -905,11 +919,19 @@ private fun CloudAlbumsView(
                 items(visibleAlbums, key = { it.id }) { album ->
                     Column(Modifier.clickable { onOpen(album) }) {
                         Box(Modifier.fillMaxWidth().aspectRatio(1.35f).background(Color.LightGray)) { RemoteBitmap(album.coverThumbnailUrl, thumbnailLoader, ContentScale.Crop, Modifier.fillMaxSize()) }
-                        Text(album.title, style = MaterialTheme.typography.titleMedium)
-                        Text(stringResource(R.string.cloud_album_items, album.photoCount), style = MaterialTheme.typography.labelSmall)
-                        album.sharedByDisplayName?.let { Text("Compartido por $it", style = MaterialTheme.typography.labelSmall) }
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            album.dateStart?.let { Text(it, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f)) }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                            Column(Modifier.weight(1f)) {
+                                Text(album.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                val dateLabel = formatCloudAlbumDate(album)
+                                Row {
+                                    Text(stringResource(R.string.cloud_album_items, album.photoCount), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    if (dateLabel.isNotEmpty()) {
+                                        Text(" · ", style = MaterialTheme.typography.labelSmall)
+                                        Text(dateLabel, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                }
+                                album.sharedByDisplayName?.let { Text("Compartido por $it", style = MaterialTheme.typography.labelSmall) }
+                            }
                             if (album.isOwner) Box {
                                 IconButton(onClick = { activeMenuAlbumId = album.id }) { Text("⋮") }
                                 DropdownMenu(expanded = activeMenuAlbumId == album.id, onDismissRequest = { activeMenuAlbumId = null }) {
