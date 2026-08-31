@@ -22,28 +22,43 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
         if (it.endsWith('/')) it else "$it/"
     }
 
-    suspend fun photos(page: Int = 1, perPage: Int = 100, albumId: String? = null, trashed: Boolean = false, sharedWithMe: Boolean = false, includeTotal: Boolean = true): CloudPhotoPage = withContext(Dispatchers.IO) {
-        val albumQuery = albumId?.takeIf { it.isNotBlank() }?.let { "&album_id=${encode(it)}" }.orEmpty()
-        val accessQuery = when {
-            trashed -> "&trashed=true&library_scope=owned"
-            albumId != null -> ""
-            sharedWithMe -> "&access_sources=direct,album&library_scope=shared_with_me"
-            else -> "&access_sources=owned,library"
+    private fun photoFiltersQuery(filters: CloudPhotoFilters, albumId: String?, trashed: Boolean, sharedWithMe: Boolean): String {
+        require(filters.mediaType in setOf("all", "image", "video"))
+        require(filters.accessSourcesMode in setOf("include", "exclude"))
+        require(filters.ownerUserIdsMode in setOf("include", "exclude"))
+        require(filters.accessSources.all { it in setOf("owned", "library", "direct", "album") })
+        val parts = mutableListOf<String>()
+        if (trashed) return "trashed=true&library_scope=owned"
+        albumId?.takeIf { it.isNotBlank() }?.let { parts += "album_id=${encode(it)}" }
+        if (sharedWithMe) parts += "library_scope=shared_with_me"
+        if (filters.mediaType != "all") parts += "media_type=${encode(filters.mediaType)}"
+        val queryAccessSources = if (albumId?.isNullOrBlank() == false && filters.accessSourcesMode == "include") filters.accessSources + "album" else filters.accessSources
+        if (queryAccessSources.isNotEmpty()) {
+            parts += "access_sources=${encode(queryAccessSources.sorted().joinToString(","))}"
+            parts += "access_sources_mode=${encode(filters.accessSourcesMode)}"
         }
+        if (filters.ownerUserIds.isNotEmpty()) {
+            parts += "owner_user_ids=${encode(filters.ownerUserIds.sorted().joinToString(","))}"
+            parts += "owner_user_ids_mode=${encode(filters.ownerUserIdsMode)}"
+        }
+        if (sharedWithMe && filters.excludeInLibrary) parts += "exclude_in_library=true"
+        if (sharedWithMe && filters.includeHidden) parts += "include_hidden=true"
+        return parts.joinToString("&")
+    }
+
+    suspend fun photos(page: Int = 1, perPage: Int = 100, albumId: String? = null, trashed: Boolean = false, sharedWithMe: Boolean = false, includeTotal: Boolean = true, filters: CloudPhotoFilters = CloudPhotoFilters()): CloudPhotoPage = withContext(Dispatchers.IO) {
+        val filterQuery = photoFiltersQuery(filters, albumId, trashed, sharedWithMe)
         val totalQuery = if (includeTotal) "" else "&include_total=false"
-        request("${baseUrl}api/orange-photos?page=$page&per_page=$perPage$albumQuery$accessQuery$totalQuery&compact=true", "No se pudo cargar la biblioteca.") { json ->
+        val query = if (filterQuery.isBlank()) "" else "&$filterQuery"
+        request("${baseUrl}api/orange-photos?page=$page&per_page=$perPage$query$totalQuery&compact=true", "No se pudo cargar la biblioteca.") { json ->
             val values = json.optJSONArray("items") ?: throw CloudApiException(200, "La respuesta no contiene elementos.")
             val items = buildList { for (index in 0 until values.length()) values.optJSONObject(index)?.let(::parsePhoto)?.let(::add) }
             CloudPhotoPage(items, json.optInt("page", page), json.optInt("per_page", perPage), json.optInt("total", items.size), json.optBoolean("has_more", false))
         }
     }
 
-    suspend fun timeline(albumId: String? = null, sharedWithMe: Boolean = false): List<CloudTimelineYear> = withContext(Dispatchers.IO) {
-        val query = when {
-            albumId != null -> "?album_id=${encode(albumId)}"
-            sharedWithMe -> "?access_sources=direct,album&library_scope=shared_with_me"
-            else -> "?access_sources=owned,library"
-        }
+    suspend fun timeline(albumId: String? = null, sharedWithMe: Boolean = false, filters: CloudPhotoFilters = CloudPhotoFilters()): List<CloudTimelineYear> = withContext(Dispatchers.IO) {
+        val query = photoFiltersQuery(filters, albumId, false, sharedWithMe).takeIf { it.isNotBlank() }?.let { "?$it" }.orEmpty()
         request("${baseUrl}api/orange-photos/timeline$query", "No se pudo cargar el timeline.") { json ->
             val years = json.optJSONArray("items") ?: return@request emptyList()
             buildList {
@@ -64,14 +79,10 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
         }
     }
 
-    suspend fun aroundDate(date: String, albumId: String? = null, direction: String? = null, perPage: Int = 100, sharedWithMe: Boolean = false): CloudPhotoWindow = withContext(Dispatchers.IO) {
+    suspend fun aroundDate(date: String, albumId: String? = null, direction: String? = null, perPage: Int = 100, sharedWithMe: Boolean = false, filters: CloudPhotoFilters = CloudPhotoFilters()): CloudPhotoWindow = withContext(Dispatchers.IO) {
         val query = buildString {
             append("date=${encode(date)}&per_page=$perPage")
-            when {
-                albumId != null -> append("&album_id=${encode(albumId)}")
-                sharedWithMe -> append("&access_sources=direct,album&library_scope=shared_with_me")
-                else -> append("&access_sources=owned,library")
-            }
+            photoFiltersQuery(filters, albumId, false, sharedWithMe).takeIf { it.isNotBlank() }?.let { append("&$it") }
             direction?.takeIf { it == "newer" || it == "older" }?.let { append("&direction=$it") }
             append("&compact=true")
         }

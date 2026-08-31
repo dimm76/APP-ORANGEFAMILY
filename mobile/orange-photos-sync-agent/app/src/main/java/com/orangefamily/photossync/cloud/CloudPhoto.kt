@@ -48,6 +48,16 @@ data class CloudPhoto(
         get() = if (mediaType == "video") "video/*" else "image/*"
 }
 
+data class CloudPhotoFilters(
+    val mediaType: String = "all",
+    val accessSources: Set<String> = emptySet(),
+    val accessSourcesMode: String = "include",
+    val ownerUserIds: Set<String> = emptySet(),
+    val ownerUserIdsMode: String = "include",
+    val excludeInLibrary: Boolean = false,
+    val includeHidden: Boolean = false,
+)
+
 data class CloudPhotoPage(
     val items: List<CloudPhoto>,
     val page: Int,

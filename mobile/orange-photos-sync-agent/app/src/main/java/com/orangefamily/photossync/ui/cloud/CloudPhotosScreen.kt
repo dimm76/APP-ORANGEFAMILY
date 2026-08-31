@@ -106,6 +106,80 @@ private val CloudDateActionIcon = cloudActionIcon("CloudDate") { moveTo(4f, 6f);
 private val CloudLocationActionIcon = cloudActionIcon("CloudLocation") { moveTo(12f, 21f); curveTo(6f, 14f, 5f, 12f, 5f, 9f); curveTo(5f, 5f, 8f, 3f, 12f, 3f); curveTo(16f, 3f, 19f, 5f, 19f, 9f); curveTo(19f, 12f, 18f, 14f, 12f, 21f); close(); moveTo(12f, 11f); curveTo(10f, 11f, 9f, 10f, 9f, 8f); curveTo(9f, 6f, 10f, 5f, 12f, 5f); curveTo(14f, 5f, 15f, 6f, 15f, 8f); curveTo(15f, 10f, 14f, 11f, 12f, 11f) }
 private val CloudDeviceActionIcon = cloudActionIcon("CloudDevice") { moveTo(8f, 2f); horizontalLineTo(16f); verticalLineTo(22f); horizontalLineTo(8f); close(); moveTo(10f, 19f); horizontalLineTo(14f) }
 private val CloudRestoreActionIcon = cloudActionIcon("CloudRestore") { moveTo(9f, 7f); lineTo(4f, 12f); lineTo(9f, 17f); moveTo(5f, 12f); horizontalLineTo(14f); curveTo(18f, 12f, 20f, 14f, 20f, 18f) }
+private fun defaultLibraryPhotoFilters() = CloudPhotoFilters(accessSources = setOf("owned", "library"))
+private fun defaultSharedPhotoFilters() = CloudPhotoFilters(accessSources = setOf("direct", "album"))
+private fun defaultAlbumPhotoFilters() = CloudPhotoFilters(accessSources = setOf("owned", "library"))
+
+@Composable
+private fun CloudPhotoFiltersDialog(
+    title: String,
+    filters: CloudPhotoFilters,
+    members: List<CloudMember>,
+    allowedSources: List<Pair<String, String>>,
+    showSharedOptions: Boolean,
+    onChange: (CloudPhotoFilters) -> Unit,
+    onClear: () -> Unit,
+    onApply: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("TIPO DE CONTENIDO", style = MaterialTheme.typography.labelLarge)
+                listOf("all" to "Todos", "image" to "Fotos", "video" to "Vídeos").forEach { (value, label) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = filters.mediaType == value, onClick = { onChange(filters.copy(mediaType = value)) })
+                        Text(label)
+                    }
+                }
+                Text("ORIGEN", style = MaterialTheme.typography.labelLarge)
+                Text("Modo", style = MaterialTheme.typography.labelMedium)
+                listOf("include" to "Incluir", "exclude" to "Excluir").forEach { (value, label) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = filters.accessSourcesMode == value, onClick = { onChange(filters.copy(accessSourcesMode = value)) })
+                        Text(label)
+                    }
+                }
+                allowedSources.forEach { (value, label) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = value in filters.accessSources, onCheckedChange = { checked -> onChange(filters.copy(accessSources = if (checked) filters.accessSources + value else filters.accessSources - value)) })
+                        Text(label)
+                    }
+                }
+                Text("FOTOS DE", style = MaterialTheme.typography.labelLarge)
+                Text("Modo", style = MaterialTheme.typography.labelMedium)
+                listOf("include" to "Incluir", "exclude" to "Excluir").forEach { (value, label) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = filters.ownerUserIdsMode == value, onClick = { onChange(filters.copy(ownerUserIdsMode = value)) })
+                        Text(label)
+                    }
+                }
+                if (members.isEmpty()) Text("No hay otros familiares disponibles.")
+                members.forEach { member ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = member.id in filters.ownerUserIds, onCheckedChange = { checked -> onChange(filters.copy(ownerUserIds = if (checked) filters.ownerUserIds + member.id else filters.ownerUserIds - member.id)) })
+                        Text(member.displayName)
+                    }
+                }
+                if (showSharedOptions) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = !filters.excludeInLibrary, onCheckedChange = { checked -> onChange(filters.copy(excludeInLibrary = !checked)) })
+                        Text("Mostrar elementos ya integrados en mi biblioteca")
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = filters.includeHidden, onCheckedChange = { checked -> onChange(filters.copy(includeHidden = checked)) })
+                        Text("Mostrar elementos ocultos")
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onApply) { Text("Aplicar") } },
+        dismissButton = { Row { TextButton(onClick = onClear) { Text("Limpiar") }; TextButton(onClick = onDismiss) { Text("Cancelar") } } },
+    )
+}
+
 @Composable
 private fun CloudTrashActionIcon() {
     Box(Modifier.size(30.dp)) {
@@ -197,6 +271,11 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     var albumOptionsDateMode by remember { mutableStateOf("single") }
     var albumOptionsDateStart by remember { mutableStateOf("") }
     var albumOptionsDateEnd by remember { mutableStateOf("") }
+    var libraryPhotoFilters by remember { mutableStateOf(defaultLibraryPhotoFilters()) }
+    var sharedPhotoFilters by remember { mutableStateOf(defaultSharedPhotoFilters()) }
+    var albumPhotoFilters by remember { mutableStateOf(defaultAlbumPhotoFilters()) }
+    var photoFiltersTarget by remember { mutableStateOf<CloudView?>(null) }
+    var photoFiltersDraft by remember { mutableStateOf(defaultLibraryPhotoFilters()) }
     val context=LocalContext.current
 
     fun clearSelection(){selected=emptySet();selectedDays=emptySet();selectionAnchor=null}
@@ -232,6 +311,43 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     fun showAlbumDatePicker(current: String, onSelected: (String) -> Unit) {
         val initial = parseCloudAlbumDate(current) ?: java.time.LocalDate.now()
         android.app.DatePickerDialog(context, { _, year, month, day -> onSelected(java.time.LocalDate.of(year, month + 1, day).toString()) }, initial.year, initial.monthValue - 1, initial.dayOfMonth).show()
+    }
+    val activePhotoFilters = when (cloudView) {
+        CloudView.SHARED_WITH_ME -> sharedPhotoFilters
+        CloudView.ALBUM_DETAIL -> albumPhotoFilters
+        CloudView.LIBRARY -> libraryPhotoFilters
+        else -> CloudPhotoFilters()
+    }
+    val photoFilterMembers = remember(members, accountUserId) { members.filter { it.id != accountUserId }.sortedBy { it.displayName.lowercase(spanishLocale) } }
+    fun requestPhotoFilters(target: CloudView) {
+        val current = when (target) {
+            CloudView.LIBRARY -> libraryPhotoFilters
+            CloudView.SHARED_WITH_ME -> sharedPhotoFilters
+            CloudView.ALBUM_DETAIL -> albumPhotoFilters
+            else -> return
+        }
+        photoFiltersDraft = current
+        photoFiltersTarget = target
+        albumDetailMenuOpen = false
+    }
+    fun applyPhotoFilters() {
+        when (photoFiltersTarget) {
+            CloudView.LIBRARY -> libraryPhotoFilters = photoFiltersDraft
+            CloudView.SHARED_WITH_ME -> sharedPhotoFilters = photoFiltersDraft
+            CloudView.ALBUM_DETAIL -> albumPhotoFilters = photoFiltersDraft
+            else -> return
+        }
+        photoFiltersTarget = null
+        clearSelection()
+        activePeriod = null
+    }
+    fun clearPhotoFiltersDraft() {
+        photoFiltersDraft = when (photoFiltersTarget) {
+            CloudView.LIBRARY -> defaultLibraryPhotoFilters()
+            CloudView.SHARED_WITH_ME -> defaultSharedPhotoFilters()
+            CloudView.ALBUM_DETAIL -> defaultAlbumPhotoFilters()
+            else -> photoFiltersDraft
+        }
     }
     fun handlePhotoClick(photo:CloudPhoto){
         if (coverSelectionMode) {
@@ -275,6 +391,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
                 albumId = albumId,
                 sharedWithMe = sharedWithMe,
                 includeTotal = false,
+                filters = activePhotoFilters,
             )
         }
         photosResult
@@ -282,14 +399,14 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
             .onFailure { error = it.message ?: "No se pudo cargar la biblioteca." }
         loading = false
         if (photosResult.isFailure) return
-        runCatching { api.timeline(albumId, sharedWithMe) }
+        runCatching { api.timeline(albumId, sharedWithMe, activePhotoFilters) }
             .onSuccess { timeline = it }
     }
     LaunchedEffect(Unit) { albums = runCatching { api.albums() }.getOrDefault(emptyList()) }
     LaunchedEffect(Unit) { albumCategories = runCatching { api.albumCategories() }.getOrDefault(emptyList()) }
     LaunchedEffect(Unit) { members = runCatching { api.members() }.getOrDefault(emptyList()) }
-    LaunchedEffect(api, cloudView, selectedAlbum?.id) { reload() }
-    LaunchedEffect(cloudView, selectedAlbum?.id){coverSelectionMode=false;albumDetailMenuOpen=false;albumShareTarget=null;albumShareData=null;albumOptionsTarget=null;albumActionError=null;clearSelection()}
+    LaunchedEffect(api, cloudView, selectedAlbum?.id, activePhotoFilters) { timelineRequestGeneration += 1; reload() }
+    LaunchedEffect(cloudView, selectedAlbum?.id){coverSelectionMode=false;albumDetailMenuOpen=false;albumShareTarget=null;albumShareData=null;albumOptionsTarget=null;photoFiltersTarget=null;albumActionError=null;clearSelection()}
     LaunchedEffect(items,mediaRefreshVersion){val ids=items.map{it.id}.distinct();localByRemoteId=if(ids.isEmpty())emptyMap()else withContext(Dispatchers.IO){repository.remoteLinkedItems(accountUserId,ids)}.filter{deviceScanner.isActive(it)}.mapNotNull{item->item.remotePhotoId?.trim()?.takeIf{it.isNotBlank()}?.let{it to item}}.groupBy({it.first},{it.second})}
     LaunchedEffect(listState.isScrollInProgress) { if (listState.isScrollInProgress) timelineThumbVisible = true else { delay(1500); timelineThumbVisible = false } }
 
@@ -304,7 +421,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
     val allFavorite=selectedPhotos.isNotEmpty()&&selectedPhotos.all{it.isFavorite}
     val bulkSelectionAllowed=selectedPhotos.isNotEmpty()&&selectedPhotos.size<=MAX_CLOUD_BULK_SELECTION
     fun runBulk(block:suspend()->Unit){if(bulkBusy)return;if(selectedPhotos.size>MAX_CLOUD_BULK_SELECTION){bulkMessage="Puedes realizar acciones sobre un máximo de 500 elementos a la vez.";return};scope.launch{bulkBusy=true;runCatching{block()}.onFailure{bulkMessage=it.message;reload()}.onSuccess{reload();clearSelection()};bulkBusy=false}}
-    fun selectAllTrash(){if(cloudView!=CloudView.TRASH||bulkBusy)return;scope.launch{bulkBusy=true;try{var currentPage=api.photos(page=1,perPage=100,trashed=true);if(currentPage.total>MAX_CLOUD_BULK_SELECTION){bulkMessage="Puedes realizar acciones sobre un máximo de 500 elementos a la vez.";return@launch};val allItems=currentPage.items.toMutableList();while(currentPage.hasMore){currentPage=api.photos(page=currentPage.page+1,perPage=100,trashed=true);allItems+=currentPage.items};val loadedItems=allItems.distinctBy{it.id};if(loadedItems.size>MAX_CLOUD_BULK_SELECTION){bulkMessage="Puedes realizar acciones sobre un máximo de 500 elementos a la vez.";return@launch};items=loadedItems;page=currentPage.page;hasMore=false;hasNewer=false;newerCursor=null;hasOlder=false;olderCursor=null;pagingMode=CloudPagingMode.NORMAL;timeline=emptyList();selected=loadedItems.map{it.id}.toSet();selectedDays=emptySet();selectionAnchor=loadedItems.lastOrNull()?.id}catch(error:Exception){bulkMessage=error.message?:"No se pudo seleccionar toda la papelera."}finally{bulkBusy=false}}}
+    fun selectAllTrash(){if(cloudView!=CloudView.TRASH||bulkBusy)return;scope.launch{bulkBusy=true;try{var currentPage=api.photos(page=1,perPage=100,trashed=true,filters=CloudPhotoFilters());if(currentPage.total>MAX_CLOUD_BULK_SELECTION){bulkMessage="Puedes realizar acciones sobre un máximo de 500 elementos a la vez.";return@launch};val allItems=currentPage.items.toMutableList();while(currentPage.hasMore){currentPage=api.photos(page=currentPage.page+1,perPage=100,trashed=true,filters=CloudPhotoFilters());allItems+=currentPage.items};val loadedItems=allItems.distinctBy{it.id};if(loadedItems.size>MAX_CLOUD_BULK_SELECTION){bulkMessage="Puedes realizar acciones sobre un máximo de 500 elementos a la vez.";return@launch};items=loadedItems;page=currentPage.page;hasMore=false;hasNewer=false;newerCursor=null;hasOlder=false;olderCursor=null;pagingMode=CloudPagingMode.NORMAL;timeline=emptyList();selected=loadedItems.map{it.id}.toSet();selectedDays=emptySet();selectionAnchor=loadedItems.lastOrNull()?.id}catch(error:Exception){bulkMessage=error.message?:"No se pudo seleccionar toda la papelera."}finally{bulkBusy=false}}}
     val selectionActions=remember(selected,allSelectedOwned,allFavorite,bulkSelectionAllowed){listOf(SelectionActionItem("album","Álbum",enabled=bulkSelectionAllowed,onClick={albumSearchQuery="";targetAlbumId=null;albumDialogOpen=true},icon={Icon(CloudAlbumActionIcon,null)}),SelectionActionItem("share","Compartir",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={shareDialogOpen=true},icon={Icon(OrangeShareIcon,null)}),SelectionActionItem("favorite",if(allFavorite)"Quitar favorita" else "Favorita",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={runBulk{selectedPhotos.forEach{api.setFavorite(it.id,!allFavorite)}}},icon={Icon(CloudFavoriteActionIcon,null)}),SelectionActionItem("date","Fecha y hora",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={val initial=selectedPhotos.firstOrNull()?.capturedAt?.let{runCatching{Instant.parse(it).atZone(ZoneId.systemDefault())}.getOrNull()}?:ZonedDateTime.now();android.app.DatePickerDialog(context,{_,y,m,d->android.app.TimePickerDialog(context,{_,h,min->val iso=ZonedDateTime.of(LocalDateTime.of(y,m+1,d,h,min),ZoneId.systemDefault()).toInstant().toString();runBulk{selectedPhotos.forEach{api.setCapturedAt(it.id,iso)}}},initial.hour,initial.minute,true).show()},initial.year,initial.monthValue-1,initial.dayOfMonth).show()},icon={Icon(CloudDateActionIcon,null)}),SelectionActionItem("location","Ubicación",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={locationValue="";locationDialogOpen=true},icon={Icon(CloudLocationActionIcon,null)}),SelectionActionItem("trash","Papelera nube",enabled=bulkSelectionAllowed&&allSelectedOwned,onClick={trashDialogOpen=true},icon={CloudTrashActionIcon()}))}
     val addToLibraryAction=SelectionActionItem("add-library","Añadir a mi biblioteca",enabled=bulkSelectionAllowed&&addableToLibrary.isNotEmpty(),onClick={runBulk{addableToLibrary.forEach{api.addToLibrary(it.id)}}},icon={Icon(OrangeFilledCloudIcon,null,tint=Color.Unspecified)})
     val downloadAction=SelectionActionItem("download-device","Descargar",enabled=bulkSelectionAllowed&&android.os.Build.VERSION.SDK_INT>=android.os.Build.VERSION_CODES.Q&&downloadCandidates.isNotEmpty(),onClick={runBulk{val downloadedImageCount=downloadCandidates.count{it.mediaType=="image"};val downloadedVideoCount=downloadCandidates.count{it.mediaType=="video"};downloadCandidates.forEach{photo->val downloaded=downloader.download(photo);localByRemoteId=localByRemoteId+(photo.id to (localByRemoteId[photo.id].orEmpty()+downloaded).distinctBy{"${it.mediaCollection}:${it.mediaType}:${it.mediaStoreId}"})};val message=when{downloadedImageCount>0&&downloadedVideoCount==0->if(downloadedImageCount==1)"Imagen descargada en Imágenes/OrangeFamily." else "$downloadedImageCount imágenes descargadas en Imágenes/OrangeFamily.";downloadedVideoCount>0&&downloadedImageCount==0->if(downloadedVideoCount==1)"Vídeo descargado en Vídeos/OrangeFamily." else "$downloadedVideoCount vídeos descargados en Vídeos/OrangeFamily.";else->"${downloadedImageCount+downloadedVideoCount} elementos descargados en Imágenes/OrangeFamily y Vídeos/OrangeFamily."};Toast.makeText(context,message,Toast.LENGTH_LONG).show()}},icon={Icon(CloudDownloadActionIcon,null)})
@@ -337,7 +454,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
         val previousActivePeriod = activePeriod
         activePeriod = period.key
         try {
-            val result = api.aroundDate(cursor, activeAlbumId(), perPage = CLOUD_PAGE_SIZE, sharedWithMe = cloudView == CloudView.SHARED_WITH_ME)
+            val result = api.aroundDate(cursor, activeAlbumId(), perPage = CLOUD_PAGE_SIZE, sharedWithMe = cloudView == CloudView.SHARED_WITH_ME, filters = activePhotoFilters)
             if (generation != timelineRequestGeneration) return
             items = result.items; page = 1; pagingMode = CloudPagingMode.WINDOW; hasMore = false; hasNewer = result.hasNewer; newerCursor = result.newerCursor; hasOlder = result.hasOlder; olderCursor = result.olderCursor; activePeriod = period.key; listState.scrollToItem(0)
         } catch (error: CancellationException) {
@@ -351,7 +468,8 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
         if (pagingMode != CloudPagingMode.WINDOW || !hasNewer || loadingWindowNewer) return
         val cursor = newerCursor ?: return
         loadingWindowNewer = true
-        try { val result = api.aroundDate(cursor, activeAlbumId(), "newer", perPage = CLOUD_PAGE_SIZE, sharedWithMe = cloudView == CloudView.SHARED_WITH_ME); if (result.items.isEmpty()) { hasNewer = false; return }; items = (result.items + items).distinctBy { it.id }; hasNewer = result.hasNewer; newerCursor = result.newerCursor } catch (error: CancellationException) { throw error } catch (error: Exception) { bulkMessage = error.message ?: "No se pudo cargar el periodo." } finally { loadingWindowNewer = false }
+        val generation = timelineRequestGeneration
+        try { val result = api.aroundDate(cursor, activeAlbumId(), "newer", perPage = CLOUD_PAGE_SIZE, sharedWithMe = cloudView == CloudView.SHARED_WITH_ME, filters = activePhotoFilters); if (generation != timelineRequestGeneration) return; if (result.items.isEmpty()) { hasNewer = false; return }; items = (result.items + items).distinctBy { it.id }; hasNewer = result.hasNewer; newerCursor = result.newerCursor } catch (error: CancellationException) { throw error } catch (error: Exception) { bulkMessage = error.message ?: "No se pudo cargar el periodo." } finally { loadingWindowNewer = false }
     }
 
     suspend fun loadWindowOlder() {
@@ -359,7 +477,9 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
         val cursor = olderCursor ?: return
         loadingWindowOlder = true
         try {
-            val result = api.aroundDate(cursor, activeAlbumId(), "older", perPage = CLOUD_PAGE_SIZE, sharedWithMe = cloudView == CloudView.SHARED_WITH_ME)
+            val generation = timelineRequestGeneration
+            val result = api.aroundDate(cursor, activeAlbumId(), "older", perPage = CLOUD_PAGE_SIZE, sharedWithMe = cloudView == CloudView.SHARED_WITH_ME, filters = activePhotoFilters)
+            if (generation != timelineRequestGeneration) return
             items = (items + result.items).distinctBy { it.id }
             hasOlder = result.hasOlder
             olderCursor = result.olderCursor
@@ -371,7 +491,7 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
             loadingWindowOlder = false
         }
     }
-    suspend fun loadNextNormalPage(){if(pagingMode!=CloudPagingMode.NORMAL||!hasMore||loadingMoreNormal)return;loadingMoreNormal=true;try{val result=api.photos(page+1,perPage=CLOUD_PAGE_SIZE,albumId=activeAlbumId(),trashed=cloudView==CloudView.TRASH,sharedWithMe=cloudView==CloudView.SHARED_WITH_ME,includeTotal=false);items=(items+result.items).distinctBy{it.id};page=result.page;hasMore=result.hasMore}finally{loadingMoreNormal=false}}
+    suspend fun loadNextNormalPage(){if(pagingMode!=CloudPagingMode.NORMAL||!hasMore||loadingMoreNormal)return;loadingMoreNormal=true;val generation=timelineRequestGeneration;try{val result=api.photos(page+1,perPage=CLOUD_PAGE_SIZE,albumId=activeAlbumId(),trashed=cloudView==CloudView.TRASH,sharedWithMe=cloudView==CloudView.SHARED_WITH_ME,includeTotal=false,filters=activePhotoFilters);if(generation!=timelineRequestGeneration)return;items=(items+result.items).distinctBy{it.id};page=result.page;hasMore=result.hasMore}finally{loadingMoreNormal=false}}
     val windowNewerNestedScroll = remember(pagingMode, hasNewer, newerCursor, loadingWindowNewer) {
         object : NestedScrollConnection {
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
@@ -603,6 +723,27 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
             dismissButton = { TextButton(enabled = !albumActionBusy, onClick = { albumOptionsTarget = null }) { Text("Cancelar") } },
         )
     }
+    photoFiltersTarget?.let { target ->
+        val allowedSources = when (target) {
+            CloudView.SHARED_WITH_ME -> listOf("direct" to "Compartidos directamente conmigo", "album" to "Procedentes de álbumes compartidos")
+            else -> listOf("owned" to "Mis elementos", "library" to "Añadidos a mi biblioteca")
+        }
+        CloudPhotoFiltersDialog(
+            title = when (target) {
+                CloudView.SHARED_WITH_ME -> "Opciones"
+                CloudView.ALBUM_DETAIL -> "Ajustes de visualización"
+                else -> "Opciones"
+            },
+            filters = photoFiltersDraft,
+            members = photoFilterMembers,
+            allowedSources = allowedSources,
+            showSharedOptions = target == CloudView.SHARED_WITH_ME,
+            onChange = { photoFiltersDraft = it },
+            onClear = { clearPhotoFiltersDraft() },
+            onApply = { applyPhotoFilters() },
+            onDismiss = { photoFiltersTarget = null },
+        )
+    }
     ModalNavigationDrawer(drawerState = drawerState, drawerContent = {
         ModalDrawerSheet {
             Spacer(Modifier.height(20.dp))
@@ -657,6 +798,11 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                                 )
                             }
                         },
+                        actions = {
+                            if (cloudView == CloudView.LIBRARY || cloudView == CloudView.SHARED_WITH_ME) {
+                                IconButton(onClick = { requestPhotoFilters(cloudView) }) { Text("⋮") }
+                            }
+                        },
                     )
                 }
             },
@@ -680,9 +826,11 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                                     if (selectedAlbum!!.isOwner) {
                                         DropdownMenuItem(text = { Text("Cambiar nombre") }, onClick = { requestAlbumRename(selectedAlbum!!) })
                                         DropdownMenuItem(text = { Text("Elegir imagen de portada") }, onClick = { albumDetailMenuOpen = false; clearSelection(); coverSelectionMode = true })
+                                        DropdownMenuItem(text = { Text("Ajustes de visualización") }, onClick = { requestPhotoFilters(CloudView.ALBUM_DETAIL) })
                                         DropdownMenuItem(text = { Text("Opciones") }, onClick = { requestAlbumOptions(selectedAlbum!!) })
                                         DropdownMenuItem(text = { Text("Eliminar álbum") }, onClick = { requestAlbumDelete(selectedAlbum!!) })
                                     } else {
+                                        DropdownMenuItem(text = { Text("Ajustes de visualización") }, onClick = { requestPhotoFilters(CloudView.ALBUM_DETAIL) })
                                         DropdownMenuItem(text = { Text("Opciones") }, onClick = { requestAlbumOptions(selectedAlbum!!) })
                                     }
                                 }
