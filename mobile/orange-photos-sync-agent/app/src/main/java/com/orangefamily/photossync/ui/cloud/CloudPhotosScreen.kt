@@ -517,9 +517,17 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                         family.forEach { member ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(checked = member.userId in albumShareSelectedFamilyIds, onCheckedChange = { checked -> albumShareSelectedFamilyIds = if (checked) albumShareSelectedFamilyIds + member.userId else albumShareSelectedFamilyIds - member.userId })
-                                Text(member.displayName + (if (member.role == "guest") " · Invitado" else " · Familiar") + (member.email?.let { " · $it" } ?: ""))
+                                Column(Modifier.weight(1f)) {
+                                    Text(member.displayName, fontWeight = FontWeight.SemiBold)
+                                    val detail = buildString {
+                                        append(if (member.role == "guest") "Invitado" else "Familiar")
+                                        member.email?.takeIf { it.isNotBlank() }?.let { append(" · "); append(it) }
+                                    }
+                                    Text(detail, style = MaterialTheme.typography.labelSmall)
+                                }
                             }
                         }
+                        albumActionError?.takeIf { it.isNotBlank() }?.let { Text(it) }
                     }
                 }
             },
@@ -534,12 +542,12 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                     }
                 }) { Text("Guardar") }
             },
-            dismissButton = { TextButton(enabled = !albumActionBusy, onClick = { albumShareTarget = null; albumShareData = null }) { Text("Cancelar") } },
+            dismissButton = { TextButton(enabled = !albumActionBusy && !albumShareLoading, onClick = { albumShareTarget = null; albumShareData = null }) { Text("Cancelar") } },
         )
     }
     if (albumOptionsTarget != null) {
         val target = albumOptionsTarget!!
-        val invalidDates = albumOptionsAssociateDate && (albumOptionsDateStart.isBlank() || (albumOptionsDateMode == "range" && (albumOptionsDateEnd.isBlank() || albumOptionsDateEnd < albumOptionsDateStart)))
+        val invalidDates = target.isOwner && albumOptionsAssociateDate && (albumOptionsDateStart.isBlank() || (albumOptionsDateMode == "range" && (albumOptionsDateEnd.isBlank() || albumOptionsDateEnd < albumOptionsDateStart)))
         AlertDialog(
             onDismissRequest = { if (!albumActionBusy) albumOptionsTarget = null },
             title = { Text("Opciones del álbum") },
@@ -557,7 +565,7 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
                         Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = albumOptionsAssociateDate, onCheckedChange = { albumOptionsAssociateDate = it }); Text("Asociar fecha") }
                         if (albumOptionsAssociateDate) {
                             Row(verticalAlignment = Alignment.CenterVertically) { RadioButton(selected = albumOptionsDateMode == "single", onClick = { albumOptionsDateMode = "single" }); Text("Fecha única"); RadioButton(selected = albumOptionsDateMode == "range", onClick = { albumOptionsDateMode = "range" }); Text("Intervalo") }
-                            TextButton(onClick = { showAlbumDatePicker(albumOptionsDateStart) { albumOptionsDateStart = it } }) { Text(if (albumOptionsDateStart.isBlank()) "Fecha" else albumOptionsDateStart) }
+                            TextButton(onClick = { showAlbumDatePicker(albumOptionsDateStart) { albumOptionsDateStart = it } }) { Text(if (albumOptionsDateStart.isBlank()) if (albumOptionsDateMode == "range") "Desde" else "Fecha" else albumOptionsDateStart) }
                             if (albumOptionsDateMode == "range") { TextButton(onClick = { showAlbumDatePicker(albumOptionsDateEnd) { albumOptionsDateEnd = it } }) { Text(if (albumOptionsDateEnd.isBlank()) "Hasta" else albumOptionsDateEnd) } }
                         }
                     }
@@ -566,19 +574,26 @@ if(purgeDialogOpen)AlertDialog(onDismissRequest={if(!bulkBusy)purgeDialogOpen=fa
             },
             confirmButton = {
                 TextButton(enabled = !albumActionBusy && !invalidDates, onClick = {
+                    val categoryIds = albumOptionsCategoryIds.toSet()
+                    val allowContributions = albumOptionsAllowContributions
+                    val allowComments = albumOptionsAllowComments
+                    val associateDate = albumOptionsAssociateDate
+                    val selectedDateMode = albumOptionsDateMode
+                    val selectedDateStart = albumOptionsDateStart
+                    val selectedDateEnd = albumOptionsDateEnd
                     albumActionBusy = true; albumActionError = null
                     scope.launch {
                         try {
                             if (target.isOwner) {
-                                val permissionsChanged = albumOptionsAllowContributions != target.allowContributions || albumOptionsAllowComments != target.allowComments
+                                val permissionsChanged = allowContributions != target.allowContributions || allowComments != target.allowComments
                                 val recipientData = if (permissionsChanged) api.albumRecipients(target.id) else null
-                                val dateMode = if (albumOptionsAssociateDate) albumOptionsDateMode else null
-                                val dateStart = if (albumOptionsAssociateDate) albumOptionsDateStart else null
-                                val dateEnd = if (!albumOptionsAssociateDate) null else if (albumOptionsDateMode == "single") albumOptionsDateStart else albumOptionsDateEnd
+                                val dateMode = if (associateDate) selectedDateMode else null
+                                val dateStart = if (associateDate) selectedDateStart else null
+                                val dateEnd = if (!associateDate) null else if (selectedDateMode == "single") selectedDateStart else selectedDateEnd
                                 api.updateAlbumDates(target.id, dateMode, dateStart, dateEnd)
-                                if (recipientData != null) api.syncAlbumRecipients(target.id, activeAlbumRecipients(recipientData, recipientData.family.filter { it.selected }.map { it.userId }.toSet()), albumOptionsAllowContributions, albumOptionsAllowComments)
+                                if (recipientData != null) api.syncAlbumRecipients(target.id, activeAlbumRecipients(recipientData, recipientData.family.filter { it.selected }.map { it.userId }.toSet()), allowContributions, allowComments)
                             }
-                            api.setAlbumCategories(target.id, albumOptionsCategoryIds)
+                            api.setAlbumCategories(target.id, categoryIds)
                             refreshAlbumsPreservingSelection(); albumOptionsTarget = null; Toast.makeText(context, "Opciones del álbum actualizadas.", Toast.LENGTH_LONG).show()
                         } catch (error: Exception) { albumActionError = error.message; runCatching { refreshAlbumsPreservingSelection() } }
                         finally { albumActionBusy = false }
