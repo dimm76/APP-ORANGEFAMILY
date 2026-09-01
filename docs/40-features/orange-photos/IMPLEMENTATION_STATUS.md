@@ -415,6 +415,49 @@ pueden retirar relaciones creadas por ellos;
 no pueden administrar el álbum;
 no adquieren ownership lógico de su contenido por colaborar.
 
+### Modelo canónico del permiso de contribución
+
+`orange_photo_albums.allow_contributions` es la fuente canónica del permiso
+general para añadir fotos y vídeos a un álbum. Aplica tanto a
+`visibility='family'` como a `visibility='selected'`.
+
+`orange_photo_album_access` determina qué usuarios tienen acceso y su estado,
+pero no mantiene un permiso de contribución individual.
+
+Para `family_memberships.role='guest'`, el usuario es un miembro de la familia,
+accede con `orange_photo_album_access.subject_type='family'` y puede contribuir
+únicamente cuando `orange_photo_albums.allow_contributions=true`, manteniendo
+las restricciones de aportación de contenido propio.
+
+`orange_photo_album_shares.can_contribute` pertenece al modelo legacy. Se
+conserva temporalmente como compatibilidad mientras existan rutas antiguas que
+lo escriban, pero no debe considerarse fuente canónica de autorización.
+
+Los invitados externos conservan por ahora sus permisos históricos
+`can_contribute` / `can_comment` en `orange_photo_album_guest_invitations` y
+`orange_photo_album_guest_grants`. No se eliminan ni se reinterpretan en esta
+corrección.
+
+#### Pendiente técnico
+
+- Migrar o eliminar en una fase independiente las rutas legacy que todavía
+  dependan de `orange_photo_album_shares`.
+- Cuando ya no exista ningún consumidor real, retirar el dual-write de
+  `orange_photo_album_shares.can_contribute`.
+- Solo después, mediante migración específica y verificada, valorar eliminar
+  esa columna.
+- Revisar en una fase independiente la convivencia entre el modelo unificado y
+  los permisos históricos de invitados externos antes de retirar cualquier
+  campo de guest invitations/grants.
+- La ruta legacy `shareAlbum()` sigue formando parte de la compatibilidad y la
+  migración completa de destinatarios hacia `orange_photo_album_access` queda
+  fuera de esta corrección.
+- Los álbumes existentes cuyo `allow_contributions` haya quedado en false por
+  operaciones anteriores no deben corregirse automáticamente si no puede
+  reconstruirse con certeza la intención del propietario. Tras desplegar esta
+  corrección se deberán volver a guardar manualmente los permisos de los
+  álbumes afectados.
+
 El propietario puede retirar cualquier elemento.
 
 Siguen aplazados:
