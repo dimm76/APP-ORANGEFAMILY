@@ -32,9 +32,8 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
         albumId?.takeIf { it.isNotBlank() }?.let { parts += "album_id=${encode(it)}" }
         if (sharedWithMe) parts += "library_scope=shared_with_me"
         if (filters.mediaType != "all") parts += "media_type=${encode(filters.mediaType)}"
-        val queryAccessSources = if (albumId?.isNullOrBlank() == false && filters.accessSourcesMode == "include") filters.accessSources + "album" else filters.accessSources
-        if (queryAccessSources.isNotEmpty()) {
-            parts += "access_sources=${encode(queryAccessSources.sorted().joinToString(","))}"
+        if (filters.accessSources.isNotEmpty()) {
+            parts += "access_sources=${encode(filters.accessSources.sorted().joinToString(","))}"
             parts += "access_sources_mode=${encode(filters.accessSourcesMode)}"
         }
         if (filters.ownerUserIds.isNotEmpty()) {

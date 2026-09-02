@@ -1128,11 +1128,14 @@ Esta es deuda técnica actual, no una arquitectura deseada:
    un `album_id` válido, existe `access_sources` y el modo efectivo es `include`.
    La regla aplica de forma común a `list`, `timeline` y `around-date` porque
    los tres pasan por `buildPhotoQuery`.
-8. Si no existe `access_sources` no se crea ningún filtro de origen y `exclude`
-   se conserva literalmente. React y Android mantienen temporalmente sus
-   normalizaciones actuales por compatibilidad durante R2A; su retirada queda
-   pendiente para R2B, después de validar Node en producción. Los fast paths de
-   Galería y Compartidas conmigo no se modifican.
+8. En R2B se elimina la inyección implícita de `album` en React y Android; ambos
+   clientes transmiten los `access_sources` declarados, mientras Node permanece
+   como única autoridad de normalización de contexto álbum. `album` continúa
+   siendo un valor explícito válido y los clientes Android anteriores siguen
+   siendo compatibles porque Node normaliza de forma idempotente. R2A fue
+   validada en producción sobre `list`, `timeline` y `around-date` sin que el
+   cliente enviara `album`; los fast paths de Galería y Compartidas conmigo
+   permanecen sin cambios.
 9. `source_user_id` liga cada relación de álbum a una copia lógica concreta.
 
 ### Objetivo de estabilización
