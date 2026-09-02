@@ -1123,7 +1123,12 @@ Esta es deuda técnica actual, no una arquitectura deseada:
    se conservan como parte del runtime multipropiedad. Ninguna otra deuda legacy
    se retira en R3B.
 4. El favorito utiliza `orange_photo_user_settings`, pero mantiene fallback
-   legacy hacia `orange_photos.is_favorite` para el propietario original.
+   legacy hacia `orange_photos.is_favorite` para el propietario original. R4A
+   introduce un backfill previo a retirar ese fallback: solo crea settings para
+   favoritos legacy `true` sin fila personal existente; una fila existente
+   prevalece siempre. R4A no cambia el runtime ni elimina
+   `orange_photos.is_favorite`; R4B solo podrá ejecutarse después de aplicar y
+   validar la migración en producción.
 5. `orange_photo_album_access` es el ACL canónico, pero
    `orange_photo_album_shares` continúa temporalmente en dual-write y sigue
    siendo consumido por partes del runtime.
