@@ -1114,9 +1114,11 @@ Esta es deuda técnica actual, no una arquitectura deseada:
    `orange_photo_library_items`.
 2. La fuente canónica de nueva lógica de ownership operativo y metadatos
    personales es `orange_photo_library_items`.
-3. `backend/src/orangePhotosService.js` conserva código legacy anterior al
-   cutover, incluido `list(req)`, aunque la exportación operativa utiliza
-   `listSafe`.
+3. R3A elimina `list(req)`, el listado legacy anterior al cutover. La
+   exportación pública continúa siendo `list:listSafe` y `listSafe` sigue
+   siendo la implementación operativa. No se retiran en R3A otros helpers ni
+   otras deudas legacy; las siguientes limpiezas deben realizarse en fases
+   independientes.
 4. El favorito utiliza `orange_photo_user_settings`, pero mantiene fallback
    legacy hacia `orange_photos.is_favorite` para el propietario original.
 5. `orange_photo_album_access` es el ACL canónico, pero
