@@ -12,7 +12,7 @@ No ejecutar la migración hasta la revisión final y el merge coordinado.
 
 ## Invitados externos — Fase 1
 
-El acceso público continúa siendo de lectura y descarga. Los miembros familiares se autorizan mediante `family_memberships`; los invitados externos son cuentas de autenticación normales sin membresía familiar y reciben un grant explícito por álbum. No existe `role='guest'` en `family_memberships`.
+El acceso público continúa siendo de lectura y descarga. Los miembros familiares se autorizan mediante `family_memberships`; los invitados externos son cuentas de autenticación normales sin membresía familiar y reciben un grant explícito por álbum. Existe `family_memberships.role='guest'` para miembros reales de la familia; estos utilizan ACL de álbum con `subject_type='family'`, mientras que los invitados externos utilizan `subject_type='external'`.
 
 Las invitaciones usan tokens aleatorios almacenados únicamente como SHA-256, caducan a los siete días y pueden revocarse. Los permisos `can_view`, `can_contribute` y `can_comment` son independientes, aunque ver siempre queda activo cuando se concede otra capacidad.
 
@@ -83,6 +83,149 @@ La generación o regeneración manual del poster de un vídeo queda reservada al
 Las estadísticas de almacenamiento contabilizan los bytes físicos una única vez. La atribución física por usuario continúa utilizando `orange_photos.owner_user_id`. Un asset solo cuenta como almacenamiento físicamente en papelera cuando existe al menos una copia lógica y no queda ninguna copia lógica activa.
 
 Android continúa consumiendo la misma API Node; este cutover no introduce una API específica para Android.
+
+## Modelo canónico de datos y estados
+
+### Asset físico
+
+Tabla: `orange_photos`
+
+- Una fila representa el asset físico.
+- `id` identifica la foto o vídeo compartido físicamente.
+- `family_id` delimita la familia.
+- `owner_user_id` es exclusivamente el propietario u origen original.
+- `owner_user_id` no representa ownership operativo después del cutover
+  multipropiedad.
+
+Los datos físicos `media_type`, `original_filename`, `mime_type`, `extension`,
+`width`, `height`, `duration_seconds`, `orientation`, `camera_make`,
+`camera_model`, `lens_model` y `exif_json` pertenecen conceptualmente al asset.
+
+`orange_photos` conserva todavía campos mutables históricos duplicados tras el
+cutover. No deben utilizarse como fuente canónica para nueva lógica de copia.
+
+### Copia lógica
+
+Tabla: `orange_photo_library_items`
+
+Clave: `(photo_id,user_id)`.
+
+Representa una copia lógica propiedad de un usuario sin duplicar el asset físico.
+Es la fuente canónica de `title`, `description`, `captured_at`,
+`captured_at_source`, `timezone`, `latitude`, `longitude`, `altitude_meters`,
+`location_*`, `visibility`, `is_trashed`, `trashed_at`, `public_enabled`,
+`public_token`, `public_created_at` y `public_revoked_at`.
+
+`user_id` es el propietario operativo de esa copia.
+
+### Preferencias del usuario
+
+Tabla: `orange_photo_user_settings`
+
+Clave: `(photo_id,user_id)`.
+
+`is_hidden` es una preferencia del usuario receptor: no cambia ownership, no
+modifica la copia que comparte y se utiliza principalmente en Compartidas
+conmigo.
+
+`is_favorite` es una preferencia personal. La implementación actual todavía
+conserva un fallback legacy hacia `orange_photos.is_favorite` para el
+propietario original; dicho fallback no debe considerarse el modelo canónico
+futuro.
+
+### Compartición directa
+
+Tabla: `orange_photo_shares`
+
+Clave efectiva: `(photo_id,owner_user_id,user_id)`.
+
+`owner_user_id` identifica la copia lógica que comparte y `user_id` es el
+destinatario. La visibilidad de la copia vive en
+`orange_photo_library_items.visibility`; `selected` utiliza
+`orange_photo_shares` para destinatarios concretos.
+
+### Álbum
+
+Tabla: `orange_photo_albums`
+
+El álbum contiene `owner_user_id`, `visibility`, `allow_contributions`,
+`allow_comments`, `is_archived`, `cover_photo_id`, `public_*` y
+`date_mode/date_start/date_end`. `allow_contributions` es la autoridad canónica
+familiar para contribuciones.
+
+### Contenido del álbum
+
+Tabla: `orange_photo_album_items`
+
+- `photo_id` identifica el asset físico.
+- `source_user_id` identifica la copia lógica que aporta el asset al álbum.
+- `added_by` identifica el actor que ejecutó la incorporación.
+
+El contenido del álbum se resuelve contra `(photo_id,source_user_id)`. Si esa
+copia lógica deja de estar activa o queda en papelera, deja de aportar contenido
+al álbum aunque existan otras copias lógicas del mismo asset. Este es el
+invariante vigente.
+
+### Acceso a álbum
+
+La fuente canónica es `orange_photo_album_access`, con `album_id`, `user_id`,
+`subject_type = family | external` y `status = pending | active | revoked`.
+Para miembros familiares, incluido `role='guest'`, se utiliza
+`subject_type='family'`. Para invitados externos se utiliza
+`subject_type='external'`.
+
+### Compatibilidad de álbum legacy
+
+`orange_photo_album_shares` no es el ACL canónico actual. Se conserva
+temporalmente porque todavía existen consultas y rutas runtime que lo consumen,
+y el servicio unificado realiza dual-write para mantener compatibilidad.
+`orange_photo_album_shares.can_contribute` no es fuente canónica.
+
+### Variables derivadas de API
+
+No son estados almacenados:
+
+`is_original_owner`, `is_owner`, `is_in_library`, `is_library_copy_trashed`,
+`copy_owner_user_id`, `access_source`, `is_shared_directly`,
+`is_shared_via_album`, `is_shared_effectively` y `shared_via_albums`.
+
+- `is_original_owner` = el usuario actual coincide con
+  `orange_photos.owner_user_id`.
+- `is_owner` = el usuario actual coincide con el `user_id` de la copia lógica
+  efectiva.
+- `is_in_library` = existe una copia lógica propia activa.
+- `copy_owner_user_id` = `user_id` de la copia lógica resuelta.
+- `access_source` = `owned`, `library`, `direct` o `album`, con prioridad
+  `owned → library → direct → album`.
+
+`access_source` no se persiste.
+
+### Parámetros de consulta
+
+`library_scope`, `access_sources`, `access_sources_mode`, `owner_user_ids`,
+`owner_user_ids_mode`, `share_states`, `share_scope`, `include_hidden` y
+`exclude_in_library` son filtros, no estados persistidos.
+
+`owner_user_ids` continúa refiriéndose a `orange_photos.owner_user_id`, es
+decir, a la procedencia u origen original, no a `copy_owner_user_id`.
+
+### Contrato de vistas
+
+Galería representa la biblioteca propia y resuelve normalmente por
+`owned/library`.
+
+Compartidas conmigo representa contenido recibido mediante `direct/album`,
+excluye ocultos por defecto, permite mostrarlos con `include_hidden` y utiliza
+`exclude_in_library` para controlar si se muestran elementos recibidos que
+también cuentan con copia propia.
+
+Detalle de álbum: `album_id` delimita primero la pertenencia al álbum; también
+debe mostrar aportaciones de otros usuarios. `owned/library/album` describen
+cómo se resuelve cada elemento, y una aportación de otro usuario no desaparece
+por no estar integrada en la biblioteca propia.
+
+Web y Android deben cumplir exactamente este mismo contrato. Estas reglas son
+de resolución y datos, no reglas específicas de interfaz.
 
 ## Permisos
 

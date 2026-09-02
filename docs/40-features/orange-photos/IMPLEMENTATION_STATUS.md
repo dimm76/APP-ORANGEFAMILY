@@ -426,6 +426,13 @@ crear necesariamente una compartición directa;
 duplicar el archivo en Wasabi;
 cambiar su propietario lógico.
 
+En una consulta acotada por `album_id`, el origen técnico `album` se incluye
+siempre cuando `access_sources_mode` es `include`. Así, el detalle del álbum
+muestra también aportaciones de otros colaboradores aunque esas fotos no estén
+integradas en la biblioteca del usuario actual. Web y Android mantienen la
+misma semántica, sin modificar el ownership, `source_user_id` ni la integración
+en biblioteca.
+
 Los colaboradores:
 
 solo pueden añadir contenido propio;
@@ -1098,3 +1105,46 @@ inventario;
 cola.
 
 Los vídeos pueden disponer de thumbnail JPEG de máximo 480 px; los vídeos con poster existente generan el thumbnail desde el poster sin descargar ni transcodificar el original únicamente para ello; los vídeos históricos completan thumbnails mediante el reconciliador; la timeline/grid web prioriza thumbnail y utiliza poster como fallback.
+
+## Estabilización del modelo multipropiedad
+
+Esta es deuda técnica actual, no una arquitectura deseada:
+
+1. `orange_photos` conserva campos mutables legacy duplicados frente a
+   `orange_photo_library_items`.
+2. La fuente canónica de nueva lógica de ownership operativo y metadatos
+   personales es `orange_photo_library_items`.
+3. `backend/src/orangePhotosService.js` conserva código legacy anterior al
+   cutover, incluido `list(req)`, aunque la exportación operativa utiliza
+   `listSafe`.
+4. El favorito utiliza `orange_photo_user_settings`, pero mantiene fallback
+   legacy hacia `orange_photos.is_favorite` para el propietario original.
+5. `orange_photo_album_access` es el ACL canónico, pero
+   `orange_photo_album_shares` continúa temporalmente en dual-write y sigue
+   siendo consumido por partes del runtime.
+6. `allow_contributions` es la fuente canónica de contribución familiar;
+   `can_contribute` legacy no debe convertirse de nuevo en autoridad.
+7. Web y Android consumen la misma API, pero existen algunas normalizaciones de
+   filtros duplicadas en ambos clientes.
+8. La regla `album_id + access_sources` se mantiene en paridad entre web y
+   Android; esta duplicación debe revisarse en la fase de estabilización y no
+   debe proliferar.
+9. `source_user_id` liga cada relación de álbum a una copia lógica concreta.
+
+### Objetivo de estabilización
+
+Antes de ampliar el modelo de Orange Photos deberán revisarse, en fases
+independientes:
+
+- el contrato canónico de consultas;
+- la eliminación de lógica cliente duplicada;
+- la retirada segura de código runtime legacy;
+- la retirada futura de columnas mutables legacy de `orange_photos` cuando pueda
+  demostrarse que ningún consumidor las necesita;
+- la eliminación posterior del dual-modelo
+  `orange_photo_album_shares` / `orange_photo_album_access`;
+- la eliminación del fallback legacy de favorito;
+- la cobertura de tests de contrato para Galería, Compartidas conmigo y
+  Álbumes.
+
+No realizar ninguna de esas refactorizaciones como parte de esta documentación.
