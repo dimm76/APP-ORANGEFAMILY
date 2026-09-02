@@ -62,3 +62,93 @@ test("check con checksum nuevo devuelve upload_required sin supresión", async (
     pool.query = originalQuery;
   }
 });
+
+test("insertPhoto crea la copia lógica inicial desde metadata sin releer campos mutables legacy", async () => {
+  const originalConnect = pool.connect;
+  const queries = [];
+  const familyId = "22222222-2222-4222-8222-222222222222";
+  const userId = "11111111-1111-4111-8111-111111111111";
+  const photoId = "33333333-3333-4333-8333-333333333333";
+  const createdAt = "2026-08-19T16:40:00.000Z";
+  const metadata = {
+    media_type: "photo",
+    title: "Canónico",
+    description: "Descripción canónica",
+    original_filename: "canonica.jpg",
+    mime_type: "image/jpeg",
+    extension: "jpg",
+    captured_at: "2026-08-18T10:20:00.000Z",
+    captured_at_source: "exif",
+    timezone: "Europe/Madrid",
+    width: 1200,
+    height: 800,
+    duration_seconds: null,
+    orientation: 1,
+    camera_make: "Orange",
+    camera_model: "Orange One",
+    lens_model: "Standard",
+    latitude: 39.4702,
+    longitude: -0.3768,
+    altitude_meters: 15,
+    location_name: "Valencia",
+    location_country: "España",
+    location_region: "Comunitat Valenciana",
+    location_locality: "Valencia",
+    location_source: "exif",
+    exif_json: { source: "test" },
+    visibility: "private",
+  };
+  const storage = {
+    provider: "wasabi",
+    bucket: "orangefamily",
+    object_key: "original/canonica.jpg",
+    mime_type: "image/jpeg",
+    size_bytes: 2048,
+    checksum_sha256: "a".repeat(64),
+    etag: "etag",
+  };
+  const client = {
+    query: async (text, params) => {
+      queries.push({ text: String(text), params });
+      if (String(text).includes("INSERT INTO public.orange_photos")) {
+        return { rows: [{ id: photoId, created_at: createdAt }] };
+      }
+      return { rows: [] };
+    },
+    release: () => {},
+  };
+
+  pool.connect = async () => client;
+  try {
+    const result = await service.insertPhoto({ familyId, userId }, metadata, storage);
+    const libraryInsert = queries.find(({ text }) =>
+      text.includes("INSERT INTO public.orange_photo_library_items"),
+    );
+
+    assert.ok(libraryInsert);
+    assert.match(libraryInsert.text, /VALUES/);
+    assert.doesNotMatch(libraryInsert.text, /FROM public\.orange_photos/);
+    assert.deepEqual(libraryInsert.params, [
+      photoId,
+      userId,
+      createdAt,
+      metadata.title,
+      metadata.description,
+      metadata.captured_at,
+      metadata.captured_at_source,
+      metadata.timezone,
+      metadata.latitude,
+      metadata.longitude,
+      metadata.altitude_meters,
+      metadata.location_name,
+      metadata.location_country,
+      metadata.location_region,
+      metadata.location_locality,
+      metadata.location_source,
+      metadata.visibility,
+    ]);
+    assert.equal(result.ok, true);
+  } finally {
+    pool.connect = originalConnect;
+  }
+});

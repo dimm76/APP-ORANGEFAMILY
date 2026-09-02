@@ -1111,7 +1111,16 @@ Los vídeos pueden disponer de thumbnail JPEG de máximo 480 px; los vídeos con
 Esta es deuda técnica actual, no una arquitectura deseada:
 
 1. `orange_photos` conserva campos mutables legacy duplicados frente a
-   `orange_photo_library_items`.
+   `orange_photo_library_items`. R5A desacopla la creación de la copia lógica
+   inicial de la lectura de metadatos mutables desde `orange_photos`:
+   `insertPhoto` crea `orange_photo_library_items` directamente desde la
+   metadata normalizada de Node, conservando `p.id` y `p.created_at` como
+   identidad y fecha física necesarias para `photo_id` y `added_at`. R5A no
+   elimina ni deja de escribir todavía los campos legacy duplicados en
+   `orange_photos`, porque siguen existiendo consumidores de compatibilidad,
+   entre ellos el tratamiento de `captured_at`/`captured_at_source` de vídeo.
+   La eliminación de campos físicos queda pospuesta a una fase posterior
+   independiente, después de retirar todos los consumidores reales.
 2. La fuente canónica de nueva lógica de ownership operativo y metadatos
    personales es `orange_photo_library_items`.
 3. R3A retiró `list(req)`, el listado legacy anterior al cutover. R3B retira
