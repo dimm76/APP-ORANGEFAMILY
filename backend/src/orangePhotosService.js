@@ -109,6 +109,36 @@ async function hasOtherLibraryMemberships(queryable, photoId, userId) {
   return row?.has_other_memberships === true;
 }
 function csvValues(value){return [...new Set((Array.isArray(value)?value:String(value||"").split(",")).map(item=>String(item).trim()).filter(Boolean))];}
+function normalizePhotoQueryContext(query={}) {
+  const normalized = { ...(query || {}) };
+
+  if (!uuid(normalized.album_id)) {
+    return normalized;
+  }
+
+  const sources = csvValues(normalized.access_sources);
+
+  if (!sources.length) {
+    return normalized;
+  }
+
+  const sourceMode = String(
+    normalized.access_sources_mode || "include"
+  );
+
+  if (sourceMode !== "include") {
+    return normalized;
+  }
+
+  normalized.access_sources = [
+    ...new Set([
+      ...sources,
+      "album",
+    ]),
+  ].join(",");
+
+  return normalized;
+}
 function parseLibraryFilters(q,values,where){const sources=csvValues(q.access_sources),states=csvValues(q.share_states),owners=csvValues(q.owner_user_ids),sourceMode=String(q.access_sources_mode||"include"),ownerMode=String(q.owner_user_ids_mode||"include");if(!FILTER_MODES.has(sourceMode)||!FILTER_MODES.has(ownerMode))return bad(400,"INVALID_FILTER","Modo de filtro no válido.");if(sources.some(v=>!ACCESS_SOURCES.has(v)))return bad(400,"INVALID_FILTER","Origen de acceso no válido.");if(states.some(v=>!SHARE_STATES.has(v)))return bad(400,"INVALID_FILTER","Estado de compartición no válido.");if(owners.some(v=>!uuid(v)))return bad(400,"INVALID_FILTER","Propietario no válido.");const selectedStates=states.length?states:["private","family","selected","public_link"];if(sources.length){const sourceCondition=`(${sources.map(source=>`li._access_source='${source}'`).join(" OR ")})`;where.push(sourceMode==="exclude"?`NOT ${sourceCondition}`:sourceCondition);}if(owners.length){values.push(owners);const ownerCondition=`p.owner_user_id=ANY($${values.length}::uuid[])`;where.push(ownerMode==="exclude"?`NOT (${ownerCondition})`:ownerCondition);}if(selectedStates.length<4){const clauses=[];if(selectedStates.includes("private"))clauses.push("li.visibility='private'");if(selectedStates.includes("family"))clauses.push("li.visibility='family'");if(selectedStates.includes("selected"))clauses.push("li.visibility='selected'");if(selectedStates.includes("public_link"))clauses.push("(li.public_enabled=true AND li.public_token IS NOT NULL AND li.public_revoked_at IS NULL)");where.push(`(${clauses.join(" OR ")})`);}return ok({owners,sources,sourceMode});}
 async function validateFilterOwners(familyId,owners){if(!owners.length)return null;const rows=(await pool.query(`SELECT au.id::text FROM public.auth_users au JOIN public.family_memberships fm ON fm.person_id=au.person_id AND fm.status='active' WHERE fm.family_id=$1::uuid AND au.status='active' AND au.id=ANY($2::uuid[])`,[familyId,owners])).rows;return rows.length===owners.length?null:bad(400,"INVALID_FILTER","Uno o más propietarios no pertenecen a la familia.");}
 function authenticatedPublicLink(row,type){const enabled=row.public_enabled===true&&row.public_token!=null&&row.public_revoked_at==null;if(!enabled)return{enabled:false,token:null,path:null};if(!row.is_owner)return{enabled:true,token:null,path:null};return{enabled:true,token:row.public_token,path:`/public/orangephotos/${type}/${row.public_token}`};}
@@ -480,7 +510,7 @@ async function createTag(req,body){const a=resolveAuthenticatedFamily(req);if(!a
 
 async function buildPhotoQuery(req, queryOverride = null) {
   const auth = resolveAuthenticatedFamily(req); if (!auth.ok) return auth;
-  const q = queryOverride || req.query || {}, values = [auth.familyId, auth.userId], where = [`p.family_id=$1::uuid`];
+  const q = normalizePhotoQueryContext(queryOverride || req.query || {}), values = [auth.familyId, auth.userId], where = [`p.family_id=$1::uuid`];
   const add = (sql, value) => { values.push(value); where.push(sql.replaceAll("?", `$${values.length}`)); };
   const trashed = q.trashed != null ? bool(q.trashed) : bool(q.include_trashed) && String(q.owner_user_id || auth.userId) === auth.userId;
   const albumParameter = !trashed && uuid(q.album_id) ? (values.push(q.album_id), `$${values.length}`) : null;

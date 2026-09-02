@@ -1124,11 +1124,15 @@ Esta es deuda técnica actual, no una arquitectura deseada:
    siendo consumido por partes del runtime.
 6. `allow_contributions` es la fuente canónica de contribución familiar;
    `can_contribute` legacy no debe convertirse de nuevo en autoridad.
-7. Web y Android consumen la misma API, pero existen algunas normalizaciones de
-   filtros duplicadas en ambos clientes.
-8. La regla `album_id + access_sources` se mantiene en paridad entre web y
-   Android; esta duplicación debe revisarse en la fase de estabilización y no
-   debe proliferar.
+7. Node es la autoridad para normalizar el origen técnico `album` cuando existe
+   un `album_id` válido, existe `access_sources` y el modo efectivo es `include`.
+   La regla aplica de forma común a `list`, `timeline` y `around-date` porque
+   los tres pasan por `buildPhotoQuery`.
+8. Si no existe `access_sources` no se crea ningún filtro de origen y `exclude`
+   se conserva literalmente. React y Android mantienen temporalmente sus
+   normalizaciones actuales por compatibilidad durante R2A; su retirada queda
+   pendiente para R2B, después de validar Node en producción. Los fast paths de
+   Galería y Compartidas conmigo no se modifican.
 9. `source_user_id` liga cada relación de álbum a una copia lógica concreta.
 
 ### Objetivo de estabilización

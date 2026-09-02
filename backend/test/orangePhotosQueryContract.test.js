@@ -164,7 +164,7 @@ test("album context resolves content through source_user_id", async () => {
   resetCalls();
   const result = await orangePhotosService.list(ownerReq({
     album_id: ALBUM_ID,
-    access_sources: "owned,library,album",
+    access_sources: "owned,library",
     access_sources_mode: "include",
     include_total: "false",
   }));
@@ -183,7 +183,7 @@ test("album context does not use the general gallery fast paths", async () => {
   resetCalls();
   await orangePhotosService.list(ownerReq({
     album_id: ALBUM_ID,
-    access_sources: "owned,library,album",
+    access_sources: "owned,library",
     access_sources_mode: "include",
     include_total: "false",
   }));
@@ -218,12 +218,52 @@ test("timeline uses the same album source relation as the grid", async () => {
   resetCalls();
   await orangePhotosService.timeline(ownerReq({
     album_id: ALBUM_ID,
-    access_sources: "owned,library,album",
+    access_sources: "owned,library",
     access_sources_mode: "include",
   }));
   const sql = normalizeSql(calls[0].sql);
   assert.match(sql, /selected_album_item/);
   assert.match(sql, /candidate\.user_id=selected_album_item\.source_user_id/);
+});
+
+test("album include sources are normalized by Node", async () => {
+  resetCalls();
+  const result = await orangePhotosService.list(ownerReq({
+    album_id: ALBUM_ID,
+    access_sources: "owned,library",
+    access_sources_mode: "include",
+    include_total: "false",
+  }));
+  assertResult(result);
+  const sql = listingSql();
+  assert.match(sql, /\(li\._access_source='owned' or li\._access_source='library' or li\._access_source='album'\)/);
+});
+
+test("album exclude sources are not expanded by Node", async () => {
+  resetCalls();
+  const result = await orangePhotosService.list(ownerReq({
+    album_id: ALBUM_ID,
+    access_sources: "owned,library",
+    access_sources_mode: "exclude",
+    include_total: "false",
+  }));
+  assertResult(result);
+  const sql = listingSql();
+  assert.match(sql, /not \(li\._access_source='owned' or li\._access_source='library'\)/);
+  assert.doesNotMatch(sql, /not \(li\._access_source='owned' or li\._access_source='library' or li\._access_source='album'\)/);
+});
+
+test("album without source filter remains unfiltered", async () => {
+  resetCalls();
+  const result = await orangePhotosService.list(ownerReq({
+    album_id: ALBUM_ID,
+    include_total: "false",
+  }));
+  assertResult(result);
+  const sql = listingSql();
+  assert.match(sql, /selected_album_item/);
+  assert.match(sql, /candidate\.user_id=selected_album_item\.source_user_id/);
+  assert.doesNotMatch(sql, /li\._access_source='/);
 });
 
 test("around-date newer preserves ascending temporal pagination", async () => {
