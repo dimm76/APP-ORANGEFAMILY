@@ -158,6 +158,7 @@ export default function OrangePhotosPage() {
   const currentUserId=user?.id?String(user.id):"",activeAlbum=albumId?albums.find(album=>String(album.id)===String(albumId)):null,addToAlbum=addToAlbumId?albums.find(album=>String(album.id)===String(addToAlbumId)):null;
   const photoOwnerMembers=useMemo(()=>members.filter(member=>String(member?.id||"")!==currentUserId),[members,currentUserId]);
   const albumMenuRef = useRef(null), fileRef = useRef(null), missingFileItemRef=useRef(null), filterRef = useRef(null), createRef = useRef(null), sentinelRef = useRef(null), scrollerRef = useRef(null), selectionAnchorRef = useRef(null), loadMoreLock = useRef(false), loadNewerLockRef=useRef(false), pendingScrollAnchorRef=useRef(null), pendingTimelineJumpRef=useRef(false), loadRequestRef = useRef(0), timelineRequestRef = useRef(0), loadAbortRef = useRef(null), timelineAbortRef = useRef(null), skipNextLoadRef = useRef(false), skipPersistRef=useRef(false), timelineScrollTimerRef = useRef(null), timelineFrameRef = useRef(null), timelineScrubRef = useRef({ key: "", timer: null }), uploadControlsRef=useRef(new Map()), uploadWakeLockRef=useRef(null), forcingUploadsRef=useRef(new Set()), activeUploadWorkRef=useRef(0), queueRef=useRef([]), progressPersistRef=useRef(new Map()), autoResumeRef=useRef(false), previousAlbumDisplayContextRef=useRef(albumDisplayContext), previousIsMainLibraryViewRef = useRef(isMainLibraryView), previousAlbumsViewRef = useRef(albumsView), groups = useMemo(() => groupPhotos(items), [items]), hasMore = windowPagination.active?windowPagination.hasOlder:items.length>0&&items.length<total, supportsObserver = typeof window !== "undefined" && "IntersectionObserver" in window;
+  const externalRefreshBusyRef = useRef(false);
   void online;void persistenceWarning;
   const load = useCallback(async (overrideFilters=null) => {
     loadAbortRef.current?.abort();if(albumsView){loadRequestRef.current+=1;return;}
@@ -358,6 +359,32 @@ export default function OrangePhotosPage() {
   const resetLibrary = updater => { loadMoreLock.current = false; setItems([]); clearSelection();clearWindowPagination();setFilters(current => { const next = updater(current); delete next.before; return { ...next, page: 1 }; }); };
   const refreshOnce = async () => {const firstPageFilters={...filters,page:1};delete firstPageFilters.before;if(filters.page!==1||filters.before){skipNextLoadRef.current=true;setFilters(firstPageFilters);}loadMoreLock.current=false;clearWindowPagination();await Promise.all([load(firstPageFilters),reloadTimeline(firstPageFilters)]);};
   const handleSelect = useCallback((id,event) => { if(event?.currentTarget?.tagName==="LABEL"&&event.target?.tagName!=="INPUT")return;const photo=items.find(item=>item.id===id),dayKey=photoDayKey(photo);if(selectedDays.has(dayKey))setSelectedDays(current=>{const next=new Set(current);next.delete(dayKey);return next;});const anchor=selectionAnchorRef.current;if(event?.shiftKey&&anchor){const start=items.findIndex(photo=>photo.id===anchor),end=items.findIndex(photo=>photo.id===id);if(start>=0&&end>=0){setSelected(current=>{const next=new Set(current);for(const photo of items.slice(Math.min(start,end),Math.max(start,end)+1))if(!addToAlbumId||!existingAlbumPhotoIds.has(String(photo.id)))next.add(photo.id);return next;});return;}}setSelected(current=>{const next=new Set(current);next.has(id)?next.delete(id):next.add(id);return next;});selectionAnchorRef.current=id; },[items,selectedDays,addToAlbumId,existingAlbumPhotoIds]), viewerIndex = viewer ? items.findIndex(photo => photo.id === viewer.id) : -1;
+  useEffect(() => {
+    if (!albumsView && !albumId && !sharedWithMeView) return undefined;
+    const refreshExternalState = async () => {
+      if (document.visibilityState !== "visible" || externalRefreshBusyRef.current) return;
+      externalRefreshBusyRef.current = true;
+      try {
+        if (albumsView) {
+          await loadAlbums();
+        } else {
+          await Promise.all([refreshOnce(), loadAlbums()]);
+        }
+      } finally {
+        externalRefreshBusyRef.current = false;
+      }
+    };
+    const handleFocus = () => { void refreshExternalState(); };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void refreshExternalState();
+    };
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [albumsView, albumId, sharedWithMeView, loadAlbums, filters]);
   const toggle = handleSelect, selectionMode = selected.size > 0;
   const selectMany = useCallback((dayKey,ids,shouldSelect) => {setSelectedDays(current=>{const next=new Set(current);shouldSelect?next.add(dayKey):next.delete(dayKey);return next;});setSelected(current => { const next=new Set(current);for(const id of ids)shouldSelect?next.add(id):next.delete(id);return next;});},[]);
   useEffect(()=>{const onKeyDown=event=>{const target=event.target,tag=target?.tagName?.toLowerCase();if(tag==="input"||tag==="textarea"||tag==="select"||target?.isContentEditable)return;if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="a"){event.preventDefault();setSelectedDays(new Set());setSelected(new Set(items.filter(photo=>!addToAlbumId||!existingAlbumPhotoIds.has(String(photo.id))).map(photo=>photo.id)));return;}if(event.key==="Escape")clearSelection();};window.addEventListener("keydown",onKeyDown);return()=>window.removeEventListener("keydown",onKeyDown);},[items,addToAlbumId,existingAlbumPhotoIds]);

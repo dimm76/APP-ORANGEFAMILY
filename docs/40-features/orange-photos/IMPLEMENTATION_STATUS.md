@@ -161,6 +161,24 @@ usuario no se deduplica revelando existencia ajena; una foto recibida que se
 añade a la biblioteca reutiliza el mismo asset físico mediante una nueva copia
 lógica.
 
+### Actualización entre dispositivos
+
+Orange Photos puede ser modificado desde la web y Android utilizando la misma
+API. La webapp refresca los álbumes, el detalle de álbum y «Compartidas
+conmigo» al recuperar el foco de la ventana o cuando la pestaña vuelve a estar
+visible.
+
+No existe polling periódico ni WebSocket/SSE. Las modificaciones realizadas
+desde otro dispositivo mientras una pestaña permanece continuamente visible y
+enfocada no se reflejan en tiempo real.
+
+#### Pendiente técnico
+
+Si en el futuro se necesita sincronización instantánea entre dispositivos,
+deberá diseñarse expresamente un mecanismo de invalidación/realtime. No debe
+resolverse añadiendo polling agresivo sin revisar previamente su impacto y la
+arquitectura.
+
 Aplicación web
 Biblioteca
 
