@@ -299,3 +299,31 @@ test("around-date older preserves exclusive descending pagination", async () => 
   assert.match(normalizeSql(calls.at(-1).sql), /has_newer/);
   assert.match(normalizeSql(calls.at(-1).sql), /has_older/);
 });
+
+test("favorite filter and list projection use canonical user settings only", async () => {
+  resetCalls();
+  const result = await orangePhotosService.list(
+    ownerReq(
+      galleryQuery({
+        favorite: "true",
+      })
+    )
+  );
+  assertResult(result);
+  const sql = listingSql();
+  assert.match(sql, /coalesce\(us\.is_favorite,false\)=\$[0-9]+/);
+  assert.match(sql, /coalesce\(us\.is_favorite,false\) is_favorite/);
+  assert.doesNotMatch(sql, /p\.is_favorite/);
+});
+
+test("detail favorite projection uses canonical user settings only", async () => {
+  resetCalls();
+  await orangePhotosService.detail(ownerReq(), ALBUM_ID);
+  const call = calls.find(({ sql }) =>
+    normalizeSql(sql).startsWith("select p.*")
+  );
+  assert.ok(call, "No se encontró la consulta de detalle.");
+  const sql = normalizeSql(call.sql);
+  assert.match(sql, /coalesce\(us\.is_favorite,false\) is_favorite/);
+  assert.doesNotMatch(sql, /p\.is_favorite/);
+});
