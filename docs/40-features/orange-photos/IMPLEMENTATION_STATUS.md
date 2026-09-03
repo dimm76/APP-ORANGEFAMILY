@@ -1125,6 +1125,14 @@ Esta es deuda técnica actual, no una arquitectura deseada:
    `captured_at`/`captured_at_source` de vídeo. La eliminación de campos físicos
    queda pospuesta a una fase posterior independiente, después de retirar
    todos los consumidores reales.
+   R5B retira `captured_at` y `captured_at_source` físicos del pipeline de
+   vídeo: la copia lógica del propietario original es la autoridad para esa
+   metadata y el reconciliador histórico usa esa misma copia. La metadata
+   física `duration_seconds`, `width`, `height` y `orientation` sigue en
+   `orange_photos`. Si falta la copia lógica propietaria, no se recrea
+   ownership ni se bloquea el procesamiento de derivados. Las columnas
+   físicas legacy todavía no se eliminan; su retirada queda para una fase
+   posterior, tras comprobar el resto de consumidores.
 2. La fuente canónica de nueva lógica de ownership operativo y metadatos
    personales es `orange_photo_library_items`.
 3. R3A retiró `list(req)`, el listado legacy anterior al cutover. R3B retira
