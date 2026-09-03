@@ -1140,6 +1140,17 @@ Esta es deuda técnica actual, no una arquitectura deseada:
    paginación ni el comportamiento visible. No se eliminan columnas todavía;
    el importador histórico de Wasabi queda pendiente de una fase separada
    antes de valorar retirar columnas legacy.
+   R5D retira el importador Wasabi pre-cutover y su comando npm. Ese script
+   pertenecía al modelo anterior a `orange_photo_library_items`, escribía metadata
+   mutable en `orange_photos` y ya no era compatible con la política actual de
+   listado de `family_photos/`. La auditoría previa de producción confirmó que el
+   único original no registrado restante era un objeto huérfano prescindible, que
+   no se registra ni se elimina en esta fase. La futura migración WordPress
+   documentada en `LEGACY-MIGRATION.md` permanece como proceso independiente y no
+   se considera implementada por el importador retirado. R5D no modifica Wasabi,
+   PostgreSQL, API, runtime, ownership, ACL ni columnas legacy; la posible retirada
+   física de columnas mutables de `orange_photos` queda para una fase posterior
+   independiente.
 2. La fuente canónica de nueva lógica de ownership operativo y metadatos
    personales es `orange_photo_library_items`.
 3. R3A retiró `list(req)`, el listado legacy anterior al cutover. R3B retira

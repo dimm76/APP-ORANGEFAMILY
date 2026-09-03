@@ -8,7 +8,6 @@
     "dev": "node --watch app.js",
     "start": "node app.js",
     "bootstrap-admin": "node scripts/bootstrap-admin.js",
-    "import-orange-photos": "node scripts/import-orange-photos-from-wasabi.js",
     "reconcile-orange-photos-videos": "node scripts/reconcile-orange-photos-videos.js",
     "reconcile-orange-photos-images": "node scripts/reconcile-orange-photos-images.js"
   },
