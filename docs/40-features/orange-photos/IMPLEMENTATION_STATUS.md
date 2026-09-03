@@ -1125,13 +1125,6 @@ Esta es deuda técnica actual, no una arquitectura deseada:
    `captured_at`/`captured_at_source` de vídeo. La eliminación de campos físicos
    queda pospuesta a una fase posterior independiente, después de retirar
    todos los consumidores reales.
-   R5C retira la implementación `guestPhotos` pre-cutover que permanecía
-   muerta; la ruta guest operativa continúa siendo `guestPhotosPaged`, que
-   obtiene la metadata mutable desde `orange_photo_library_items` mediante
-   `orange_photo_album_items.source_user_id`. No cambia la API, ACL, permisos,
-   paginación ni el comportamiento visible. No se eliminan columnas todavía;
-   el importador histórico de Wasabi queda pendiente de una fase separada
-   antes de valorar retirar columnas legacy.
    R5B retira `captured_at` y `captured_at_source` físicos del pipeline de
    vídeo: la copia lógica del propietario original es la autoridad para esa
    metadata y el reconciliador histórico usa esa misma copia. La metadata
@@ -1140,6 +1133,13 @@ Esta es deuda técnica actual, no una arquitectura deseada:
    ownership ni se bloquea el procesamiento de derivados. Las columnas
    físicas legacy todavía no se eliminan; su retirada queda para una fase
    posterior, tras comprobar el resto de consumidores.
+   R5C retira la implementación `guestPhotos` pre-cutover que permanecía
+   muerta; la ruta guest operativa continúa siendo `guestPhotosPaged`, que
+   obtiene la metadata mutable desde `orange_photo_library_items` mediante
+   `orange_photo_album_items.source_user_id`. No cambia la API, ACL, permisos,
+   paginación ni el comportamiento visible. No se eliminan columnas todavía;
+   el importador histórico de Wasabi queda pendiente de una fase separada
+   antes de valorar retirar columnas legacy.
 2. La fuente canónica de nueva lógica de ownership operativo y metadatos
    personales es `orange_photo_library_items`.
 3. R3A retiró `list(req)`, el listado legacy anterior al cutover. R3B retira
