@@ -127,11 +127,44 @@ test("insertPhoto crea la copia lógica inicial desde metadata sin releer campos
 
     assert.ok(libraryInsert);
     assert.match(libraryInsert.text, /VALUES/);
-    assert.doesNotMatch(libraryInsert.text, /FROM public\.orange_photos/);
+    assert.equal(
+      (libraryInsert.text.match(/SELECT created_at FROM public\.orange_photos WHERE id=\$1::uuid AND owner_user_id=\$2::uuid/g) || []).length,
+      1,
+    );
+    assert.doesNotMatch(
+      libraryInsert.text,
+      /SELECT id,owner_user_id,created_at,title,description,captured_at/,
+    );
+    for (const field of [
+      "title",
+      "description",
+      "captured_at",
+      "captured_at_source",
+      "timezone",
+      "latitude",
+      "longitude",
+      "altitude_meters",
+      "location_name",
+      "location_country",
+      "location_region",
+      "location_locality",
+      "location_source",
+      "visibility",
+      "is_trashed",
+      "trashed_at",
+      "public_enabled",
+      "public_token",
+      "public_created_at",
+      "public_revoked_at",
+    ]) {
+      assert.doesNotMatch(
+        libraryInsert.text,
+        new RegExp(`SELECT[^;]*${field}`),
+      );
+    }
     assert.deepEqual(libraryInsert.params, [
       photoId,
       userId,
-      createdAt,
       metadata.title,
       metadata.description,
       metadata.captured_at,
