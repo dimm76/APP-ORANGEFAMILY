@@ -96,11 +96,13 @@ test("selected adapts recipients and preserves the legacy response", async () =>
     can_contribute: true,
   });
   assert.equal(result.ok, true);
-  assert.deepEqual(accessCalls[0], [request(), ALBUM_ID, {
+  assert.deepEqual(accessCalls[0].slice(0, 3), [request(), ALBUM_ID, {
     recipients: MEMBER_IDS.map(user_id => ({ user_id, subject_type: "family", status: "active", invitation_id: null })),
     allow_contributions: true,
     allow_comments: true,
   }]);
+  assert.equal(accessCalls[0][3], pool);
+  assert.deepEqual(accessCalls[0][4], { preserveExternal: true, visibilityOverride: "selected" });
   assert.deepEqual(result.payload, {
     visibility: "selected",
     user_ids: MEMBER_IDS,
@@ -122,6 +124,7 @@ test("family resolves all canonical eligible recipients instead of body.user_ids
     can_contribute: false,
   });
   assert.deepEqual(accessCalls[0][2].recipients.map(({ user_id }) => user_id), familyIds);
+  assert.deepEqual(accessCalls[0][4], { preserveExternal: true, visibilityOverride: "family" });
 });
 
 test("private sends no recipients and disables contributions while preserving comments", async () => {
@@ -131,6 +134,7 @@ test("private sends no recipients and disables contributions while preserving co
     can_contribute: true,
   });
   assert.deepEqual(accessCalls[0][2], { recipients: [], allow_contributions: false, allow_comments: true });
+  assert.deepEqual(accessCalls[0][4], { preserveExternal: true, visibilityOverride: "private" });
   assert.equal(result.payload.visibility, "private");
   assert.deepEqual(result.payload.user_ids, []);
 });
