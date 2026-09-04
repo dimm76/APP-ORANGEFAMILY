@@ -1174,6 +1174,11 @@ Esta es deuda técnica actual, no una arquitectura deseada:
    legacy. Esta fase no afecta al dual-modelo
    `orange_photo_album_shares` / `orange_photo_album_access`, cuya retirada queda
    para una fase posterior independiente.
+   Durante la validación post-R5F se detectó que el filtro personal `library`
+   no entraba en el fast path existente y caía en la resolución ACL genérica.
+   El fast path personal cubre ahora `owned`, `library` y `owned + library`, sin
+   cambiar el modelo de datos, añadir migraciones ni modificar ACL. `orange_photo_library_items`
+   continúa siendo la autoridad de la copia lógica.
 2. La fuente canónica de nueva lógica de ownership operativo y metadatos
    personales es `orange_photo_library_items`.
 3. R3A retiró `list(req)`, el listado legacy anterior al cutover. R3B retira

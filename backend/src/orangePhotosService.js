@@ -516,7 +516,7 @@ async function buildPhotoQuery(req, queryOverride = null) {
   const parsedFilters=parseLibraryFilters(q,values,where); if(!parsedFilters.ok)return parsedFilters;
   const ownerError=await validateFilterOwners(auth.familyId,parsedFilters.payload.owners);if(ownerError)return ownerError;
   const candidateSources=parsedFilters.payload.sources,candidateSourceMode=parsedFilters.payload.sourceMode;
-  const ownLibraryFastPath=!trashed&&!albumParameter&&candidateSourceMode==="include"&&candidateSources.length===2&&candidateSources.includes("owned")&&candidateSources.includes("library");
+  const ownLibraryFastPath=!trashed&&!albumParameter&&candidateSourceMode==="include"&&candidateSources.length>0&&candidateSources.every(source=>source==="owned"||source==="library");
   const sharedWithMeFastPath=!trashed&&!albumParameter&&libraryScope==="shared_with_me"&&candidateSourceMode==="include"&&candidateSources.every(source=>source==="direct"||source==="album");
   const sharedWantsDirect=sharedWithMeFastPath&&(candidateSources.length===0||candidateSources.includes("direct"));
   const sharedWantsAlbum=sharedWithMeFastPath&&(candidateSources.length===0||candidateSources.includes("album"));

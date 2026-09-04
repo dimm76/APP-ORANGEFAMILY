@@ -98,6 +98,39 @@ test("owned and library preserve ownLibraryFastPath", async () => {
   assert.match(sql, /from public\.orange_photo_library_items candidate where candidate\.photo_id=p\.id and candidate\.user_id=\$2::uuid and candidate\.is_trashed=false/);
 });
 
+test("library alone uses ownLibraryFastPath", async () => {
+  resetCalls();
+  const result = await orangePhotosService.list(ownerReq({
+    access_sources: "library",
+    access_sources_mode: "include",
+    include_total: "false",
+  }));
+  assertResult(result);
+  const sql = listingSql();
+  assert.match(sql, /join lateral/);
+  assert.match(sql, /from public\.orange_photo_library_items candidate where candidate\.photo_id=p\.id and candidate\.user_id=\$2::uuid and candidate\.is_trashed=false/);
+  assert.match(sql, /case when p\.owner_user_id=\$2::uuid then 'owned' else 'library' end _access_source/);
+  assert.match(sql, /li\._access_source='library'/);
+  assert.doesNotMatch(sql, /logical_direct_share/);
+  assert.doesNotMatch(sql, /logical_album_item/);
+});
+
+test("owned alone uses ownLibraryFastPath", async () => {
+  resetCalls();
+  const result = await orangePhotosService.list(ownerReq({
+    access_sources: "owned",
+    access_sources_mode: "include",
+    include_total: "false",
+  }));
+  assertResult(result);
+  const sql = listingSql();
+  assert.match(sql, /join lateral/);
+  assert.match(sql, /from public\.orange_photo_library_items candidate where candidate\.photo_id=p\.id and candidate\.user_id=\$2::uuid and candidate\.is_trashed=false/);
+  assert.match(sql, /li\._access_source='owned'/);
+  assert.doesNotMatch(sql, /logical_direct_share/);
+  assert.doesNotMatch(sql, /logical_album_item/);
+});
+
 test("include_total false avoids the count query", async () => {
   resetCalls();
   await orangePhotosService.list(ownerReq(galleryQuery()));
@@ -212,6 +245,22 @@ test("timeline preserves the shared-with-me query contract", async () => {
   assert.match(sql, /coalesce\(us\.is_hidden,false\)=false/);
   assert.match(sql, /group by extract\(year from li\.captured_at\), extract\(month from li\.captured_at\)/);
   assert.equal(calls.some(({ params }) => params?.includes("2026-08-01T00:00:00.000Z")), false);
+});
+
+test("timeline library alone uses ownLibraryFastPath", async () => {
+  resetCalls();
+  const result = await orangePhotosService.timeline(ownerReq({
+    access_sources: "library",
+    access_sources_mode: "include",
+  }));
+  assertResult(result);
+  const sql = normalizeSql(calls[0].sql);
+  assert.match(sql, /select extract\(year from li\.captured_at\)/);
+  assert.match(sql, /candidate\.user_id=\$2::uuid/);
+  assert.match(sql, /li\._access_source='library'/);
+  assert.doesNotMatch(sql, /logical_direct_share/);
+  assert.doesNotMatch(sql, /logical_album_item/);
+  assert.match(sql, /group by extract\(year from li\.captured_at\), extract\(month from li\.captured_at\)/);
 });
 
 test("timeline uses the same album source relation as the grid", async () => {
