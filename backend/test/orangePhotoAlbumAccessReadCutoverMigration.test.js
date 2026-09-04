@@ -26,6 +26,15 @@ test("R6C migration reconciles family album ACL without touching external grants
   assert.match(sql, /status in \('active','pending'\)/);
   assert.match(sql, /subject_type='external'/);
   assert.match(sql, /subject_type='family'/);
+  assert.doesNotMatch(sql, /updated_by_user_id/);
+  assert.match(sql, /invitation_id,created_by_user_id,accepted_at,revoked_at,created_at,updated_at/);
+  assert.match(
+    sql,
+    /select album_id,user_id,'family','active',null,created_by_user_id,now\(\),null,now\(\),now\(\)/
+  );
+  assert.match(sql, /accepted_at=coalesce\(public\.orange_photo_album_access\.accepted_at,excluded\.accepted_at\)/);
+  assert.match(sql, /invitation_id=null/);
+  assert.match(sql, /revoked_at=null/);
   assert.match(sql, /final guard/);
   assert.match(sql, /status='revoked'/);
   assert.doesNotMatch(sql, /orange_photo_album_guest_grants/);

@@ -67,12 +67,14 @@ WITH expected_family AS (
     AND u.id<>a.owner_user_id
 )
 INSERT INTO public.orange_photo_album_access
-  (album_id,user_id,subject_type,status,revoked_at,created_by_user_id,created_at,updated_by_user_id,updated_at)
-SELECT album_id,user_id,'family','active',NULL,created_by_user_id,now(),NULL,now()
+  (album_id,user_id,subject_type,status,invitation_id,created_by_user_id,accepted_at,revoked_at,created_at,updated_at)
+SELECT album_id,user_id,'family','active',NULL,created_by_user_id,now(),NULL,now(),now()
 FROM expected_family
 ON CONFLICT (album_id,user_id) DO UPDATE
-SET subject_type='family',status='active',revoked_at=NULL,
-    created_by_user_id=EXCLUDED.created_by_user_id,updated_at=now()
+SET subject_type='family',status='active',invitation_id=NULL,
+    created_by_user_id=EXCLUDED.created_by_user_id,
+    accepted_at=COALESCE(public.orange_photo_album_access.accepted_at,EXCLUDED.accepted_at),
+    revoked_at=NULL,updated_at=now()
 WHERE public.orange_photo_album_access.subject_type='family';
 
 WITH expected_family AS (

@@ -452,10 +452,10 @@ pero no mantiene un permiso de contribución individual.
 R6A migró React al endpoint `/recipients`. R6B convierte `POST .../share` en un
 adaptador de compatibilidad: `shareAlbum()` ya no escribe directamente en
 `orange_photo_album_shares`, sino que delega el estado canónico en
-`syncAlbumRecipients()`. El dual-write hacia `orange_photo_album_shares` sigue
-existiendo dentro del servicio canónico mientras queden lectores legacy, y las
-lecturas todavía no se han migrado. La siguiente fase será migrar esas lecturas
-hacia `orange_photo_album_access`.
+`syncAlbumRecipients()`. R6C elimina los lectores de
+`orange_photo_album_shares` de `orangePhotosService.js`; la tabla permanece
+temporalmente solo como destino del dual-write de compatibilidad. Su retirada
+corresponde a R6D.
 
 El adaptador legacy limita la sincronización al scope `family`, conserva la
 visibilidad explícita solicitada por su contrato y no modifica ACL `external`
@@ -465,11 +465,10 @@ fuera de esta fase.
 
 El modal de compartición y la creación de álbumes compartidos desde React
 utilizan ahora el endpoint canónico `/recipients`, que escribe
-`orange_photo_album_access`. `orange_photo_album_shares` continúa temporalmente
-como compatibilidad y el servicio canónico mantiene el dual-write mientras
-existan lectores legacy. La ruta legacy `shareAlbum()` / `POST .../share` sigue
-existiendo, pero ya no es el flujo normal de React; la migración de las lecturas
-hacia `orange_photo_album_access` queda para una fase posterior.
+`orange_photo_album_access`. `orange_photo_album_shares` permanece temporalmente
+solo como destino del dual-write de compatibilidad. La ruta legacy `shareAlbum()`
+/ `POST .../share` sigue existiendo, pero ya no es el flujo normal de React; su
+retirada corresponde a R6D.
 
 R6C completa el corte de lecturas de álbumes hacia `orange_photo_album_access`.
 La reconciliación previa considera únicamente membresías activas con acceso a
