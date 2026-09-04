@@ -113,6 +113,11 @@ Superada la validación, el workflow conecta por SSH y:
 6. Reinicia exclusivamente `orangefamily-backend.service`.
 7. Comprueba el servicio y el healthcheck local.
 
+La sesión SSH de despliegue utiliza `ServerAliveInterval=30` y
+`ServerAliveCountMax=10` para mantenerse activa durante operaciones remotas
+largas o silenciosas, como `npm ci`, y evitar cierres por inactividad o por
+intermediarios de red.
+
 La concurrencia impide que dos despliegues de producción se ejecuten a la
 vez. Un despliegue en curso no se cancela cuando llega otro.
 

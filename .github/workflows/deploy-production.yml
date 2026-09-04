@@ -63,6 +63,8 @@ jobs:
           set -euo pipefail
           ssh -i ~/.ssh/orangefamily_production \
             -o BatchMode=yes \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=10 \
             "$PROD_SSH_USER@$PROD_SSH_HOST" \
             bash -s -- "$PROD_APP_PATH" "$PROD_FRONTEND_PATH" <<'REMOTE_SCRIPT'
           set -euo pipefail
