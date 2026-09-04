@@ -315,8 +315,14 @@ Requiere backup previo: sí/no
 ## Git y despliegue
 
 - No hacer commit ni push automáticamente salvo instrucción explícita.
+- Cuando una instrucción autorice expresamente Git, el agente debe ejecutar él
+  mismo las operaciones rutinarias disponibles en su shell en lugar de pedir al
+  usuario que las ejecute manualmente: `git status`, creación o cambio de rama
+  autorizado, staging selectivo, commit, push de rama, `pull --ff-only`,
+  `merge --ff-only` y push de main después de autorización.
 - Antes de modificar código, revisar `git status`.
-- No usar `git add .` automáticamente cuando existan cambios ajenos o provisionales.
+- No usar `git add .`, `reset --hard`, `rebase`, force push, amend ni crear tags
+  o releases sin autorización.
 - Añadir únicamente los archivos validados.
 - Al terminar, mostrar o resumir el diff.
 - No cambiar de rama sin autorización.
@@ -324,6 +330,11 @@ Requiere backup previo: sí/no
 - No crear tags ni releases salvo instrucción explícita.
 - No modificar workflows de despliegue salvo instrucción explícita.
 - No asumir que staging o producción están configurados si la documentación no lo confirma.
+- El merge o push a main requiere autorización distinta del commit o push de una
+  rama, salvo que la instrucción incluya expresamente ambos pasos.
+- El acceso Git no implica autorización de producción. Operaciones VPS,
+  migraciones productivas o acciones destructivas requieren autorización
+  explícita aunque técnicamente puedan ejecutarse.
 
 ## Documentación
 
@@ -410,6 +421,9 @@ Migración SQL:
 
 Commit/push:
 - no realizado salvo instrucción explícita.
+
+Cuando se hayan ejecutado, incluir también rama, SHA, commit, push y estado
+final.
 ```
 
 No omitir limitaciones, riesgos ni comprobaciones pendientes.

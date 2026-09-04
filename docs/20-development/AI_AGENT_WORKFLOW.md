@@ -17,19 +17,40 @@ Actúa como:
 - analista funcional y técnico;
 - revisor de documentación;
 - revisor del código real;
+- diseñador de la solución concreta;
 - delimitador del alcance;
 - redactor de instrucciones para Cursor o Codex;
-- revisor de los resultados comunicados por los agentes.
+- revisor de commits GitHub;
+- revisor de despliegues;
+- coordinador del proceso.
+
+ChatGPT debe realizar por sí mismo la investigación disponible mediante el
+repositorio y la documentación antes de pedir ejecución a Codex.
 
 ### Cursor y Codex
 
 Actúan como:
 
-- ejecutores de cambios concretos;
-- asistentes de implementación;
-- revisores de compatibilidad con el código existente;
-- detectores de bloqueos;
-- proponentes de alternativas acotadas cuando la instrucción no encaje con la implementación real.
+- ejecutores;
+- operadores del repositorio local;
+- ejecutores de checks;
+- ejecutores de Git cuando esté autorizado;
+- ejecutores de operaciones locales autorizadas.
+
+No son responsables de volver a planificar una tarea que ya ha sido analizada.
+
+### Usuario
+
+El usuario:
+
+- define objetivos;
+- resuelve decisiones funcionales cuando son necesarias;
+- autoriza acciones sensibles;
+- autoriza producción o destrucción de datos cuando corresponda;
+- valida funcionalmente cuando sea necesario.
+
+El usuario no debe actuar por defecto como puente manual para comandos Git o
+PowerShell que Codex o Cursor puedan ejecutar.
 
 ---
 
@@ -145,3 +166,44 @@ Las reglas estables deben referenciar esta documentación en lugar de repetirse 
 Para cualquier tarea de reutilización desde APP-ORANGEDESK, revisar previamente:
 
 - `docs/20-development/ORANGEDESK_TO_ORANGEFAMILY_REUSE.md`
+
+---
+
+## Flujo estándar de desarrollo
+
+1. **Solicitud**: el usuario define el objetivo funcional, bug o cambio.
+2. **Análisis por ChatGPT**: revisa documentación, código real y decisiones
+   existentes; localiza archivos, relaciones, permisos, ownership, seguridad y
+   datos; investiga lo comprobable en el repositorio y delimita el cambio
+   mínimo. ChatGPT planifica y delimita; Codex o Cursor ejecutan.
+3. **Preparación de la rama**: cuando sea necesaria, parte de un `main`
+   actualizado y limpio. Codex o Cursor pueden crear o cambiar de rama cuando
+   la instrucción lo autorice, sin requerir que el usuario copie comandos.
+4. **Implementación**: ChatGPT entrega objetivo, archivos autorizados, cambio,
+   comportamiento, restricciones, checks y autorizaciones. Codex o Cursor
+   ejecutan sin replantear, ampliar scope ni refactorizar fuera del encargo.
+5. **Validación local**: ejecutan syntax, ESLint, build, tests, `git diff
+   --check` y verificaciones específicas, comunicando resultados, baseline,
+   archivos, migraciones y limitaciones.
+6. **Git de la rama**: con autorización explícita ejecutan `status`, staging
+   selectivo, checks, commit y push directamente. No usan automáticamente `git
+   add .`, `reset --hard`, `rebase`, `push --force` ni `commit --amend`.
+7. **Revisión remota**: tras el push, ChatGPT revisa en GitHub el SHA, commits,
+   base, ahead/behind, archivos, diff acumulado y compatibilidad del scope.
+8. **Correcciones**: ChatGPT prepara instrucciones exactas; Codex o Cursor
+   corrigen en la misma rama, validan y crean nuevos commits cuando se autorice.
+9. **Integración en main**: solo tras aprobación remota; se prefieren
+   `pull --ff-only`, `merge --ff-only` y push explícitamente autorizados.
+10. **Despliegue**: tras el push a main, ChatGPT revisa workflow, SHA,
+    conclusión, pasos relevantes y healthcheck cuando estén disponibles.
+11. **Migraciones locales**: solo con autorización explícita, entorno conocido,
+    configuración segura y protección contra producción.
+12. **Migraciones de producción**: requieren autorización explícita, revisión
+    SQL, evaluación de backup y validaciones antes y después.
+13. **VPS/SSH**: solo con acceso confirmado, acción explícita y alcance
+    definido; si no hay acceso, el usuario actúa como operador de esa acción.
+14. **Cierre**: ChatGPT confirma commit, main, producción, migraciones, checks
+    y pendientes reales.
+
+El usuario no es el operador de terminal por defecto. Codex o Cursor ejecutan
+PowerShell, shell y Git autorizado cuando disponen de acceso.

@@ -85,3 +85,9 @@ Si estamos trabajando en una tarea activa y el usuario acaba de mostrar o valida
 Pero no debe tratarlos como código revisado en GitHub.
 
 Para cambios amplios, sensibles o estructurales, pedir `git status`, `git diff` o archivos relevantes si no están pusheados.
+
+Una vez pusheada la rama, el informe local del agente es provisional. ChatGPT
+debe preferir revisar el commit remoto real en GitHub. Para cambios relevantes
+debe comparar la rama contra su base o `main`, comprobar ahead/behind, la lista
+real de archivos y el diff acumulado. No debe pedir al usuario grandes copias
+de `git diff` cuando GitHub ya contiene el commit.

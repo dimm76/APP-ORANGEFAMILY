@@ -25,6 +25,23 @@ Cada instrucción deberá indicar:
 
 Codex debe aplicar CAMBIO MÍNIMO.
 
+## Perfil de ejecución
+
+Codex ejecuta instrucciones previamente analizadas. No debe volver a investigar
+ni diseñar la solución cuando el encargo ya define archivos y cambios. Puede
+ejecutar PowerShell, shell y Git cuando la tarea lo autorice, y debe realizar
+directamente las operaciones rutinarias disponibles en lugar de devolverlas al
+usuario. Commit y push requieren autorización explícita; el acceso a
+producción también. Disponer de shell no implica autorización para producción.
+
+## Git delegado
+
+Con autorización explícita puede ejecutar `status`, `branch` o `switch`,
+staging de archivos concretos, checks de diff, commit, push, `pull --ff-only`,
+`merge --ff-only` y push a main. Sin autorización no ejecuta force push, hard
+reset, rebase, amend, borrado de ramas remotas, tags/releases, cambios de
+producción ni migraciones productivas.
+
 ---
 
 ## Prohibiciones
@@ -59,3 +76,7 @@ Codex deberá informar:
 - validaciones realizadas;
 - validaciones no realizadas;
 - posibles limitaciones pendientes.
+- rama y SHA completo cuando proceda;
+- commit, push correcto o fallido y estado Git final cuando se hayan ejecutado;
+- migración ejecutada o no ejecutada;
+- entorno donde se ejecutó y si producción fue tocada.

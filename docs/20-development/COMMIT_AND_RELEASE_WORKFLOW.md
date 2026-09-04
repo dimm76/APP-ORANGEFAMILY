@@ -34,6 +34,24 @@ Ejemplo:
 git add ruta/archivo-1 ruta/archivo-2
 git commit -m "tipo: descripción"
 git push
+```
+
+## Flujo de rama de trabajo
+
+El flujo normal es: `main` limpio y actualizado, rama específica,
+implementación, checks, stage de archivos concretos, commit, push de la rama,
+revisión remota, correcciones si son necesarias, fast-forward a `main` tras la
+aprobación y push de `main`. Codex o Cursor pueden ejecutar estas operaciones
+cuando estén expresamente autorizados.
+
+### No utilizar al usuario como terminal intermedio
+
+Si el agente ejecutor dispone de shell y permisos suficientes, debe realizar
+él mismo las operaciones rutinarias indicadas por ChatGPT. No usar por defecto
+`git add .`, force push, rebase, `reset --hard` ni amend; no hacer merge a main
+antes de la revisión remota; preferir `--ff-only`. Release y tag siguen siendo
+un proceso explícito distinto.
+
 Release
 
 Solo se preparará una release cuando se solicite expresamente.
