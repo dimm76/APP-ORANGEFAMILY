@@ -449,6 +449,14 @@ general para añadir fotos y vídeos a un álbum. Aplica tanto a
 `orange_photo_album_access` determina qué usuarios tienen acceso y su estado,
 pero no mantiene un permiso de contribución individual.
 
+R6A migró React al endpoint `/recipients`. R6B convierte `POST .../share` en un
+adaptador de compatibilidad: `shareAlbum()` ya no escribe directamente en
+`orange_photo_album_shares`, sino que delega el estado canónico en
+`syncAlbumRecipients()`. El dual-write hacia `orange_photo_album_shares` sigue
+existiendo dentro del servicio canónico mientras queden lectores legacy, y las
+lecturas todavía no se han migrado. La siguiente fase será migrar esas lecturas
+hacia `orange_photo_album_access`.
+
 El modal de compartición y la creación de álbumes compartidos desde React
 utilizan ahora el endpoint canónico `/recipients`, que escribe
 `orange_photo_album_access`. `orange_photo_album_shares` continúa temporalmente
