@@ -471,6 +471,17 @@ existan lectores legacy. La ruta legacy `shareAlbum()` / `POST .../share` sigue
 existiendo, pero ya no es el flujo normal de React; la migración de las lecturas
 hacia `orange_photo_album_access` queda para una fase posterior.
 
+R6C completa el corte de lecturas de álbumes hacia `orange_photo_album_access`.
+La reconciliación previa considera únicamente membresías activas con acceso a
+`orange_photos` y conserva sin cambios los ACL `external` y los guest grants.
+En runtime, el propietario tiene acceso implícito y el resto de usuarios se
+autorizan mediante filas activas no revocadas del ACL canónico. Los campos
+`shared_user_ids` y `shared_people` usan únicamente ACL `family`, y
+`allow_contributions` es la autoridad para contribuir. `orangePhotosService` ya
+no lee `orange_photo_album_shares`; esa tabla permanece solo para el dual-write
+de compatibilidad en `syncAlbumRecipients()` y el adaptador legacy `shareAlbum()`.
+La retirada física de ese dual-write queda para R6D.
+
 Para `family_memberships.role='guest'`, el usuario es un miembro de la familia,
 accede con `orange_photo_album_access.subject_type='family'` y puede contribuir
 únicamente cuando `orange_photo_albums.allow_contributions=true`, manteniendo
@@ -1208,9 +1219,10 @@ Esta es deuda técnica actual, no una arquitectura deseada:
    R3A: `visibilitySql`, `publicLinkActiveSql`, `ownedAccessSql`,
    `libraryMembershipSql`, `libraryAccessSql`, `directReceivedAccessSql` y
    `albumOnlyAccessSql`. `listSafe` sigue siendo la implementación operativa;
-   `albumVisibilitySql` se conserva porque continúa en uso y los `logicalCopy*`
-   se conservan como parte del runtime multipropiedad. Ninguna otra deuda legacy
-   se retira en R3B.
+   `albumVisibilitySql` se conservaba porque continuaba en uso en R3B; R6C lo
+   sustituye por `albumAccessSql`, basado en `orange_photo_album_access`. Los
+   `logicalCopy*` se conservan como parte del runtime multipropiedad. Ninguna
+   otra deuda legacy se retira en R3B.
 4. R4A ya fue aplicada y validada en producción; después del backfill no quedan
    favoritos legacy `true` sin settings canónico. R4B elimina del runtime el
    fallback hacia `orange_photos.is_favorite`: `orange_photo_user_settings` pasa

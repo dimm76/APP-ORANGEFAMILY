@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const path = require("node:path");
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -152,6 +153,10 @@ test("shared with me preserves sharedWithMeFastPath", async () => {
   assert.match(sql, /'direct'::text _access_source/);
   assert.match(sql, /'album'::text _access_source/);
   assert.match(sql, /union all/);
+  assert.match(sql, /orange_photo_album_access/);
+  assert.match(sql, /status='active'/);
+  assert.match(sql, /revoked_at is null/);
+  assert.doesNotMatch(sql, /orange_photo_album_shares/);
   assert.doesNotMatch(sql, /from public\.orange_photo_library_items candidate where candidate\.photo_id=p\.id and candidate\.user_id=\$2::uuid and candidate\.is_trashed=false/);
 });
 
@@ -206,6 +211,10 @@ test("album context resolves content through source_user_id", async () => {
   assert.match(sql, /public\.orange_photo_album_items selected_album_item/);
   assert.match(sql, /candidate\.user_id=selected_album_item\.source_user_id/);
   assert.match(sql, /selected_album_item\.photo_id=p\.id/);
+  assert.match(sql, /orange_photo_album_access/);
+  assert.match(sql, /status='active'/);
+  assert.match(sql, /revoked_at is null/);
+  assert.doesNotMatch(sql, /orange_photo_album_shares/);
   assert.match(sql, /'owned'/);
   assert.match(sql, /'library'/);
   assert.match(sql, /'album'/);
@@ -313,6 +322,51 @@ test("album without source filter remains unfiltered", async () => {
   assert.match(sql, /selected_album_item/);
   assert.match(sql, /candidate\.user_id=selected_album_item\.source_user_id/);
   assert.doesNotMatch(sql, /li\._access_source='/);
+});
+
+test("albums reads canonical active family ACL", async () => {
+  resetCalls();
+  const result = await orangePhotosService.albums(ownerReq());
+  assertResult(result);
+  const sql = normalizeSql(calls[0].sql);
+  assert.match(sql, /orange_photo_album_access/);
+  assert.match(sql, /status='active'/);
+  assert.match(sql, /revoked_at is null/);
+  assert.match(sql, /subject_type='family'/);
+  assert.doesNotMatch(sql, /orange_photo_album_shares/);
+  assert.doesNotMatch(sql, /ash\.can_contribute/);
+});
+
+test("album photo ids use canonical album access", async () => {
+  resetCalls();
+  const result = await orangePhotosService.albumPhotoIds(ownerReq(), ALBUM_ID);
+  assert.equal(result.ok, false);
+  const sql = normalizeSql(calls[0].sql);
+  assert.match(sql, /orange_photo_album_access/);
+  assert.match(sql, /status='active'/);
+  assert.match(sql, /revoked_at is null/);
+  assert.doesNotMatch(sql, /orange_photo_album_shares/);
+});
+
+test("album category writes resolve albums through canonical ACL", async () => {
+  resetCalls();
+  const result = await orangePhotosService.setAlbumCategories(ownerReq(), ALBUM_ID, {
+    category_ids: [],
+  });
+  assert.equal(result.ok, false);
+  const sql = normalizeSql(calls[0].sql);
+  assert.match(sql, /orange_photo_album_access/);
+  assert.match(sql, /status='active'/);
+  assert.match(sql, /revoked_at is null/);
+  assert.doesNotMatch(sql, /orange_photo_album_shares/);
+});
+
+test("orangePhotosService has no legacy album share reads", () => {
+  const serviceSource = fs.readFileSync(
+    path.resolve(__dirname, "../src/orangePhotosService.js"),
+    "utf8"
+  );
+  assert.equal(serviceSource.includes("orange_photo_album_shares"), false);
 });
 
 test("around-date newer preserves ascending temporal pagination", async () => {
