@@ -449,6 +449,14 @@ general para añadir fotos y vídeos a un álbum. Aplica tanto a
 `orange_photo_album_access` determina qué usuarios tienen acceso y su estado,
 pero no mantiene un permiso de contribución individual.
 
+El modal de compartición y la creación de álbumes compartidos desde React
+utilizan ahora el endpoint canónico `/recipients`, que escribe
+`orange_photo_album_access`. `orange_photo_album_shares` continúa temporalmente
+como compatibilidad y el servicio canónico mantiene el dual-write mientras
+existan lectores legacy. La ruta legacy `shareAlbum()` / `POST .../share` sigue
+existiendo, pero ya no es el flujo normal de React; la migración de las lecturas
+hacia `orange_photo_album_access` queda para una fase posterior.
+
 Para `family_memberships.role='guest'`, el usuario es un miembro de la familia,
 accede con `orange_photo_album_access.subject_type='family'` y puede contribuir
 únicamente cuando `orange_photo_albums.allow_contributions=true`, manteniendo

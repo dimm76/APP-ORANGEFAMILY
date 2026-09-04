@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { IonIcon } from "@ionic/react";
 import { addOutline, arrowBackOutline, arrowUndoOutline, closeOutline, ellipsisVerticalOutline, funnelOutline, peopleOutline, searchOutline, shareSocialOutline, timeOutline, trashOutline } from "ionicons/icons";
 import { useAuth } from "../../app/authContext.js";
-import { abortOrangePhotoMultipartUpload, addOrangePhotoToLibrary, addPhotoToAlbum, checkOrangePhotoUpload, completeOrangePhotoMultipartUpload, createOrangeAlbum, createOrangeAlbumCategory, deleteOrangeAlbum, downloadOrangePhotosZip, emptyOrangePhotosTrash, generateOrangePhotoPoster, getOrangePhoto, getOrangePhotoMultipartPartUrls, getOrangePhotoMultipartUpload, initiateOrangePhotoMultipartUpload, listActiveOrangePhotoUploads, listOrangeAlbumCategories, listOrangeAlbumPhotoIds, listOrangeAlbums, listOrangePhotoMembers, listOrangePhotos, listOrangePhotosAroundDate, listOrangePhotosTimeline, purgeOrangePhoto, restoreOrangePhoto, setOrangeAlbumCategories, setOrangePhotoHidden, shareOrangeAlbum, shareOrangePhoto, trashOrangePhoto, updateOrangeAlbum, updateOrangePhoto, uploadOrangePhoto, uploadOrangePhotoDirect, uploadOrangePhotoMultipartPart } from "../../shared/api/orangePhotosApi.js";
+import { abortOrangePhotoMultipartUpload, addOrangePhotoToLibrary, addPhotoToAlbum, checkOrangePhotoUpload, completeOrangePhotoMultipartUpload, createOrangeAlbum, createOrangeAlbumCategory, deleteOrangeAlbum, downloadOrangePhotosZip, emptyOrangePhotosTrash, generateOrangePhotoPoster, getOrangePhoto, getOrangePhotoMultipartPartUrls, getOrangePhotoMultipartUpload, initiateOrangePhotoMultipartUpload, listActiveOrangePhotoUploads, listOrangeAlbumCategories, listOrangeAlbumPhotoIds, listOrangeAlbums, listOrangePhotoMembers, listOrangePhotos, listOrangePhotosAroundDate, listOrangePhotosTimeline, purgeOrangePhoto, restoreOrangePhoto, setOrangeAlbumCategories, setOrangePhotoHidden, shareOrangePhoto, trashOrangePhoto, updateOrangeAlbum, updateOrangePhoto, uploadOrangePhoto, uploadOrangePhotoDirect, uploadOrangePhotoMultipartPart } from "../../shared/api/orangePhotosApi.js";
 import OrangePhotosBulkActions from "./OrangePhotosBulkActions.jsx";
 import OrangeAlbumsView, { formatAlbumDate } from "./OrangeAlbumsView.jsx";
 import OrangePhotosCreateMenu from "./OrangePhotosCreateMenu.jsx";
@@ -17,7 +17,7 @@ import OrangePhotoViewer from "./OrangePhotoViewer.jsx";
 import OrangeAlbumShareModal from "./OrangeAlbumShareModal.jsx";
 import OrangeAlbumOptionsModal from "./OrangeAlbumOptionsModal.jsx";
 import OrangeAlbumCategoryModal from "./OrangeAlbumCategoryModal.jsx";
-import { listOrangeGuestAlbums, listOrangeGuestOwnedPhotos } from "./orangeGuestAlbumApi.js";
+import { listOrangeAlbumRecipients, listOrangeGuestAlbums, listOrangeGuestOwnedPhotos, syncOrangeAlbumRecipients } from "./orangeGuestAlbumApi.js";
 import { downloadOrangeGuestAlbumPhotos, getOrangeGuestAlbum, orangeGuestAlbumPhotoDownloadUrl, listOrangeGuestAlbumPhotos } from "./orangeGuestAlbumApi.js";
 import { deleteUploadQueueItem, loadUploadQueue, putUploadQueueItem, putUploadQueueItems } from "./orangePhotosUploadQueueDb.js";
 import "./orangePhotos.css";
@@ -197,10 +197,22 @@ export default function OrangePhotosPage() {
       ).item;
       if (body.visibility !== "private") {
         try {
-          await shareOrangeAlbum(created.id, {
-            visibility: body.visibility,
-            user_ids: body.user_ids,
-            can_contribute: body.can_contribute,
+          let recipientIds = Array.isArray(body.user_ids) ? body.user_ids : [];
+          if (body.visibility === "family") {
+            const access = await listOrangeAlbumRecipients(created.id);
+            recipientIds = Array.isArray(access.family)
+              ? access.family.map(member => member.user_id)
+              : [];
+          }
+          await syncOrangeAlbumRecipients(created.id, {
+            recipients: recipientIds.map(userId => ({
+              user_id: userId,
+              subject_type: "family",
+              status: "active",
+              invitation_id: null,
+            })),
+            allow_contributions: body.can_contribute === true,
+            allow_comments: false,
           });
         } catch (shareError) {
           await loadAlbums();
