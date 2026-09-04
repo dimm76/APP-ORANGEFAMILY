@@ -1228,9 +1228,10 @@ Esta es deuda técnica actual, no una arquitectura deseada:
    a ser la única fuente runtime y la ausencia de settings equivale a `false`.
    `orange_photos.is_favorite` permanece físicamente por ahora; su retirada será
    una fase posterior independiente.
-5. `orange_photo_album_access` es el ACL canónico, pero
-   `orange_photo_album_shares` continúa temporalmente en dual-write y sigue
-   siendo consumido por partes del runtime.
+5. `orange_photo_album_access` es el ACL canónico y la autoridad runtime de
+   lectura. `orange_photo_album_shares` ya no tiene lectores en
+   `orangePhotosService.js`; permanece temporalmente únicamente como destino
+   del dual-write de compatibilidad y su retirada definitiva corresponde a R6D.
 6. `allow_contributions` es la fuente canónica de contribución familiar;
    `can_contribute` legacy no debe convertirse de nuevo en autoridad.
 7. Node es la autoridad para normalizar el origen técnico `album` cuando existe
