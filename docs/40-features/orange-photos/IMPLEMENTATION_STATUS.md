@@ -449,13 +449,15 @@ general para añadir fotos y vídeos a un álbum. Aplica tanto a
 `orange_photo_album_access` determina qué usuarios tienen acceso y su estado,
 pero no mantiene un permiso de contribución individual.
 
-R6A migró React al endpoint `/recipients`. R6B convierte `POST .../share` en un
-adaptador de compatibilidad: `shareAlbum()` ya no escribe directamente en
-`orange_photo_album_shares`, sino que delega el estado canónico en
-`syncAlbumRecipients()`. R6C elimina los lectores de
-`orange_photo_album_shares` de `orangePhotosService.js`; la tabla permanece
-temporalmente solo como destino del dual-write de compatibilidad. Su retirada
-corresponde a R6D.
+R6A migró React al endpoint `/recipients`. R6B convirtió temporalmente
+`POST .../share` en un adaptador de compatibilidad y R6C eliminó los lectores de
+`orange_photo_album_shares` de `orangePhotosService.js`. R6D completa la retirada
+del runtime legacy: `/recipients` es la única API de gestión de destinatarios de
+álbum, `shareAlbum()` y `POST .../share` están retirados, y
+`syncAlbumRecipients()` ya no hace dual-write a `orange_photo_album_shares`.
+`preserveExternal` y `visibilityOverride` también se retiran al quedar sin
+consumidor. `orange_photo_album_access` continúa siendo el ACL canónico y
+`allow_contributions` la autoridad de contribución familiar.
 
 El adaptador legacy limita la sincronización al scope `family`, conserva la
 visibilidad explícita solicitada por su contrato y no modifica ACL `external`
@@ -464,11 +466,9 @@ normal; la convivencia completa con los permisos históricos externos continúa
 fuera de esta fase.
 
 El modal de compartición y la creación de álbumes compartidos desde React
-utilizan ahora el endpoint canónico `/recipients`, que escribe
-`orange_photo_album_access`. `orange_photo_album_shares` permanece temporalmente
-solo como destino del dual-write de compatibilidad. La ruta legacy `shareAlbum()`
-/ `POST .../share` sigue existiendo, pero ya no es el flujo normal de React; su
-retirada corresponde a R6D.
+utilizan el endpoint canónico `/recipients`, que escribe
+`orange_photo_album_access`. La ruta legacy `shareAlbum()` / `POST .../share` ya
+no existe.
 
 R6C completa el corte de lecturas de álbumes hacia `orange_photo_album_access`.
 La reconciliación previa considera únicamente membresías activas con acceso a
@@ -476,19 +476,16 @@ La reconciliación previa considera únicamente membresías activas con acceso a
 En runtime, el propietario tiene acceso implícito y el resto de usuarios se
 autorizan mediante filas activas no revocadas del ACL canónico. Los campos
 `shared_user_ids` y `shared_people` usan únicamente ACL `family`, y
-`allow_contributions` es la autoridad para contribuir. `orangePhotosService` ya
-no lee `orange_photo_album_shares`; esa tabla permanece solo para el dual-write
-de compatibilidad en `syncAlbumRecipients()` y el adaptador legacy `shareAlbum()`.
-La retirada física de ese dual-write queda para R6D.
+`allow_contributions` es la autoridad para contribuir. `orangePhotosService` no
+lee `orange_photo_album_shares` y R6D retira también su dual-write. La tabla se
+elimina mediante la migración R6D
+`20260904200000_drop_orange_photo_album_shares.sql`, protegida por la
+comprobación de representación en el ACL familiar activo.
 
 Para `family_memberships.role='guest'`, el usuario es un miembro de la familia,
 accede con `orange_photo_album_access.subject_type='family'` y puede contribuir
 únicamente cuando `orange_photo_albums.allow_contributions=true`, manteniendo
 las restricciones de aportación de contenido propio.
-
-`orange_photo_album_shares.can_contribute` pertenece al modelo legacy. Se
-conserva temporalmente como compatibilidad mientras existan rutas antiguas que
-lo escriban, pero no debe considerarse fuente canónica de autorización.
 
 Los invitados externos conservan por ahora sus permisos históricos
 `can_contribute` / `can_comment` en `orange_photo_album_guest_invitations` y
@@ -497,18 +494,9 @@ corrección.
 
 #### Pendiente técnico
 
-- Migrar o eliminar en una fase independiente las rutas legacy que todavía
-  dependan de `orange_photo_album_shares`.
-- Cuando ya no exista ningún consumidor real, retirar el dual-write de
-  `orange_photo_album_shares.can_contribute`.
-- Solo después, mediante migración específica y verificada, valorar eliminar
-  esa columna.
 - Revisar en una fase independiente la convivencia entre el modelo unificado y
   los permisos históricos de invitados externos antes de retirar cualquier
   campo de guest invitations/grants.
-- La ruta legacy `shareAlbum()` sigue formando parte de la compatibilidad y la
-  migración completa de destinatarios hacia `orange_photo_album_access` queda
-  fuera de esta corrección.
 - Los álbumes existentes cuyo `allow_contributions` haya quedado en false por
   operaciones anteriores no deben corregirse automáticamente si no puede
   reconstruirse con certeza la intención del propietario. Tras desplegar esta
@@ -1229,9 +1217,8 @@ Esta es deuda técnica actual, no una arquitectura deseada:
    `orange_photos.is_favorite` permanece físicamente por ahora; su retirada será
    una fase posterior independiente.
 5. `orange_photo_album_access` es el ACL canónico y la autoridad runtime de
-   lectura. `orange_photo_album_shares` ya no tiene lectores en
-   `orangePhotosService.js`; permanece temporalmente únicamente como destino
-   del dual-write de compatibilidad y su retirada definitiva corresponde a R6D.
+   lectura. R6D retira el runtime y el dual-write de
+   `orange_photo_album_shares`, que se elimina mediante su migración protegida.
 6. `allow_contributions` es la fuente canónica de contribución familiar;
    `can_contribute` legacy no debe convertirse de nuevo en autoridad.
 7. Node es la autoridad para normalizar el origen técnico `album` cuando existe
@@ -1247,6 +1234,10 @@ Esta es deuda técnica actual, no una arquitectura deseada:
    cliente enviara `album`; los fast paths de Galería y Compartidas conmigo
    permanecen sin cambios.
 9. `source_user_id` liga cada relación de álbum a una copia lógica concreta.
+10. R6D deja `/recipients` como única API de gestión de destinatarios de álbum.
+    `orange_photo_album_access` sigue siendo el ACL canónico, mientras que los
+    permisos históricos de `orange_photo_album_guest_invitations` y
+    `orange_photo_album_guest_grants` permanecen fuera de esta retirada.
 
 ### Objetivo de estabilización
 
