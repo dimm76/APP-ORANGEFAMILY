@@ -459,12 +459,6 @@ del runtime legacy: `/recipients` es la única API de gestión de destinatarios 
 consumidor. `orange_photo_album_access` continúa siendo el ACL canónico y
 `allow_contributions` la autoridad de contribución familiar.
 
-El adaptador legacy limita la sincronización al scope `family`, conserva la
-visibilidad explícita solicitada por su contrato y no modifica ACL `external`
-ni `guest grants`. El endpoint canónico `/recipients` mantiene su comportamiento
-normal; la convivencia completa con los permisos históricos externos continúa
-fuera de esta fase.
-
 El modal de compartición y la creación de álbumes compartidos desde React
 utilizan el endpoint canónico `/recipients`, que escribe
 `orange_photo_album_access`. La ruta legacy `shareAlbum()` / `POST .../share` ya
