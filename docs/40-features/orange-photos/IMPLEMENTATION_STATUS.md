@@ -1160,6 +1160,20 @@ Esta es deuda técnica actual, no una arquitectura deseada:
    reconstruye con la metadata canónica normalizada en memoria, sin releer esos
    campos desde `orange_photos`. La eliminación física de columnas queda
    aplazada a una migración posterior y separada.
+   R5F retira físicamente las 21 columnas mutables legacy de `orange_photos`.
+   `orange_photo_library_items` pasa a ser la autoridad única de title,
+   description, captured_at/captured_at_source, timezone, ubicación, visibility,
+   trash y public link; `orange_photo_user_settings` es la autoridad única de
+   favorite. `orange_photos` queda como entidad del asset físico, metadata
+   técnica, procedencia e identidad. Su `owner_user_id` sigue representando la
+   procedencia/original owner, pero no implica que todavía exista una copia
+   lógica de ese owner: la auditoría previa confirmó un caso válido en el que
+   esa copia había sido purgada y otra copia lógica conservaba el asset. No se
+   reconstruye ownership por ese motivo. La migración incluye guards, no usa
+   `CASCADE` y elimina los índices y constraints asociados a las columnas
+   legacy. Esta fase no afecta al dual-modelo
+   `orange_photo_album_shares` / `orange_photo_album_access`, cuya retirada queda
+   para una fase posterior independiente.
 2. La fuente canónica de nueva lógica de ownership operativo y metadatos
    personales es `orange_photo_library_items`.
 3. R3A retiró `list(req)`, el listado legacy anterior al cutover. R3B retira
