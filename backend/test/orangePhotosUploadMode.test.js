@@ -121,10 +121,55 @@ test("insertPhoto crea la copia lógica inicial desde metadata sin releer campos
   pool.connect = async () => client;
   try {
     const result = await service.insertPhoto({ familyId, userId }, metadata, storage);
+    const physicalInsert = queries.find(({ text }) =>
+      text.includes("INSERT INTO public.orange_photos"),
+    );
     const libraryInsert = queries.find(({ text }) =>
       text.includes("INSERT INTO public.orange_photo_library_items"),
     );
 
+    assert.ok(physicalInsert);
+    for (const field of [
+      "title",
+      "description",
+      "captured_at",
+      "captured_at_source",
+      "timezone",
+      "latitude",
+      "longitude",
+      "altitude_meters",
+      "location_name",
+      "location_country",
+      "location_region",
+      "location_locality",
+      "location_source",
+      "visibility",
+      "is_favorite",
+      "is_trashed",
+      "trashed_at",
+      "public_enabled",
+      "public_token",
+      "public_created_at",
+      "public_revoked_at",
+    ]) {
+      assert.doesNotMatch(physicalInsert.text, new RegExp(`\\b${field}\\b`));
+    }
+    assert.deepEqual(physicalInsert.params, [
+      familyId,
+      userId,
+      metadata.media_type,
+      metadata.original_filename,
+      metadata.mime_type,
+      metadata.extension,
+      metadata.width,
+      metadata.height,
+      metadata.duration_seconds,
+      metadata.orientation,
+      metadata.camera_make,
+      metadata.camera_model,
+      metadata.lens_model,
+      metadata.exif_json,
+    ]);
     assert.ok(libraryInsert);
     assert.match(libraryInsert.text, /VALUES/);
     assert.equal(
@@ -181,6 +226,27 @@ test("insertPhoto crea la copia lógica inicial desde metadata sin releer campos
       metadata.visibility,
     ]);
     assert.equal(result.ok, true);
+    assert.equal(result.payload.item.title, metadata.title);
+    assert.equal(result.payload.item.description, metadata.description);
+    assert.equal(result.payload.item.captured_at, metadata.captured_at);
+    assert.equal(result.payload.item.captured_at_source, metadata.captured_at_source);
+    assert.equal(result.payload.item.timezone, metadata.timezone);
+    assert.equal(result.payload.item.latitude, metadata.latitude);
+    assert.equal(result.payload.item.longitude, metadata.longitude);
+    assert.equal(result.payload.item.altitude_meters, metadata.altitude_meters);
+    assert.equal(result.payload.item.location_name, metadata.location_name);
+    assert.equal(result.payload.item.location_country, metadata.location_country);
+    assert.equal(result.payload.item.location_region, metadata.location_region);
+    assert.equal(result.payload.item.location_locality, metadata.location_locality);
+    assert.equal(result.payload.item.location_source, metadata.location_source);
+    assert.equal(result.payload.item.visibility, metadata.visibility);
+    assert.equal(result.payload.item.is_favorite, false);
+    assert.equal(result.payload.item.is_trashed, false);
+    assert.equal(result.payload.item.trashed_at, null);
+    assert.equal(result.payload.item.public_enabled, false);
+    assert.equal(result.payload.item.public_token, null);
+    assert.equal(result.payload.item.public_created_at, null);
+    assert.equal(result.payload.item.public_revoked_at, null);
   } finally {
     pool.connect = originalConnect;
   }

@@ -1151,6 +1151,15 @@ Esta es deuda técnica actual, no una arquitectura deseada:
    PostgreSQL, API, runtime, ownership, ACL ni columnas legacy; la posible retirada
    física de columnas mutables de `orange_photos` queda para una fase posterior
    independiente.
+   R5E deja de escribir metadata mutable legacy en `orange_photos` al crear
+   nuevos assets. `orange_photo_library_items` es la única escritura inicial de
+   title, description, captured_at/captured_at_source, timezone, ubicación,
+   visibility, trash y estado de public link. `orange_photos` conserva por ahora
+   las columnas legacy físicamente, pero ya no son autoridad ni reciben valores
+   funcionales desde `insertPhoto()`. La respuesta inmediata de subida se
+   reconstruye con la metadata canónica normalizada en memoria, sin releer esos
+   campos desde `orange_photos`. La eliminación física de columnas queda
+   aplazada a una migración posterior y separada.
 2. La fuente canónica de nueva lógica de ownership operativo y metadatos
    personales es `orange_photo_library_items`.
 3. R3A retiró `list(req)`, el listado legacy anterior al cutover. R3B retira
