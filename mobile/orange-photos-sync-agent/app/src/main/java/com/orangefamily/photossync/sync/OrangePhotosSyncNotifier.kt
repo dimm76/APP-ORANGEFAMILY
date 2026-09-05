@@ -24,14 +24,25 @@ class OrangePhotosSyncNotifier(private val context: Context) {
         val decision = OrangePhotosSyncPolicy.notification(uploaded, failed, preferences.getInt(KEY_LAST_FAILED, -1))
         if (failed > 0) {
             if (decision.showError) {
-                manager.notify(STATUS_NOTIFICATION_ID, notification(context.resources.getQuantityString(R.plurals.sync_failed_notification, failed, failed)))
+                notifyStatus(context.resources.getQuantityString(R.plurals.sync_failed_notification, failed, failed))
                 preferences.edit().putInt(KEY_LAST_FAILED, failed).apply()
             }
             return
         }
         if (decision.cancelError) manager.cancel(STATUS_NOTIFICATION_ID)
         preferences.edit().putInt(KEY_LAST_FAILED, 0).apply()
-        if (decision.showSuccess) manager.notify(STATUS_NOTIFICATION_ID, notification(context.resources.getQuantityString(R.plurals.sync_success_notification, uploaded, uploaded)))
+        if (decision.showSuccess) notifyStatus(context.resources.getQuantityString(R.plurals.sync_success_notification, uploaded, uploaded))
+    }
+
+    private fun notifyStatus(message: String) {
+        try {
+            manager.notify(
+                STATUS_NOTIFICATION_ID,
+                notification(message),
+            )
+        } catch (_: SecurityException) {
+            // El permiso puede cambiar entre la comprobación y el envío.
+        }
     }
 
     private fun notification(message: String) = NotificationCompat.Builder(context, CHANNEL_ID)

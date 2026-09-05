@@ -259,7 +259,39 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestMediaTrash(items:List<LocalMediaItem>,operation:MediaOperation,completion:((Boolean,String?)->Unit)?=null,remotePhotoIds:List<String> = emptyList()){if(items.isEmpty()){completion?.invoke(true,null);return};pendingDeleteItems=items;pendingMediaOperation=operation;pendingMediaCompletion=completion;pendingRemotePhotoIds=remotePhotoIds;deleteMediaLauncher.launch(IntentSenderRequest.Builder(MediaStore.createTrashRequest(contentResolver,items.map{Uri.parse(it.contentUri)},true).intentSender).build())}
+    private fun requestMediaTrash(
+        items: List<LocalMediaItem>,
+        operation: MediaOperation,
+        completion: ((Boolean, String?) -> Unit)? = null,
+        remotePhotoIds: List<String> = emptyList(),
+    ) {
+        if (items.isEmpty()) {
+            completion?.invoke(true, null)
+            return
+        }
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            completion?.invoke(
+                false,
+                "La papelera del dispositivo requiere Android 11 o superior.",
+            )
+            return
+        }
+
+        pendingDeleteItems = items
+        pendingMediaOperation = operation
+        pendingMediaCompletion = completion
+        pendingRemotePhotoIds = remotePhotoIds
+        deleteMediaLauncher.launch(
+            IntentSenderRequest.Builder(
+                MediaStore.createTrashRequest(
+                    contentResolver,
+                    items.map { Uri.parse(it.contentUri) },
+                    true,
+                ).intentSender,
+            ).build(),
+        )
+    }
     private suspend fun trashRemotePhotoIds(remotePhotoIds:List<String>){val ids=remotePhotoIds.map{it.trim()}.filter{it.isNotBlank()}.distinct();if(ids.isEmpty())error("No se pudo identificar el contenido de OrangeFamily.");val token=sessionStore.load(BuildConfig.API_BASE_URL)?:error("La sesión de OrangeFamily no está disponible.");val api=OrangePhotosSyncApi(BuildConfig.API_BASE_URL,token,InstallationIdStore(applicationContext).getOrCreate());ids.forEach{api.trashPhoto(it)}}
     private fun deleteCloudAndLocal(
         remotePhotoIds: List<String>,
@@ -380,7 +412,23 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun restoreMedia(items:List<LocalMediaItem>){if(Build.VERSION.SDK_INT<Build.VERSION_CODES.R||items.isEmpty())return;pendingDeleteItems=items;pendingMediaOperation=MediaOperation.RESTORE;deleteMediaLauncher.launch(IntentSenderRequest.Builder(MediaStore.createTrashRequest(contentResolver,items.map{Uri.parse(it.contentUri)},false).intentSender).build())}
-    private fun deleteForever(items:List<LocalMediaItem>){if(items.isEmpty())return;pendingDeleteItems=items;pendingMediaOperation=MediaOperation.DELETE;deleteMediaLauncher.launch(IntentSenderRequest.Builder(MediaStore.createDeleteRequest(contentResolver,items.map{Uri.parse(it.contentUri)}).intentSender).build())}
+    private fun deleteForever(items: List<LocalMediaItem>) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || items.isEmpty()) {
+            return
+        }
+
+        pendingDeleteItems = items
+        pendingMediaOperation = MediaOperation.DELETE
+
+        deleteMediaLauncher.launch(
+            IntentSenderRequest.Builder(
+                MediaStore.createDeleteRequest(
+                    contentResolver,
+                    items.map { Uri.parse(it.contentUri) },
+                ).intentSender,
+            ).build(),
+        )
+    }
 
     private fun reconcileDeletedMedia(items:List<LocalMediaItem>){lifecycleScope.launch(Dispatchers.IO){items.forEach{item->val exists=runCatching{contentResolver.openFileDescriptor(Uri.parse(item.contentUri),"r")?.use{true}?:false}.getOrDefault(false);if(!exists)repository.removeLocalItem(item)}}}
 
