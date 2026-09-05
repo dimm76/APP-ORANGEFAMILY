@@ -497,7 +497,34 @@ fun CloudPhotosScreen(api: OrangePhotosCloudApi, thumbnailLoader: RemoteThumbnai
             loadingWindowOlder = false
         }
     }
-    suspend fun loadNextNormalPage(){if(pagingMode!=CloudPagingMode.NORMAL||!hasMore||loadingMoreNormal)return;loadingMoreNormal=true;val generation=timelineRequestGeneration;try{val result=api.photos(page+1,perPage=CLOUD_PAGE_SIZE,albumId=activeAlbumId(),trashed=cloudView==CloudView.TRASH,sharedWithMe=cloudView==CloudView.SHARED_WITH_ME,includeTotal=false,filters=activePhotoFilters);if(generation!=timelineRequestGeneration)return;items=(items+result.items).distinctBy{it.id};page=result.page;hasMore=result.hasMore}finally{loadingMoreNormal=false}}
+    suspend fun loadNextNormalPage() {
+        if (pagingMode != CloudPagingMode.NORMAL || !hasMore || loadingMoreNormal) return
+        loadingMoreNormal = true
+        val generation = timelineRequestGeneration
+        try {
+            val result = api.photos(
+                page + 1,
+                perPage = CLOUD_PAGE_SIZE,
+                albumId = activeAlbumId(),
+                trashed = cloudView == CloudView.TRASH,
+                sharedWithMe = cloudView == CloudView.SHARED_WITH_ME,
+                includeTotal = false,
+                filters = activePhotoFilters,
+            )
+            if (generation != timelineRequestGeneration) return
+            items = (items + result.items).distinctBy { it.id }
+            page = result.page
+            hasMore = result.hasMore
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            if (generation == timelineRequestGeneration) {
+                bulkMessage = error.message ?: "No se pudo cargar más contenido."
+            }
+        } finally {
+            loadingMoreNormal = false
+        }
+    }
     val windowNewerNestedScroll = remember(pagingMode, hasNewer, newerCursor, loadingWindowNewer) {
         object : NestedScrollConnection {
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
