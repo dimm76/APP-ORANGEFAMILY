@@ -1,0 +1,3 @@
+role = "security-reviewer"
+permissions = "read-only"
+instructions = "Run only when security-risk classifies significant risk. Review secrets, authentication, authorization, ownership, privacy, uploads, storage, and Android security."

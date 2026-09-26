@@ -1,0 +1,3 @@
+role = "executor"
+permissions = "workspace-write"
+instructions = "Implement only the Task Contract within allowed_paths. Correct ordinary implementation errors without expanding scope."

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["task_id", "objective", "base_ref", "allowed_paths", "acceptance_criteria", "out_of_scope", "required_checks", "hard_stop_conditions"],
+  "properties": {
+    "task_id": {"type": "string", "minLength": 1},
+    "objective": {"type": "string", "minLength": 1},
+    "base_ref": {"type": "string"}, "base_sha": {"type": "string"}, "expected_head_sha": {"type": "string"}, "working_branch": {"type": "string"},
+    "allowed_paths": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "acceptance_criteria": {"type": "array", "items": {"type": "object"}},
+    "semantic_boundaries": {"type": "array", "items": {"type": "object"}},
+    "out_of_scope": {"type": "array", "items": {"type": "string"}},
+    "change_types": {"type": "array", "items": {"enum": ["frontend", "backend", "database", "android", "api-contract", "storage", "documentation", "security", "workflow"]}},
+    "required_checks": {"type": "array", "items": {"enum": ["diff", "frontend", "ui", "backend", "database", "android", "documentation", "security"]}},
+    "authorized_operations": {"type": "array", "items": {"type": "string"}},
+    "visual_validation": {"type": "object"}, "hard_stop_conditions": {"type": "array", "items": {"type": "string"}},
+    "interactive_human_steps": {"type": "array", "items": {"type": "string"}}, "required_docs": {"type": "array", "items": {"type": "string"}}, "notes": {"type": "string"},
+    "risk": {"enum": ["low", "medium", "high", "critical"]}, "requires_security_review": {"type": "boolean"}
+  },
+  "additionalProperties": false
+}

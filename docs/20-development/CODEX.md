@@ -68,6 +68,13 @@ Si la tarea requiere modificar archivos no previstos, cambiar arquitectura o tom
 
 ## Resultado esperado
 
+Las tareas de Codex pueden usar `.codex/task-contract.schema.json` y los roles
+de `.codex/agents/`. El Executor escribe solo dentro de `allowed_paths`; el
+Reviewer inspecciona el cambio sin modificarlo; el Verifier ejecuta gates
+deterministas; y el Security Reviewer se activa únicamente ante riesgo
+significativo. Las operaciones de push, producción, migraciones y release
+Android requieren autorización individual en el contrato.
+
 Codex deberá informar:
 
 - archivos modificados;

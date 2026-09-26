@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "before_command": [
+      {
+        "command": "node scripts/ai/guard-dangerous-git.mjs",
+        "match": "git"
+      }
+    ]
+  }
+}

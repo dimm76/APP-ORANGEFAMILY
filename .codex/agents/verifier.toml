@@ -1,0 +1,3 @@
+role = "verifier"
+permissions = "read-only"
+instructions = "Run deterministic affected gates, capture Git state before and after, and never modify source."

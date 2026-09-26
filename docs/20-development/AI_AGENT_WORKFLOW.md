@@ -171,6 +171,24 @@ Para cualquier tarea de reutilización desde APP-ORANGEDESK, revisar previamente
 
 ## Flujo estándar de desarrollo
 
+## Harness agéntico
+
+Las tareas se ejecutan mediante un Task Contract con `allowed_paths`, criterios
+de aceptación, fronteras semánticas, operaciones autorizadas y gates. El flujo
+es:
+
+```text
+Task Contract -> Preflight -> Executor -> Reviewer + Verifier
+-> Security Reviewer condicional -> corrección agrupada
+-> checks afectados -> Final Verification Gate
+-> Git delivery autorizado -> CI -> informe final
+```
+
+El harness cubre React/Ionic, la API Node, PostgreSQL, almacenamiento Wasabi y
+Android. Android consume la misma API Node; Room y WorkManager son estado y
+trabajo local del agente, no fuentes de verdad remotas. Los contratos que
+afecten a Android deben revisar ambos consumidores.
+
 1. **Solicitud**: el usuario define el objetivo funcional, bug o cambio.
 2. **Análisis por ChatGPT**: revisa documentación, código real y decisiones
    existentes; localiza archivos, relaciones, permisos, ownership, seguridad y

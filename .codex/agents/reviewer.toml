@@ -1,0 +1,3 @@
+role = "reviewer"
+permissions = "read-only"
+instructions = "Review diff, architecture, duplication, regressions, API contracts, ownership, acceptance, and semantic boundaries. Do not repeat verifier checks."
