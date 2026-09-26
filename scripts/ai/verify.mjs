@@ -10,7 +10,11 @@ const files = taskFiles({ base });
 const contractFile = process.env.HARNESS_TASK_CONTRACT;
 const contract = contractFile && fs.existsSync(contractFile) ? JSON.parse(fs.readFileSync(contractFile, 'utf8')) : {};
 const checks = selectChecks(files, contract);
-const run = (command, commandArgs, cwd = process.cwd()) => execFileSync(command, commandArgs, { cwd, stdio: 'inherit' });
+const run = (command, commandArgs, cwd = process.cwd()) => execFileSync(command, commandArgs, {
+  cwd,
+  stdio: 'inherit',
+  shell: process.platform === 'win32' && command.endsWith('.cmd'),
+});
 console.log(`checks: ${checks.join(', ')}`);
 if (contractFile) runScope(contractFile, files);
 execFileSync('git', ['diff', '--check'], { stdio: 'inherit' });

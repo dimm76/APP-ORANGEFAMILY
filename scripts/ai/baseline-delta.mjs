@@ -4,7 +4,7 @@ export function stableFailures(output) {
   const failures = new Set();
   for (const line of String(output).split(/\r?\n/)) {
     const match = line.match(/^\s*(?:✖|not ok)\s+(.+?)\s*(?:\(|$)/);
-    if (match) failures.add(match[1].trim());
+    if (match && match[1].trim() !== 'failing tests:') failures.add(match[1].trim());
   }
   return [...failures].sort();
 }
