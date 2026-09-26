@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyChangedFiles, inAllowedPaths, securityRisk, semanticBoundaryEvidence } from './harness-lib.mjs';
+import { classifyChangedFiles, inAllowedPaths, securityRisk, selectChecks, semanticBoundaryEvidence } from './harness-lib.mjs';
 
 test('allowed paths and outside scope', () => { assert.equal(inAllowedPaths('scripts/ai/verify.mjs', ['scripts/ai/**']), true); assert.equal(inAllowedPaths('src/App.jsx', ['scripts/ai/**']), false); });
 test('security secrets and dangerous Android files', () => { assert.equal(securityRisk(['AndroidManifest.xml']).significant, true); assert.equal(securityRisk(['auth-service.js']).level, 'review'); });
 test('selects frontend, backend, database and Android', () => { assert.deepEqual(classifyChangedFiles(['src/App.jsx']), ['diff', 'frontend', 'ui']); assert.ok(classifyChangedFiles(['backend/app.js']).includes('backend')); assert.ok(classifyChangedFiles(['docs/30-database/migration/1.sql']).includes('database')); assert.deepEqual(classifyChangedFiles(['mobile/orange-photos-sync-agent/app/src/main/X.kt']), ['diff', 'android']); });
 test('Android manifest selects security', () => { assert.ok(classifyChangedFiles(['mobile/orange-photos-sync-agent/app/src/main/AndroidManifest.xml']).includes('security')); });
-test('semantic boundary requires concrete evidence', () => { assert.equal(semanticBoundaryEvidence('Android Worker -> API Node', []), false); assert.equal(semanticBoundaryEvidence('Android Worker -> API Node', [{ boundary: 'Android Worker -> API Node', entrypoint: 'worker', downstream: 'api', test_file: 'test.js' }]), true); });
+test('semantic boundary requires concrete evidence', () => { assert.equal(semanticBoundaryEvidence('Android Worker -> API Node', []), false); assert.equal(semanticBoundaryEvidence('Android Worker -> API Node', [{ boundary: 'Android Worker -> API Node', entrypoint: 'worker', downstream: 'api', test_file: 'test.js', integration_test: true, observed: true }]), true); });
 test('API contract changes activate Android only when declared by surface', () => { assert.ok(classifyChangedFiles(['docs/20-development/API.md']).includes('documentation')); assert.ok(!classifyChangedFiles(['docs/20-development/API.md']).includes('android')); });
+test('API contract task selects Android consumer review', () => { assert.ok(selectChecks(['backend/src/api.js'], { change_types: ['api-contract'] }).includes('android')); });
 test('workflow and storage changes are security-sensitive', () => { assert.ok(classifyChangedFiles(['.github/workflows/verify.yml']).includes('security')); assert.ok(classifyChangedFiles(['backend/src/wasabi.js']).includes('security')); });
 test('documentation paths are classified', () => { assert.ok(classifyChangedFiles(['AGENTS.md']).includes('documentation')); assert.ok(classifyChangedFiles(['.agents/RULES.md']).includes('documentation')); });
 test('scope supports nested allowed paths', () => { assert.equal(inAllowedPaths('mobile/orange-photos-sync-agent/app/src/main/X.kt', ['mobile/orange-photos-sync-agent/**']), true); });
@@ -18,3 +19,4 @@ test('frontend source classification covers TypeScript and Vite', () => { assert
 test('API/backend and Android remain separate checks', () => { const checks = classifyChangedFiles(['backend/app.js', 'mobile/orange-photos-sync-agent/app/src/main/X.kt']); assert.ok(checks.includes('backend')); assert.ok(checks.includes('android')); });
 test('public/auth changes select security', () => { assert.ok(classifyChangedFiles(['backend/src/auth.js']).includes('security')); assert.ok(classifyChangedFiles(['backend/src/publicRoutes.js']).includes('security')); });
 test('UI style guide selects UI and documentation', () => { const checks = classifyChangedFiles(['docs/10-architecture/UI-STYLE-GUIDE.md']); assert.ok(checks.includes('ui')); assert.ok(checks.includes('documentation')); });
+test('sensitive filenames are classified without reading content', () => { assert.ok(securityRisk(['.env.production']).significant); assert.ok(securityRisk(['id_ed25519']).significant); });

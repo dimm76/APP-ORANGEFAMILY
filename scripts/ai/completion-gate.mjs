@@ -1,4 +1,11 @@
-const [state] = process.argv.slice(2);
-if (state === 'BLOCKED' && !process.env.RECOVERY_ATTEMPTS) { console.error('FAIL: BLOCKED requires recovery_attempts'); process.exit(2); }
-if (!['COMPLETE', 'BLOCKED', 'AUTO_CONTINUE'].includes(state)) { console.error('FAIL: invalid state'); process.exit(2); }
-console.log(`PASS: ${state}`);
+const [file] = process.argv.slice(2);
+const contract = JSON.parse(await import('node:fs/promises').then(fs => fs.readFile(file, 'utf8')));
+const fail = message => { console.error(`FAIL: ${message}`); process.exitCode = 2; };
+if (!['COMPLETE', 'BLOCKED', 'AUTO_CONTINUE'].includes(contract.state)) fail('invalid state');
+if (contract.state === 'BLOCKED' && !(contract.recovery_attempts?.length > 0)) fail('BLOCKED requires recovery_attempts');
+for (const criterion of contract.acceptance_criteria ?? []) if (!(criterion.evidence?.length > 0 && criterion.satisfied === true)) fail(`acceptance criterion lacks evidence: ${criterion.id ?? 'unknown'}`);
+for (const boundary of contract.semantic_boundaries ?? []) if (boundary.required !== false && !(boundary.evidence?.length > 0 && boundary.satisfied === true)) fail(`semantic boundary lacks evidence: ${boundary.boundary ?? 'unknown'}`);
+if (contract.visual_validation?.required === true && !(contract.visual_validation.performed === true && contract.visual_validation.evidence)) fail('required visual validation lacks evidence');
+if ((contract.blockers ?? []).length) fail('unresolved blockers');
+if (process.exitCode) process.exit(process.exitCode);
+console.log(`PASS: ${contract.state}`);

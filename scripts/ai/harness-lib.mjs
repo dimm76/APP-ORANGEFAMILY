@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 const normalize = value => value.replaceAll('\\', '/').replace(/^\.\//, '');
 const matches = (file, pattern) => {
@@ -31,14 +32,33 @@ export function classifyChangedFiles(files) {
   return [...checks];
 }
 
+export function selectChecks(files, contract = {}) {
+  const checks = new Set(classifyChangedFiles(files));
+  if (contract.change_types?.includes('api-contract') || (contract.semantic_boundaries ?? []).some(item => /Android|React.*Node|Node.*API/i.test(item.boundary ?? ''))) checks.add('android');
+  if (contract.requires_security_review === true) checks.add('security');
+  return [...checks];
+}
+
 export function securityRisk(files, contents = '') {
   const text = `${files.join('\n')}\n${contents}`;
-  const significant = /secret|credential|keystore|cleartext|exported|AndroidManifest|FileProvider|WebView|auth bypass|public route|force.?push|production/i.test(text);
+  const significant = /secret|credential|keystore|cleartext|exported|AndroidManifest|FileProvider|WebView|auth bypass|public route|force.?push|production|(?:^|[\\/])\.env(?:\.|$)|id_(?:rsa|ed25519)/i.test(text);
   return { level: significant ? 'significant' : /auth|permission|upload|download|AndroidManifest|Room|WorkManager/i.test(text) ? 'review' : 'low', significant };
 }
 
 export function semanticBoundaryEvidence(boundary, evidence = []) {
-  return evidence.some(item => item.boundary === boundary && item.entrypoint && item.downstream && item.test_file);
+  return evidence.some(item => item.boundary === boundary && item.entrypoint && item.downstream && item.test_file && item.integration_test === true && item.observed === true);
+}
+
+export function taskFiles({ base = 'origin/main', includeWorkingTree = true } = {}) {
+  const names = new Set();
+  const add = output => output.split(/\r?\n/).map(normalize).filter(Boolean).forEach(file => names.add(file));
+  add(execFileSync('git', ['diff', '--name-only', `${base}...HEAD`], { encoding: 'utf8' }));
+  if (includeWorkingTree) {
+    add(execFileSync('git', ['diff', '--name-only'], { encoding: 'utf8' }));
+    add(execFileSync('git', ['diff', '--cached', '--name-only'], { encoding: 'utf8' }));
+    add(execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { encoding: 'utf8' }));
+  }
+  return [...names];
 }
 
 export function readJson(file) { return JSON.parse(fs.readFileSync(path.resolve(file), 'utf8')); }
