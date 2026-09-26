@@ -1,6 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { selectChecks, taskFiles } from './harness-lib.mjs';
+import { compareResults, runCheck } from './baseline-delta.mjs';
 const args = process.argv.slice(2);
 const base = process.env.HARNESS_BASE_REF ?? 'origin/main';
 const files = taskFiles({ base });
@@ -13,9 +16,25 @@ if (contractFile) runScope(contractFile, files);
 execFileSync('git', ['diff', '--check'], { stdio: 'inherit' });
 function runScope(file, changed) { run(process.execPath, ['scripts/ai/scope-check.mjs', file, ...changed]); }
 if (checks.includes('frontend')) { run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'build']); run(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['eslint', ...files.filter(file => /\.(mjs|js|jsx|ts|tsx)$/.test(file))]); }
-if (checks.includes('backend')) run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['test', '--prefix', 'backend']);
+if (checks.includes('backend')) {
+  const current = runCheck(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['test', '--prefix', 'backend'], process.cwd());
+  let baseline = null;
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'orangefamily-baseline-'));
+  try {
+    run('git', ['worktree', 'add', '--detach', temp, process.env.HARNESS_BASE_SHA ?? base]);
+    run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['ci', '--prefix', 'backend'], temp);
+    baseline = runCheck(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['test', '--prefix', 'backend'], temp);
+  } finally {
+    run('git', ['worktree', 'remove', '--force', temp]);
+  }
+  const delta = compareResults(baseline, current);
+  console.log(`backend current: ${current.status} (${current.failed.length} failures)`);
+  console.log(`backend baseline: ${baseline?.status ?? 'unavailable'} (${baseline?.failed?.length ?? 0} failures)`);
+  console.log(`backend delta: ${delta.status}`);
+  if (!['PASS', 'PASS_WITH_BASELINE', 'PASS_IMPROVED'].includes(delta.status)) process.exit(4);
+}
 if (checks.includes('database')) run(process.execPath, ['scripts/ai/migration-schema-check.mjs', ...files]);
-if (checks.includes('documentation')) run(process.execPath, ['scripts/ai/docs-impact.mjs', ...files]);
+if (checks.includes('documentation')) run(process.execPath, ['scripts/ai/docs-impact.mjs', ...(contractFile ? ['--contract', contractFile] : []), '--files', ...files]);
 if (checks.includes('security')) run(process.execPath, ['scripts/ai/security-risk.mjs', ...files]);
 if (checks.includes('android')) {
   const androidDir = 'mobile/orange-photos-sync-agent';

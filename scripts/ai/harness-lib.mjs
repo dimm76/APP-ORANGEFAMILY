@@ -34,6 +34,7 @@ export function classifyChangedFiles(files) {
 
 export function selectChecks(files, contract = {}) {
   const checks = new Set(classifyChangedFiles(files));
+  for (const check of contract.required_checks ?? []) checks.add(check);
   if (contract.change_types?.includes('api-contract') || (contract.semantic_boundaries ?? []).some(item => /Android|React.*Node|Node.*API/i.test(item.boundary ?? ''))) checks.add('android');
   if (contract.requires_security_review === true) checks.add('security');
   return [...checks];

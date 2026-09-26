@@ -4,6 +4,10 @@
   "required": ["task_id", "objective", "base_ref", "allowed_paths", "acceptance_criteria", "out_of_scope", "required_checks", "hard_stop_conditions"],
   "properties": {
     "task_id": {"type": "string", "minLength": 1},
+    "state": {"enum": ["AUTO_CONTINUE", "BLOCKED", "HARD_STOP", "COMPLETE"]},
+    "blockers": {"type": "array", "items": {"type": "object", "required": ["category", "reason", "evidence", "resolved"], "properties": {"category": {"enum": ["human_decision", "missing_authorization", "destructive_risk", "security_risk", "external_interaction", "git_conflict", "technical_unavailable", "unexpected_state", "ci_deploy_failure"]}, "reason": {"type": "string"}, "evidence": {"type": "string", "minLength": 1}, "resolved": {"type": "boolean"}}, "additionalProperties": false}},
+    "recovery_attempts": {"type": "array", "items": {"type": "object", "required": ["action", "result"], "properties": {"action": {"type": "string"}, "result": {"type": "string"}}, "additionalProperties": false}},
+    "check_results": {"type": "array", "items": {"type": "object", "required": ["check", "status", "evidence"], "properties": {"check": {"type": "string"}, "status": {"enum": ["PASS", "PASS_WITH_BASELINE", "PASS_IMPROVED", "FAIL", "BLOCKED"]}, "evidence": {"type": "string", "minLength": 1}}, "additionalProperties": false}},
     "objective": {"type": "string", "minLength": 1},
     "base_ref": {"type": "string"}, "base_sha": {"type": "string"}, "expected_head_sha": {"type": "string"}, "working_branch": {"type": "string"},
     "allowed_paths": {"type": "array", "items": {"type": "string"}, "minItems": 1},
