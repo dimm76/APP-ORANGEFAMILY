@@ -300,7 +300,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
     }
     private suspend fun <T> request(url:String,fallback:String,parse:(JSONObject)->T):T=request(url,fallback,"GET",null,parse)
 
-    suspend fun downloadOriginalTo(photoId: String, output: OutputStream, onProgress: (Long, Long?) -> Unit) = withContext(Dispatchers.IO) {
+    suspend fun downloadOriginalTo(photoId: String, output: OutputStream, onProgress: suspend (Long, Long?) -> Unit = { _, _ -> }) = withContext(Dispatchers.IO) {
         val connection = URL("${baseUrl}api/orange-photos/${encode(photoId)}/download").openConnection() as HttpURLConnection
         try {
             connection.requestMethod = "GET"
@@ -309,9 +309,17 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
             connection.setRequestProperty("Accept", "application/octet-stream")
             connection.setRequestProperty("Cookie", "of_session=$sessionToken")
             val status = connection.responseCode
-            if (status !in 200..299) throw CloudApiException(status, "No se pudo descargar el original.")
+            if (status !in 200..299) {
+                val body = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+                val message = runCatching {
+                    JSONObject(body).optString("message").takeIf { it.isNotBlank() }
+                }.getOrNull() ?: "No se pudo descargar el original."
+                throw CloudApiException(status, message)
+            }
             val total = connection.contentLengthLong.takeIf { it >= 0L }
             var downloaded = 0L
+            var lastProgressAt = SystemClock.elapsedRealtime()
+            var lastReportedBytes = 0L
             onProgress(downloaded, total)
             connection.inputStream.use { input ->
                 val buffer = ByteArray(8192)
@@ -320,16 +328,21 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
                     if (read < 0) break
                     output.write(buffer, 0, read)
                     downloaded += read
-                    onProgress(downloaded, total)
+                    val now = SystemClock.elapsedRealtime()
+                    if (now - lastProgressAt >= 100L) {
+                        onProgress(downloaded, total)
+                        lastProgressAt = now
+                        lastReportedBytes = downloaded
+                    }
                 }
             }
+            if (downloaded != lastReportedBytes) onProgress(downloaded, total)
         } finally {
             connection.disconnect()
         }
     }
 
     private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
-    suspend fun downloadOriginalTo(photoId:String,output:OutputStream)=withContext(Dispatchers.IO){val connection=URL("${baseUrl}api/orange-photos/${encode(photoId)}/download").openConnection() as HttpURLConnection;try{connection.requestMethod="GET";connection.connectTimeout=15_000;connection.readTimeout=30_000;connection.setRequestProperty("Accept","application/octet-stream");connection.setRequestProperty("Cookie","of_session=$sessionToken");val status=connection.responseCode;if(status !in 200..299){val body=connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use{it.readText()}.orEmpty();val message=runCatching{JSONObject(body).optString("message").takeIf{it.isNotBlank()}}.getOrNull()?:"No se pudo descargar el original.";throw CloudApiException(status,message)};connection.inputStream.use{input->input.copyTo(output,8192)}}finally{connection.disconnect()}}
     private fun JSONObject.optionalString(name: String): String? = if (isNull(name)) null else optString(name).trim().takeIf { it.isNotBlank() }
     private fun JSONObject.optionalInt(name: String): Int? = if (isNull(name) || !has(name)) null else optInt(name)
     private fun JSONObject.optionalDouble(name: String): Double? = if (isNull(name) || !has(name)) null else optDouble(name)

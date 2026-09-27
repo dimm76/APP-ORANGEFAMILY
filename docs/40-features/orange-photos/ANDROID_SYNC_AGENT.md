@@ -788,8 +788,9 @@ pendientes y resultados sin iniciar otra subida al tocar el indicador.
 La política de red se guarda por usuario en preferencias privadas y parte de
 `WIFI_ONLY`.
 
-El worker decide por archivo utilizando
-`NET_CAPABILITY_NOT_METERED`.
+El worker decide por archivo utilizando la política de red y las capacidades
+`TRANSPORT_WIFI` y `NET_CAPABILITY_NOT_METERED`. Una red apta para transferencia
+ilimitada es Wi-Fi o una red no medida.
 
 Políticas implementadas:
 
@@ -799,16 +800,17 @@ Políticas implementadas:
   modifica la baseline ni elimina pendientes; al regresar a un modo automático,
   el siguiente análisis incluye también el contenido creado durante la pausa;
 - `WIFI_ONLY`: detecta y registra los archivos con cualquier red disponible, pero
-  mantiene la transferencia pendiente hasta una red no medida;
-- `MOBILE_UP_TO_800_MB`: permite transferir mediante red medida archivos de hasta
-  800 MB y aplaza los superiores hasta Wi-Fi;
+  mantiene la transferencia pendiente hasta Wi-Fi o una red no medida;
+- `MOBILE_UP_TO_800_MB`: permite hasta 800 MB en red medida no Wi-Fi y cualquier
+  tamaño admitido mediante Wi-Fi, incluso si está marcada como medida, o una red
+  no medida; los superiores quedan pendientes hasta una red apta;
 - `ANY_NETWORK`: permite cualquier tamaño admitido mediante cualquier red
   conectada.
 
 Los archivos aplazados permanecen en `pending` y no se convierten en fallos.
 
-`ConnectivityManager.NetworkCallback` reactiva la cola cuando aparece una red no
-medida. La aplicación conserva un conjunto sincronizado de redes no medidas y
+`ConnectivityManager.NetworkCallback` reactiva la cola cuando aparece Wi-Fi o una
+red no medida. La aplicación conserva un conjunto sincronizado de redes aptas y
 solo agenda el trabajo cuando se pasa de cero redes disponibles a una o más.
 
 Los avisos repetidos sobre la misma Wi-Fi no vuelven a programar el worker.
@@ -1047,18 +1049,3 @@ Objetivo:
 - mantener completamente separadas las pruebas locales y producción.
 
 Este cambio no está implementado en esta tarea.
-## Comportamiento final de red y descargas Android
-
-`WIFI_ONLY` transfiere cuando existe Wi-Fi o una red identificada como no
-medida. `MOBILE_UP_TO_800_MB` permite hasta 800 MB en redes medidas no Wi-Fi y
-cualquier tamaño admitido cuando existe Wi-Fi o una red no medida. Una Wi-Fi
-marcada como medida sigue contando como Wi-Fi; los elementos aplazados siguen
-en `pending` y la aparición de una red apta reactiva la cola sin duplicados.
-
-Los vídeos de más de 500 MB no son incompatibles: el umbral de 500 MB solo
-separa subida simple y multipart, que sigue siendo reanudable.
-
-Las descargas cloud escriben mediante streaming a MediaStore, mantienen
-`IS_PENDING` hasta completar, muestran progreso y posición de lote, usan
-progreso indeterminado sin Content-Length y eliminan el elemento parcial si
-fallan.

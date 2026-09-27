@@ -15,7 +15,7 @@ import java.time.Instant
 class CloudMediaDownloader(context: Context, private val repository: CameraBackupRepository, private val api: OrangePhotosCloudApi, private val accountUserId: String) {
     private val resolver = context.applicationContext.contentResolver
 
-    suspend fun download(photo: CloudPhoto, onProgress: (Long, Long?) -> Unit = { _, _ -> }): LocalMediaItem = withContext(Dispatchers.IO) {
+    suspend fun download(photo: CloudPhoto, onProgress: suspend (Long, Long?) -> Unit = { _, _ -> }): LocalMediaItem = withContext(Dispatchers.IO) {
         check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { "Descargar a la biblioteca del dispositivo requiere Android 10 o superior." }
         val video = photo.mediaType == LocalMediaItem.TYPE_VIDEO
         val collection = if (video) MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) else MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)

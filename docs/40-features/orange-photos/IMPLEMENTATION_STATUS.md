@@ -960,17 +960,19 @@ permite cualquier tamaño admitido;
 utiliza cualquier red conectada;
 no agenda un trabajo exclusivo para Wi-Fi.
 
-El worker utiliza:
-
-NET_CAPABILITY_NOT_METERED
-
-para determinar si la red es no medida.
+El worker y la reactivación utilizan `TRANSPORT_WIFI` y
+`NET_CAPABILITY_NOT_METERED`. Una red apta para transferencia ilimitada es
+Wi-Fi o una red no medida. `MOBILE_UP_TO_800_MB` permite como máximo 800 MB en
+red medida no Wi-Fi y cualquier tamaño admitido en Wi-Fi, incluso medida, o en
+una red no medida. Los elementos aplazados permanecen en `pending`.
 
 Reactivación al conectar Wi-Fi
 
-ConnectivityManager.NetworkCallback detecta la aparición de redes no medidas.
+ConnectivityManager.NetworkCallback detecta la aparición de Wi-Fi o redes no
+medidas y agenda un trabajo con `CONNECTED`; el worker vuelve a validar la
+política por archivo.
 
-La aplicación conserva un conjunto sincronizado de redes no medidas activas.
+La aplicación conserva un conjunto sincronizado de redes aptas activas.
 
 La cola se reactiva únicamente cuando el conjunto pasa de:
 
@@ -1250,9 +1252,3 @@ independientes:
   Álbumes.
 
 No realizar ninguna de esas refactorizaciones como parte de esta documentación.
-## Estado Android actualizado
-
-La política de red considera apta para transferencia ilimitada una Wi-Fi o una
-red no medida. Los vídeos de más de 500 MB siguen usando multipart. Las
-descargas cloud muestran progreso por streaming, posición dentro del lote y
-eliminan el elemento MediaStore parcial si fallan.

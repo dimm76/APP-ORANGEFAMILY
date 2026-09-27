@@ -44,11 +44,14 @@ class OrangePhotosSyncScheduler(context: Context) {
         scheduleImmediateSync(accountUserId)
     }
 
-    fun scheduleUnmeteredSync(accountUserId: String) {
+    fun scheduleTransferNetworkSync(accountUserId: String) {
         if (policyStore.get(accountUserId) == UploadNetworkPolicy.MANUAL_ONLY) return
-        val request = oneTimeRequest(NetworkType.UNMETERED)
+        val request = oneTimeRequest(NetworkType.CONNECTED)
         workManager.enqueueUniqueWork(unmeteredName(accountUserId), ExistingWorkPolicy.REPLACE, request)
     }
+
+    // Compatibilidad con el worker existente; el trabajo ya usa CONNECTED.
+    fun scheduleUnmeteredSync(accountUserId: String) = scheduleTransferNetworkSync(accountUserId)
 
     fun scheduleMediaChangeSync(accountUserId: String) {
         if (policyStore.get(accountUserId) == UploadNetworkPolicy.MANUAL_ONLY) return
@@ -68,14 +71,14 @@ class OrangePhotosSyncScheduler(context: Context) {
         workManager.enqueueUniquePeriodicWork(periodicName(accountUserId), ExistingPeriodicWorkPolicy.KEEP, request)
     }
 
-    fun onUnmeteredNetworkAvailable(accountUserId: String, policy: UploadNetworkPolicy) {
+    fun onTransferNetworkAvailable(accountUserId: String, policy: UploadNetworkPolicy) {
         when (policy) {
             UploadNetworkPolicy.MANUAL_ONLY,
             UploadNetworkPolicy.ANY_NETWORK,
             -> Unit
             UploadNetworkPolicy.WIFI_ONLY,
             UploadNetworkPolicy.MOBILE_UP_TO_800_MB,
-            -> scheduleUnmeteredSync(accountUserId)
+            -> scheduleTransferNetworkSync(accountUserId)
         }
     }
 
@@ -90,7 +93,7 @@ class OrangePhotosSyncScheduler(context: Context) {
             }
             UploadNetworkPolicy.WIFI_ONLY -> {
                 schedulePeriodicSync(accountUserId)
-                scheduleUnmeteredSync(accountUserId)
+                scheduleTransferNetworkSync(accountUserId)
             }
             UploadNetworkPolicy.MOBILE_UP_TO_800_MB,
             UploadNetworkPolicy.ANY_NETWORK,

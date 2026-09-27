@@ -51,7 +51,7 @@ class OrangePhotosSyncApplication : Application() {
             }
             if (!becameAvailable) return
             val accountUserId = observedAccountUserId ?: return
-            scheduler.onUnmeteredNetworkAvailable(
+            scheduler.onTransferNetworkAvailable(
                 accountUserId = accountUserId,
                 policy = policyStore.get(accountUserId),
             )

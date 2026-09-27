@@ -107,7 +107,7 @@
     <string name="network_wifi_only">Económica · Solo Wi-Fi</string>
     <string name="network_wifi_only_detail">No subir archivos mediante red móvil.</string>
     <string name="network_mobile_800">Intermedia · Datos móviles hasta 800 MB</string>
-    <string name="network_mobile_800_detail">Los archivos mayores quedan esperando una red no medida.</string>
+    <string name="network_mobile_800_detail">Los archivos mayores quedan esperando Wi-Fi o una red no medida.</string>
     <string name="network_any">Extrema · Cualquier conexión</string>
     <string name="network_any_detail">Permite cualquier archivo mediante red móvil o Wi-Fi.</string>
     <string name="network_any_warning">Puede consumir una gran cantidad de datos móviles.</string>
