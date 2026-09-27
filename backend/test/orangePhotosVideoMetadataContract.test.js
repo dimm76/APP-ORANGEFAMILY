@@ -8,6 +8,7 @@ process.env.DB_PORT = "5432";
 
 const pool = require("../db");
 const processor = require("../src/orangePhotosVideoProcessor");
+const service = require("../src/orangePhotosService");
 const processorSource = fs.readFileSync(require.resolve("../src/orangePhotosVideoProcessor"), "utf8");
 const reconcileSource = fs.readFileSync(require.resolve("../scripts/reconcile-orange-photos-videos"), "utf8");
 
@@ -22,12 +23,48 @@ test("el pipeline de vídeo usa metadata canónica y conserva metadata física",
   assert.doesNotMatch(processorSource, /UPDATE public\.orange_photos[^`]*captured_at/);
   assert.match(processorSource, /UPDATE public\.orange_photo_library_items li SET captured_at=.*captured_at_source='exif'/);
   assert.match(processorSource, /li\.user_id=p\.owner_user_id/);
-  assert.match(processorSource, /li\.captured_at_source IN \('upload_date','file_mtime','unknown'\)/);
+  assert.match(processorSource, /li\.captured_at_source IN \('upload_date','file_mtime','filename','unknown'\)/);
   assert.match(reconcileSource, /LEFT JOIN public\.orange_photo_library_items owner_li/);
   assert.match(reconcileSource, /owner_li\.captured_at AS captured_at,owner_li\.captured_at_source AS captured_at_source/);
   assert.doesNotMatch(reconcileSource, /p\.captured_at/);
   assert.doesNotMatch(reconcileSource, /p\.captured_at_source/);
-  assert.match(reconcileSource, /owner_li\.captured_at_source IN \('upload_date','file_mtime','unknown'\)/);
+  assert.match(reconcileSource, /owner_li\.captured_at_source IN \('upload_date','file_mtime','filename','unknown'\)/);
+});
+
+test("normalizeMetadata recovers recognized WhatsApp dates with safe precedence", () => {
+  const image = service.normalizeMetadata(
+    { file_last_modified_at: null },
+    { filename: "IMG-20240115-WA0001.jpg", mimeType: "image/jpeg" },
+  );
+  assert.equal(image.captured_at, "2024-01-15T12:00:00.000Z");
+  assert.equal(image.captured_at_source, "filename");
+
+  const video = service.normalizeMetadata(
+    { file_last_modified_at: null },
+    { filename: "VID-20221231-WA0123.mp4", mimeType: "video/mp4" },
+  );
+  assert.equal(video.captured_at, "2022-12-31T12:00:00.000Z");
+  assert.equal(video.captured_at_source, "filename");
+
+  assert.notEqual(
+    service.normalizeMetadata({}, { filename: "IMG-20230231-WA0001.jpg", mimeType: "image/jpeg" }).captured_at_source,
+    "filename",
+  );
+  assert.notEqual(
+    service.normalizeMetadata({}, { filename: "PHOTO-20240115-1.jpg", mimeType: "image/jpeg" }).captured_at_source,
+    "filename",
+  );
+  assert.equal(
+    service.normalizeMetadata(
+      { file_last_modified_at: "2020-01-01T00:00:00.000Z", device_timestamp_source: "date_taken" },
+      { filename: "IMG-20240115-WA0001.jpg", mimeType: "image/jpeg" },
+    ).captured_at_source,
+    "date_taken",
+  );
+  assert.equal(
+    service.normalizeMetadata({ captured_at: "2023-03-01T00:00:00.000Z" }, { filename: "IMG-20240115-WA0001.jpg", mimeType: "image/jpeg" }).captured_at_source,
+    "manual",
+  );
 });
 
 test("processStoredOrangePhotoVideo decide metadata con la copia lógica del owner", async () => {

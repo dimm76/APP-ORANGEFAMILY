@@ -75,6 +75,7 @@ import com.orangefamily.photossync.ui.device.DeviceTrashScreen
 import com.orangefamily.photossync.cloud.OrangePhotosCloudApi
 import com.orangefamily.photossync.cloud.CloudPhoto
 import com.orangefamily.photossync.cloud.RemoteThumbnailLoader
+import com.orangefamily.photossync.cloud.OrangePhotosDownloadManager
 import com.orangefamily.photossync.ui.cloud.CloudPhotosScreen
 import com.orangefamily.photossync.ui.theme.OrangePrimary
 import com.orangefamily.photossync.ui.theme.OrangeText
@@ -160,6 +161,7 @@ class MainActivity : ComponentActivity() {
                             authController.login(lifecycleScope, email, password)
                         },
                         onLogout = {
+                            OrangePhotosDownloadManager.reset()
                             (application as OrangePhotosSyncApplication).configureMediaObservation(null)
                             authController.logout(lifecycleScope)
                         },

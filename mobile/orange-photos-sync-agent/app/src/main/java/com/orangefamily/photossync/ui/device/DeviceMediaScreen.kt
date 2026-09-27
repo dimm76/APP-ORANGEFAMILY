@@ -127,7 +127,7 @@ LaunchedEffect(folder?.stableId,refreshVersion,mediaSort){val current=folder?:re
 LaunchedEffect(gridState,folder?.stableId,mediaView){snapshotFlow{val layoutInfo=gridState.layoutInfo;Triple(layoutInfo.visibleItemsInfo.lastOrNull()?.index?:-1,layoutInfo.totalItemsCount,hasMore)}.map{(last,total,more)->mediaView==DeviceMediaView.GRID&&more&&total>0&&last>=total-20}.distinctUntilChanged().collect{nearEnd->val current=folder;if(nearEnd&&current!=null)loadNextPage(current)}}
 LaunchedEffect(listState,folder?.stableId,mediaView){snapshotFlow{val layoutInfo=listState.layoutInfo;Triple(layoutInfo.visibleItemsInfo.lastOrNull()?.index?:-1,layoutInfo.totalItemsCount,hasMore)}.map{(last,total,more)->mediaView==DeviceMediaView.LIST&&more&&total>0&&last>=total-20}.distinctUntilChanged().collect{nearEnd->val current=folder;if(nearEnd&&current!=null)loadNextPage(current)}}
     fun toggleSelection(item:LocalMediaItem){val id=DeviceMediaRules.stableId(item);selected=if(id in selected)selected-id else selected+id;anchorId=id}
-    fun extendSelection(item:LocalMediaItem,index:Int){val id=DeviceMediaRules.stableId(item);selected=selected+id;anchorId=id}
+    fun extendSelection(item:LocalMediaItem,index:Int){val id=DeviceMediaRules.stableId(item);val anchorIndex=anchorId?.let{anchor->displayedMedia.indexOfFirst{DeviceMediaRules.stableId(it)==anchor}}?:-1;if(anchorIndex<0){selected=selected+id}else{selected=selected+DeviceMediaRules.range(displayedMedia,anchorIndex,index)};anchorId=id}
     fun onMediaClick(item:LocalMediaItem){if(selected.isEmpty())onOpen(item)else toggleSelection(item)}
     val uploadStatusAction: @Composable RowScope.() -> Unit = {
         UploadStatusAction(

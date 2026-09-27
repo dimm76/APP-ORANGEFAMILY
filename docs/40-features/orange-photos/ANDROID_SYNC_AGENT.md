@@ -778,7 +778,17 @@ mantiene `IS_PENDING=1` hasta completar correctamente y se publica con
 descarga, con progreso en bytes y porcentaje cuando existe `Content-Length`, o
 progreso indeterminado si no se conoce la longitud. En descargas múltiples
 muestra la posición `n de total` y mantiene la ejecución secuencial. Ante
-cualquier fallo se elimina el elemento MediaStore parcial.
+cualquier fallo se elimina el elemento MediaStore parcial. La cola pertenece a
+un gestor de proceso independiente de Compose: ocultar el modal o cambiar la
+orientación no la detiene mientras siga vivo el proceso de la aplicación. El
+icono de descargas permite volver a abrir el estado y cancelar la cola; la
+cancelación también elimina el parcial.
+
+En las subidas Android, la fecha enviada conserva la prioridad de fecha de
+captura de MediaStore (`DATE_TAKEN`), fecha de modificación y fecha de alta,
+con su origen explícito; el backend completa después la precedencia con
+metadatos EXIF o de vídeo, nombre WhatsApp reconocido, fecha de fichero y
+fecha de subida.
 
 El lock local de sincronización dura 30 minutos. Antes de adquirirlo, el worker
 recupera únicamente locks caducados, sin expiración o heredados cuya expiración

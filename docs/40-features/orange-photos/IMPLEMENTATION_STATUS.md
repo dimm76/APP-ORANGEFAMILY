@@ -574,7 +574,8 @@ La fecha de captura utiliza esta prioridad:
 
 fecha manual;
 EXIF DateTimeOriginal o CreateDate;
-fecha de modificación proporcionada por el dispositivo;
+fecha de captura enviada por Android (`date_taken`), nombre WhatsApp reconocido
+(`filename`) y fecha de modificación del fichero;
 fecha de subida.
 Vídeos
 
@@ -605,7 +606,8 @@ La fecha de captura utiliza esta prioridad:
 
 fecha manual;
 creation_time del contenedor;
-fecha de modificación proporcionada por el dispositivo;
+fecha de captura enviada por Android (`date_taken`), nombre WhatsApp reconocido
+(`filename`) y fecha de modificación del fichero;
 fecha de subida.
 
 El propietario puede generar o recrear el poster.
@@ -816,9 +818,12 @@ Descargas desde la biblioteca cloud
 
 El original se descarga desde la API Node mediante streaming directo a
 MediaStore, en `Pictures/OrangeFamily/` para imágenes y `Movies/OrangeFamily/`
-para vídeos. `IS_PENDING` se mantiene hasta completar; la interfaz muestra
+para vídeos. `IS_PENDING` se mantiene hasta completar y la interfaz muestra
 progreso determinado o indeterminado, posición dentro del lote y ejecución
-secuencial. Si falla, se elimina el elemento MediaStore parcial.
+secuencial. La cola vive en un gestor independiente de Compose, por lo que
+ocultar el modal o rotar la pantalla no la detiene mientras siga vivo el proceso;
+puede reabrirse desde el indicador y cancelarse. Si falla o se cancela, se
+elimina el elemento MediaStore parcial.
 
 Activación del backup
 

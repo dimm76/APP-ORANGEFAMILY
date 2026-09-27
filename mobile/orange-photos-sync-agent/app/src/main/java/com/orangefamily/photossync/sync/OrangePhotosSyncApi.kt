@@ -13,6 +13,24 @@ import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
+import java.time.Instant
+
+fun uploadMetadata(item: LocalMediaItem): JSONObject = JSONObject().apply {
+    put("visibility", "private")
+    item.width?.takeIf { it > 0 }?.let { put("width", it) }
+    item.height?.takeIf { it > 0 }?.let { put("height", it) }
+    item.durationMs?.takeIf { it > 0L }?.let { put("duration_seconds", it / 1000.0) }
+    val timestamp = when {
+        item.dateTaken != null && item.dateTaken > 0L -> "date_taken" to item.dateTaken
+        item.dateModified > 0L -> "date_modified" to item.dateModified * 1000L
+        item.dateAdded > 0L -> "date_added" to item.dateAdded * 1000L
+        else -> null
+    }
+    timestamp?.let { (source, millis) ->
+        put("file_last_modified_at", Instant.ofEpochMilli(millis).toString())
+        put("device_timestamp_source", source)
+    }
+}
 
 class OrangePhotosSyncApi(apiBaseUrl: String, private val sessionToken: String, private val installationId: String) {
     private val authApi = OrangeFamilyAuthApi(apiBaseUrl)
@@ -85,7 +103,7 @@ class OrangePhotosSyncApi(apiBaseUrl: String, private val sessionToken: String, 
         val json = requestJson("api/orange-photos", "POST", "multipart/form-data; boundary=$boundary") { output ->
             fun text(value: String) = output.write(value.toByteArray(Charsets.UTF_8))
             text("--$boundary\r\nContent-Disposition: form-data; name=\"metadata\"\r\n\r\n")
-            text(JSONObject().put("visibility", "private").toString())
+            text(uploadMetadata(item).toString())
             text("\r\n--$boundary\r\nContent-Disposition: form-data; name=\"force_duplicate\"\r\n\r\n$forceDuplicate")
             text("\r\n--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"${safeFilename(item.displayName)}\"\r\nContent-Type: ${item.mimeType}\r\n\r\n")
             contentResolver.openInputStream(Uri.parse(item.contentUri))?.use { input -> copyWithProgress(input,output,item.sizeBytes,onProgress) }
@@ -96,7 +114,7 @@ class OrangePhotosSyncApi(apiBaseUrl: String, private val sessionToken: String, 
     }
 
     fun uploadDirect(item: LocalMediaItem, checksum: String, contentResolver: ContentResolver, forceDuplicate: Boolean = false, onProgress:(Long,Long)->Unit={_,_->}): String {
-        val metadata = JSONObject().put("visibility", "private").toString()
+        val metadata = uploadMetadata(item).toString()
         val json = requestJson("api/orange-photos/uploads/direct", "POST", "application/octet-stream", mapOf(
             "x-orange-filename" to Uri.encode(item.displayName),
             "x-orange-mime-type" to item.mimeType.orEmpty(),
@@ -115,7 +133,7 @@ class OrangePhotosSyncApi(apiBaseUrl: String, private val sessionToken: String, 
             .put("original_filename", item.displayName)
             .put("size_bytes", item.sizeBytes)
             .put("mime_type", item.mimeType)
-            .put("metadata", JSONObject().put("visibility", "private"))
+            .put("metadata", uploadMetadata(item))
             .put("client_upload_key", clientUploadKey)
             .put("force_possible_duplicate", true)
             .put("force_duplicate", forceDuplicate)

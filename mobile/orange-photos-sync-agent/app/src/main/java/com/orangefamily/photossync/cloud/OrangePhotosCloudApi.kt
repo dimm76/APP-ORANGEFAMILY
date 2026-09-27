@@ -3,6 +3,8 @@ package com.orangefamily.photossync.cloud
 import android.os.SystemClock
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.json.JSONArray
@@ -324,6 +326,7 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
             connection.inputStream.use { input ->
                 val buffer = ByteArray(8192)
                 while (true) {
+                    currentCoroutineContext().ensureActive()
                     val read = input.read(buffer)
                     if (read < 0) break
                     output.write(buffer, 0, read)
