@@ -214,7 +214,7 @@ Si aparece `INSTALL_FAILED_VERSION_DOWNGRADE`, comprobar primero el APK real: no
 
 ## 11. Qué debe mostrar el agente al usuario
 
-If el agente tiene shell y autorización, debe ejecutar los comandos de build/ADB por sí mismo. No utilizar al usuario como terminal intermedio.
+Si el agente tiene shell y autorización, debe ejecutar los comandos de build/ADB por sí mismo. No utilizar al usuario como terminal intermedio.
 
 Si una acción manual es imprescindible, el bloque debe empezar siempre con:
 
@@ -387,7 +387,13 @@ No publicar si no coincide.
 
 La convención de las publicaciones actuales es fichero legible por Nginx con permisos `0644`.
 
-Publicar:
+Antes de instalar, comprobar la convención real de los APK ya publicados:
+
+```powershell
+ssh -i $key $server "stat -c '%U:%G %a %n' /var/www/family.orangedesk.net/downloads/android/orangefamily-*.apk | tail -n 5"
+```
+
+Solo si la convención confirmada es `root:root 0644`, publicar:
 
 ```powershell
 ssh -i $key $server "sudo install -o root -g root -m 0644 '$remoteTmp' '$remoteFinal'"
