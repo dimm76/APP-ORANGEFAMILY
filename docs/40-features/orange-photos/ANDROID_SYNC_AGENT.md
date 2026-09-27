@@ -784,11 +784,11 @@ orientación no la detiene mientras siga vivo el proceso de la aplicación. El
 icono de descargas permite volver a abrir el estado y cancelar la cola; la
 cancelación también elimina el parcial.
 
-En las subidas Android, la fecha enviada conserva la prioridad de fecha de
-captura de MediaStore (`DATE_TAKEN`), fecha de modificación y fecha de alta,
-con su origen explícito; el backend completa después la precedencia con
-metadatos EXIF o de vídeo, nombre WhatsApp reconocido, fecha de fichero y
-fecha de subida.
+En las subidas Android, la prioridad de captura es metadata EXIF o
+`creation_time` real de vídeo, después `MediaStore.DATE_TAKEN`, fecha reconocida
+del nombre WhatsApp, `DATE_MODIFIED`/`DATE_ADDED` como `file_mtime` y, por
+último, fecha de subida. `date_taken` es un valor válido de
+`captured_at_source`; `DATE_MODIFIED` y `DATE_ADDED` no tienen source propio.
 
 El lock local de sincronización dura 30 minutos. Antes de adquirirlo, el worker
 recupera únicamente locks caducados, sin expiración o heredados cuya expiración

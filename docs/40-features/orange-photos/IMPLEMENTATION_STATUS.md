@@ -574,8 +574,9 @@ La fecha de captura utiliza esta prioridad:
 
 fecha manual;
 EXIF DateTimeOriginal o CreateDate;
-fecha de captura enviada por Android (`date_taken`), nombre WhatsApp reconocido
-(`filename`) y fecha de modificación del fichero;
+MediaStore `DATE_TAKEN` (`date_taken`);
+nombre WhatsApp reconocido (`filename`);
+`DATE_MODIFIED`/`DATE_ADDED` como `file_mtime`;
 fecha de subida.
 Vídeos
 
@@ -605,10 +606,14 @@ Estos 12 elementos incompletos no representan un fallo sistémico.
 La fecha de captura utiliza esta prioridad:
 
 fecha manual;
-creation_time del contenedor;
-fecha de captura enviada por Android (`date_taken`), nombre WhatsApp reconocido
-(`filename`) y fecha de modificación del fichero;
+creation_time real del contenedor;
+MediaStore `DATE_TAKEN` (`date_taken`);
+nombre WhatsApp reconocido (`filename`);
+`DATE_MODIFIED`/`DATE_ADDED` como `file_mtime`;
 fecha de subida.
+
+`date_taken` es un valor válido de `captured_at_source`; `DATE_MODIFIED` y
+`DATE_ADDED` no tienen source propio.
 
 El propietario puede generar o recrear el poster.
 

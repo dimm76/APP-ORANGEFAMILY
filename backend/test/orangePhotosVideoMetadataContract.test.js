@@ -11,6 +11,7 @@ const processor = require("../src/orangePhotosVideoProcessor");
 const service = require("../src/orangePhotosService");
 const processorSource = fs.readFileSync(require.resolve("../src/orangePhotosVideoProcessor"), "utf8");
 const reconcileSource = fs.readFileSync(require.resolve("../scripts/reconcile-orange-photos-videos"), "utf8");
+const migrationSource = fs.readFileSync(require.resolve("../../docs/30-database/migration/20260927200000_orange_photo_library_add_date_taken_source.sql"), "utf8");
 
 test("el pipeline de vídeo usa metadata canónica y conserva metadata física", () => {
   assert.match(processorSource, /LEFT JOIN public\.orange_photo_library_items owner_li/);
@@ -23,12 +24,13 @@ test("el pipeline de vídeo usa metadata canónica y conserva metadata física",
   assert.doesNotMatch(processorSource, /UPDATE public\.orange_photos[^`]*captured_at/);
   assert.match(processorSource, /UPDATE public\.orange_photo_library_items li SET captured_at=.*captured_at_source='exif'/);
   assert.match(processorSource, /li\.user_id=p\.owner_user_id/);
-  assert.match(processorSource, /li\.captured_at_source IN \('upload_date','file_mtime','filename','unknown'\)/);
+  assert.match(processorSource, /li\.captured_at_source IN \('upload_date','file_mtime','filename','date_taken','unknown'\)/);
   assert.match(reconcileSource, /LEFT JOIN public\.orange_photo_library_items owner_li/);
   assert.match(reconcileSource, /owner_li\.captured_at AS captured_at,owner_li\.captured_at_source AS captured_at_source/);
   assert.doesNotMatch(reconcileSource, /p\.captured_at/);
   assert.doesNotMatch(reconcileSource, /p\.captured_at_source/);
-  assert.match(reconcileSource, /owner_li\.captured_at_source IN \('upload_date','file_mtime','filename','unknown'\)/);
+  assert.match(reconcileSource, /owner_li\.captured_at_source IN \('upload_date','file_mtime','filename','date_taken','unknown'\)/);
+  assert.match(migrationSource, /orange_photo_library_items_captured_source_check[\s\S]*'date_taken'/);
 });
 
 test("normalizeMetadata recovers recognized WhatsApp dates with safe precedence", () => {
@@ -96,6 +98,10 @@ test("processStoredOrangePhotoVideo decide metadata con la copia lógica del own
     pool.query = async () => ({ rows: [{ ...baseRow, owner_captured_at_source: "file_mtime" }] });
     const fileMtime = await processor.processStoredOrangePhotoVideo(baseRow.id, { dryRun: true });
     assert.equal(fileMtime.actions.update_metadata, true);
+
+    pool.query = async () => ({ rows: [{ ...baseRow, owner_captured_at_source: "date_taken" }] });
+    const dateTaken = await processor.processStoredOrangePhotoVideo(baseRow.id, { dryRun: true });
+    assert.equal(dateTaken.actions.update_metadata, true);
 
     pool.query = async () => ({ rows: [{ ...baseRow, owner_captured_at_source: null }] });
     const missingOwnerCopy = await processor.processStoredOrangePhotoVideo(baseRow.id, { dryRun: true });
