@@ -770,6 +770,16 @@ campos `local_status`, `cloud_status=backed_up`, `remotePhotoId`, checksum y fec
 de verificación. El Flow observado por la cuadrícula refleja inmediatamente la
 nube confirmada sin exigir una reconciliación manual.
 
+La biblioteca cloud Android permite descargar originales al dispositivo. Las
+imágenes se guardan en `Pictures/OrangeFamily/` y los vídeos en
+`Movies/OrangeFamily/`, mediante streaming directo a MediaStore. El elemento
+mantiene `IS_PENDING=1` hasta completar correctamente y se publica con
+`IS_PENDING=0` al finalizar. La interfaz muestra inmediatamente el elemento en
+descarga, con progreso en bytes y porcentaje cuando existe `Content-Length`, o
+progreso indeterminado si no se conoce la longitud. En descargas múltiples
+muestra la posición `n de total` y mantiene la ejecución secuencial. Ante
+cualquier fallo se elimina el elemento MediaStore parcial.
+
 El lock local de sincronización dura 30 minutos. Antes de adquirirlo, el worker
 recupera únicamente locks caducados, sin expiración o heredados cuya expiración
 supere ese máximo; un lock activo válido hace que el worker secundario termine correctamente sin

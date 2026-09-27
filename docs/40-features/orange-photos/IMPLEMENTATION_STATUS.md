@@ -812,6 +812,14 @@ aplicación.
 La eliminación definitiva local solo puede realizarse desde una papelera
 compatible y mediante una acción explícita del usuario.
 
+Descargas desde la biblioteca cloud
+
+El original se descarga desde la API Node mediante streaming directo a
+MediaStore, en `Pictures/OrangeFamily/` para imágenes y `Movies/OrangeFamily/`
+para vídeos. `IS_PENDING` se mantiene hasta completar; la interfaz muestra
+progreso determinado o indeterminado, posición dentro del lote y ejecución
+secuencial. Si falla, se elimina el elemento MediaStore parcial.
+
 Activación del backup
 
 La primera activación:
