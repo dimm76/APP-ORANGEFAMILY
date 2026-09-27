@@ -1,187 +1,546 @@
-# Workflow de release Android — OrangeFamily
+# Workflow Android APK — prueba, validación y publicación
 
-Este documento define el procedimiento obligatorio para crear, validar, firmar, instalar y publicar una versión Android de OrangeFamily. Ninguna APK release se publica desde cambios no trazables.
+Este documento es la fuente canónica para generar, instalar, validar y publicar APK de OrangeFamily.
+
+Se aplica junto con:
+
+- `.agents/skills/orangefamily-android/SKILL.md`
+- `.agents/skills/orangefamily-android-release/SKILL.md`
+- `docs/20-development/COMMIT_AND_RELEASE_WORKFLOW.md`
+
+La regla principal es separar dos artefactos y dos momentos:
+
+1. **APK de prueba física**, antes de cambiar la versión.
+2. **APK definitiva publicable**, después del OK físico y del bump de versión.
+
+Una APK de prueba no es una release publicada.
 
 ## 1. Fuentes de verdad
 
-- Código: Git, rama `main`.
-- Versión compilada: `mobile/orange-photos-sync-agent/app/build.gradle.kts`.
-- Release registrada: PostgreSQL, tabla `application_releases`.
-- Binario: APK publicada en la URL HTTPS configurada.
-- Estado instalado: paquete consultado mediante ADB.
+- Código funcional: Git.
+- Código aprobado para una prueba: SHA exacto de la rama revisada.
+- Código de una release definitiva: SHA exacto de `main`.
+- Versión declarada: `mobile/orange-photos-sync-agent/app/build.gradle.kts`.
+- Release publicada: `public.application_releases`.
+- Binario publicado: fichero servido por HTTPS.
+- Estado real del móvil: paquete consultado mediante ADB.
+- Identidad del binario: SHA-256 de la APK.
 
-`application_releases` no sustituye a Git. Toda versión registrada debe proceder de un commit conocido de `main`.
+No utilizar como fuente de verdad un fichero antiguo que siga existiendo en `app/build/outputs/apk/release/`. Antes de cualquier build release se ejecuta `clean assembleRelease`.
 
-## 2. Reglas de trazabilidad obligatorias
+## 2. Invariante obligatorio: probar antes de versionar
 
-1. Nunca compilar desde cambios sin commit ni desde una rama funcional pendiente.
-2. Nunca publicar versiones no registradas en Git.
-3. La APK definitiva se compila únicamente desde `main` limpio y actualizado.
-4. Registrar el SHA exacto antes de compilar.
-5. `versionCode` y `versionName` publicados deben coincidir con la APK.
-6. Publicar exactamente la APK probada y conservar su SHA-256.
-7. Nunca regenerar el keystore.
+El flujo correcto es:
 
-## 3. Preparación del entorno
-
-Repositorio habitual: `C:\Users\dimm7\local-sites\APP-ORANGEFAMILY`.
-Proyecto: `C:\Users\dimm7\local-sites\APP-ORANGEFAMILY\mobile\orange-photos-sync-agent`.
-Las rutas pueden variar y no deben codificarse en la aplicación.
-
-```powershell
-$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
-$env:Path = "$env:JAVA_HOME\bin;$env:Path"
+```text
+rama funcional
+→ checks
+→ commit + push
+→ revisión remota
+→ APK release firmada DE PRUEBA con la versión publicada actual
+→ adb install -r
+→ prueba física humana
+→ si falla: corregir, revisar y repetir la APK de prueba SIN bump
+→ OK humano explícito
+→ bump versionCode/versionName
+→ commit de versión
+→ fast-forward a main
+→ APK definitiva desde main limpio
+→ adb install -r + smoke final
+→ publicar EXACTAMENTE ese binario
+→ cuatro hashes iguales
+→ registrar application_releases
 ```
 
-## 4. SDK Android y ADB
+Está prohibido hacer el bump de versión para poder realizar la primera prueba física.
 
-`local.properties` es local, no se versiona y puede regenerarse. Leer siempre `sdk.dir`:
+Los intentos de prueba no consumen `versionCode`.
+
+## 3. Infraestructura local verificada
+
+- Repositorio: `C:\Users\dimm7\local-sites\APP-ORANGEFAMILY`
+- Proyecto Android: `C:\Users\dimm7\local-sites\APP-ORANGEFAMILY\mobile\orange-photos-sync-agent`
+- Java/JBR: `C:\Program Files\Android\Android Studio\jbr`
+- SDK Android: `C:\Users\dimm7\AppData\Local\Android\Sdk`
+- ADB: `C:\Users\dimm7\AppData\Local\Android\Sdk\platform-tools\adb.exe`
+- Keystore release: `C:\Users\dimm7\orangefamily-secrets\orangefamily-release.jks`
+- Gradle signing properties: `C:\Users\dimm7\.gradle\gradle.properties`
+- Application ID: `com.orangefamily.photossync`
+- API release: `https://family.orangedesk.net/`
+- Alias: `orangefamily`
+
+Nunca imprimir contraseñas, copiar secretos al repositorio ni regenerar el keystore.
+
+# FASE A — APK DE PRUEBA FÍSICA
+
+## 4. Requisito previo
+
+La implementación funcional debe estar:
+
+- en una rama específica;
+- committeada;
+- subida al remoto;
+- revisada directamente desde GitHub;
+- corregida si procede;
+- aprobada para prueba física.
+
+No hace falta que la rama esté integrada todavía en `main`.
+
+La APK de prueba se genera desde el SHA funcional aprobado y mantiene exactamente el `versionCode` y `versionName` publicados actualmente.
+
+Esto permite reinstalar sobre la aplicación existente mediante la misma firma sin inventar una nueva release solo para probar.
+
+Si la tarea incluye backend no compatible con producción, su despliegue requiere una autorización de producción separada. La APK de prueba no autoriza por sí sola un despliegue backend.
+
+## 5. Determinar el estado antes de construir
+
+Comprobar:
+
+1. versión declarada en `build.gradle.kts`;
+2. release publicada en Ajustes → Descargas o mediante la API autenticada;
+3. versión instalada en el dispositivo.
+
+Desde el proyecto Android:
 
 ```powershell
-Get-Content .\mobile\orange-photos-sync-agent\local.properties | Select-String "^sdk\.dir="
-$adb = "<sdk.dir>\platform-tools\adb.exe"
+cd C:\Users\dimm7\local-sites\APP-ORANGEFAMILY\mobile\orange-photos-sync-agent
+
+$adb="$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
+
+Select-String `
+  -Path ".\app\build.gradle.kts" `
+  -Pattern "versionCode|versionName"
+
 & $adb devices
+
+& $adb shell dumpsys package com.orangefamily.photossync |
+  Select-String "versionCode|versionName"
 ```
 
-La configuración comprobada es `C:\Users\dimm7\AppData\Local\Android\Sdk`. No asumir que ADB está en `PATH`.
+Si el dispositivo tiene una versión superior a la que se pretende instalar, detenerse.
 
-## 5. Inicio de desarrollo
+Nunca utilizar `adb install -d`.
+
+Nunca desinstalar para evitar una comprobación de versión o firma.
+
+## 6. Entorno Java
 
 ```powershell
+$env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
+$env:Path="$env:JAVA_HOME\bin;$env:Path"
+
+java -version
+```
+
+No instalar otro Java para una release si el JBR de Android Studio está disponible.
+
+## 7. Checks previos de la APK de prueba
+
+```powershell
+cd C:\Users\dimm7\local-sites\APP-ORANGEFAMILY\mobile\orange-photos-sync-agent
+
+.\gradlew.bat :app:testDebugUnitTest --no-configuration-cache
+.\gradlew.bat :app:assembleDebug --no-configuration-cache
+
+git diff --check
+git status --short
+```
+
+La prueba física no sustituye los tests.
+
+## 8. Generar la APK de prueba
+
+La APK de prueba es un build **release firmado**, no un debug build.
+
+No cambiar versión.
+
+Ejecutar siempre:
+
+```powershell
+.\gradlew.bat clean assembleRelease --no-configuration-cache
+```
+
+Debe finalizar con `BUILD SUCCESSFUL`.
+
+APK resultante:
+
+`app\build\outputs\apk\release\app-release.apk`
+
+El `clean` es obligatorio para impedir que una APK antigua quede confundida con la recién generada.
+
+## 9. Verificar el binario antes de instalar
+
+```powershell
+$apk=".\app\build\outputs\apk\release\app-release.apk"
+$sdk="$env:LOCALAPPDATA\Android\Sdk"
+$buildTools=Get-ChildItem "$sdk\build-tools" -Directory |
+  Sort-Object Name -Descending |
+  Select-Object -First 1
+
+$aapt=Join-Path $buildTools.FullName "aapt.exe"
+$apksigner=Join-Path $buildTools.FullName "apksigner.bat"
+
+& $aapt dump badging $apk | Select-String "^package:"
+& $apksigner verify --verbose --print-certs $apk
+Get-FileHash $apk -Algorithm SHA256
+```
+
+El `package` debe ser `com.orangefamily.photossync`; la versión embebida debe ser la publicada actual para la fase de prueba.
+
+No instalar si package, versión o firma son inesperados.
+
+## 10. Instalar APK de prueba
+
+```powershell
+$adb="$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
+
+& $adb devices
+& $adb install -r ".\app\build\outputs\apk\release\app-release.apk"
+```
+
+Resultado esperado: `Success`.
+
+No usar `-d`.
+
+No desinstalar.
+
+No borrar datos.
+
+No cerrar sesión expresamente.
+
+La misma firma y `-r` conservan Room, preferencias, sesión y estado local.
+
+Si aparece `INSTALL_FAILED_VERSION_DOWNGRADE`, comprobar primero el APK real: normalmente significa que se ha intentado instalar un artefacto antiguo o que el dispositivo ya tiene un `versionCode` superior.
+
+## 11. Qué debe mostrar el agente al usuario
+
+If el agente tiene shell y autorización, debe ejecutar los comandos de build/ADB por sí mismo. No utilizar al usuario como terminal intermedio.
+
+Si una acción manual es imprescindible, el bloque debe empezar siempre con:
+
+```powershell
+cd C:\Users\dimm7\local-sites\APP-ORANGEFAMILY\mobile\orange-photos-sync-agent
+$adb="$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
+```
+
+No mostrar comandos que dependan de una variable no definida.
+
+Después de instalar, el agente debe indicar únicamente las pruebas físicas concretas relacionadas con el cambio y el resultado esperado.
+
+Formato:
+
+```text
+Prueba física pendiente:
+1. Acción concreta en la app.
+2. Resultado esperado.
+3. Caso límite que originó el bug.
+```
+
+En este punto el proceso se detiene hasta recibir del usuario un OK o un fallo.
+
+No hacer bump.
+
+No publicar.
+
+No registrar `application_releases`.
+
+## 12. Si la prueba falla
+
+Volver a la rama funcional.
+
+Aplicar cambio mínimo.
+
+Ejecutar tests.
+
+Commit + push.
+
+Revisión remota del nuevo commit.
+
+Generar de nuevo una APK release de prueba con la misma versión publicada.
+
+Instalar mediante `adb install -r`.
+
+Repetir la validación.
+
+No incrementar `versionCode` para iteraciones de prueba.
+
+# FASE B — APK DEFINITIVA Y PUBLICACIÓN
+
+## 13. Condición de entrada
+
+Solo se inicia cuando el usuario ha confirmado explícitamente que la APK de prueba funciona físicamente.
+
+Sin ese OK no se cambia la versión.
+
+## 14. Determinar la nueva versión
+
+Comprobar la release publicada y `build.gradle.kts`.
+
+El nuevo `versionCode` debe ser estrictamente superior al publicado.
+
+Modificar únicamente `mobile/orange-photos-sync-agent/app/build.gradle.kts` y solo:
+
+```kotlin
+versionCode = <nuevo código>
+versionName = "<nueva versión>"
+```
+
+Commit separado de versión.
+
+No mezclar cambios funcionales con el bump.
+
+## 15. Integrar en main
+
+Tras revisar el commit de versión:
+
+```powershell
+git fetch origin
 git switch main
 git pull --ff-only origin main
-git status --short
-git switch -c <tipo>/<nombre>
+git merge --ff-only <rama-aprobada>
+git push origin main
+
+git rev-parse main
+git rev-parse origin/main
 ```
 
-El working tree debe estar limpio. No implementar directamente sobre `main`.
+Los dos SHA deben coincidir.
 
-## 6. Desarrollo mínimo
+No usar force push, rebase ni merge commit cuando el fast-forward es posible.
 
-Modificar solo archivos necesarios, no mezclar versionado con desarrollo funcional, ejecutar checks y revisar `git diff --check` y `git status --short`.
+## 16. Build definitivo desde main limpio
 
-## 7. Commit y push funcional
+La APK definitiva sale exclusivamente del SHA aprobado de `main`.
+
+Si el working tree habitual contiene untracked o trabajo ajeno, utilizar un worktree limpio del SHA de release en lugar de borrar, mover o hacer stash de trabajo no relacionado.
+
+Ejecutar nuevamente:
 
 ```powershell
-git diff --check; git status --short; git add <archivos>; git commit -m "<mensaje>"; git push -u origin <rama>
+.\gradlew.bat :app:testDebugUnitTest --no-configuration-cache
+.\gradlew.bat :app:assembleDebug --no-configuration-cache
+.\gradlew.bat clean assembleRelease --no-configuration-cache
 ```
 
-No generar aquí la APK release definitiva.
+Repetir las verificaciones de package, `versionCode`, `versionName`, firma y SHA-256.
 
-## 8. Revisión previa a release
-
-Revisar diff contra `main`, archivos, tests, build, scope, secretos, UTF-8 y pruebas funcionales. No continuar con errores conocidos.
-
-## 9. Determinación de versión
-
-Comprobar `build.gradle.kts`, Ajustes > Descargas o `application_releases`, y el dispositivo:
+## 17. Instalar la APK definitiva antes de publicar
 
 ```powershell
-& $adb shell dumpsys package com.orangefamily.photossync | Select-String "versionCode|versionName"
+& $adb shell dumpsys package com.orangefamily.photossync |
+  Select-String "versionCode|versionName"
+
+& $adb install -r ".\app\build\outputs\apk\release\app-release.apk"
+
+& $adb shell dumpsys package com.orangefamily.photossync |
+  Select-String "versionCode|versionName"
 ```
 
-El nuevo `versionCode` debe ser superior al distribuido y nunca reutilizarse. Si Git, dispositivo y registro discrepan, detener y alinear primero.
+Realizar un smoke final de inicio, sesión, conectividad y funcionalidad modificada.
 
-## 10. Actualización de versión
+Una vez validada, **no volver a compilar**. El fichero probado es el que se publica.
 
-Modificar solo `versionCode` y `versionName` en `mobile/orange-photos-sync-agent/app/build.gradle.kts`. El cambio debe estar committeado antes del build definitivo.
+# PUBLICACIÓN EN EL VPS
 
-## 11. Integración en main
+## 18. Infraestructura real
 
-Tras aprobar la rama, ejecutar `git switch main`, `git pull --ff-only origin main`, `git status --short` y `git log -1 --oneline`. Registrar el SHA. La APK definitiva sale de este `main` limpio.
+- Servidor: `ubuntu@141.95.179.205`
+- Alias operativo conocido: `orangekode-prod-01m`
+- Clave SSH desde Windows: `$env:USERPROFILE\.ssh\orangedesk-prod-2026`
+- Repositorio de producción: `/opt/orangefamily/APP-ORANGEFAMILY`
+- Directorio público de APK: `/var/www/family.orangedesk.net/downloads/android/`
+- Patrón de fichero: `orangefamily-<versionName>.apk`
+- URL pública: `https://family.orangedesk.net/downloads/android/orangefamily-<versionName>.apk`
 
-## 12. Configuración release
+La publicación del APK es independiente del workflow normal de deploy de frontend/backend.
+
+## 19. Preparar variables de publicación
+
+```powershell
+cd C:\Users\dimm7\local-sites\APP-ORANGEFAMILY\mobile\orange-photos-sync-agent
+
+$version="<versionName>"
+$file="orangefamily-$version.apk"
+$apk=".\app\build\outputs\apk\release\app-release.apk"
+$key="$env:USERPROFILE\.ssh\orangedesk-prod-2026"
+$server="ubuntu@141.95.179.205"
+$remoteTmp="/tmp/$file"
+$remoteFinal="/var/www/family.orangedesk.net/downloads/android/$file"
+$url="https://family.orangedesk.net/downloads/android/$file"
+
+$localHash=(Get-FileHash $apk -Algorithm SHA256).Hash
+$localHash
+```
+
+## 20. Subir primero a /tmp
+
+```powershell
+scp -i $key $apk "$server`:$remoteTmp"
+ssh -i $key $server "sha256sum '$remoteTmp'"
+```
+
+El hash temporal debe coincidir con `$localHash`.
+
+No publicar si no coincide.
+
+## 21. Instalar en el directorio público
+
+La convención de las publicaciones actuales es fichero legible por Nginx con permisos `0644`.
+
+Publicar:
+
+```powershell
+ssh -i $key $server "sudo install -o root -g root -m 0644 '$remoteTmp' '$remoteFinal'"
+```
+
+Verificar:
+
+```powershell
+ssh -i $key $server "stat -c '%U:%G %a %s %n' '$remoteFinal' && sha256sum '$remoteFinal'"
+```
+
+Si la instalación existente del servidor no usa `root:root 0644`, detenerse y preservar la convención existente en lugar de modificarla silenciosamente.
+
+## 22. Verificar el mismo binario por HTTPS
+
+```powershell
+$httpsCopy=Join-Path $env:TEMP $file
+
+Invoke-WebRequest `
+  -Uri $url `
+  -OutFile $httpsCopy
+
+$httpsHash=(Get-FileHash $httpsCopy -Algorithm SHA256).Hash
+$httpsHash
+```
+
+Los cuatro hashes obligatorios son:
+
+1. local;
+2. `/tmp`;
+3. fichero final del VPS;
+4. descarga HTTPS.
+
+Los cuatro deben coincidir exactamente.
+
+Después puede eliminarse la copia temporal local y el fichero de `/tmp`.
+
+# REGISTRO DE LA RELEASE
+
+## 23. application_releases
+
+El registro normal no se hace mediante SQL manual.
+
+Ruta de interfaz:
+
+`Ajustes → Descargas → Publicación Android`
+
+Solo un owner puede actualizarlo.
+
+La interfaz llama:
+
+`PUT /api/settings/app-releases/android/latest`
+
+Node valida y actualiza `public.application_releases` y registra la acción en audit logs.
+
+Campos:
+
+- `version_code`
+- `version_name`
+- `file_name`
+- `download_url`
+- `release_notes`
+
+Ejemplo conceptual:
 
 ```text
-Application ID: com.orangefamily.photossync
-API: https://family.orangedesk.net/
-Keystore: C:\Users\dimm7\orangefamily-secrets\orangefamily-release.jks
-Alias: orangefamily
-Gradle properties: C:\Users\dimm7\.gradle\gradle.properties
+version_code: <nuevo código>
+version_name: <nueva versión>
+file_name: orangefamily-<nueva versión>.apk
+download_url: https://family.orangedesk.net/downloads/android/orangefamily-<nueva versión>.apk
+release_notes: <cambios validados>
 ```
 
-Propiedades: `orangeFamily.releaseApiBaseUrl`, `orangeFamily.keystoreFile`, `orangeFamily.keystorePassword`, `orangeFamily.keyAlias` y `orangeFamily.keyPassword`. Nunca documentar contraseñas o secretos. No cambiar alias, `applicationId` ni regenerar el keystore.
+No registrar hasta que la URL HTTPS y los cuatro hashes estén verificados.
 
-## 13. Verificación previa
+## 24. Verificación después del registro
 
-```powershell
-Test-Path "C:\Users\dimm7\orangefamily-secrets\orangefamily-release.jks"
-```
+En Ajustes → Descargas comprobar:
 
-El `build.gradle.kts` valida la configuración release.
+- versión;
+- código;
+- nombre de fichero;
+- notas;
+- enlace.
 
-## 14. Tests
+Abrir/descargar el enlace y confirmar que sigue correspondiendo al mismo APK.
 
-Desde `mobile/orange-photos-sync-agent`: `./gradlew.bat :app:testDebugUnitTest --no-configuration-cache` y `./gradlew.bat :app:assembleDebug --no-configuration-cache`. Después revisar `git diff --check` y `git status --short`.
+Los clientes Android comparan el `versionCode` instalado con la release publicada. Solo después de registrar un código superior debe aparecer la actualización a usuarios con una versión anterior.
 
-## 15. Build release
+## 25. Qué debe devolver el agente al cerrar
 
-Desde `mobile/orange-photos-sync-agent`, ejecutar `./gradlew.bat clean assembleRelease --no-configuration-cache`. La salida es `app\build\outputs\apk\release\app-release.apk`; solo `BUILD SUCCESSFUL` valida el build.
-
-## 16. Verificación de APK
-
-Comprobar fichero, package, versiones, certificado y SHA-256 con `apkanalyzer`/`apksigner` del SDK y:
-
-```powershell
-Get-FileHash ".\app\build\outputs\apk\release\app-release.apk" -Algorithm SHA256
-```
-
-Package, versiones y firma deben coincidir con Git y el keystore esperado.
-
-## 17. Dispositivo
-
-`& $adb devices` debe mostrar un dispositivo en estado `device`, nunca `unauthorized` u `offline`. Registrar la versión anterior con `dumpsys package`.
-
-## 18. Instalación
-
-No desinstalar. Ejecutar `& $adb install -r ".\app\build\outputs\apk\release\app-release.apk"`. La misma firma y un `versionCode` válido conservan sesión, Room, preferencias y datos locales. Ante firma incompatible, detenerse.
-
-## 19. Verificación posterior
-
-Comprobar de nuevo package y versiones. Abrir la app y probar inicio, sesión, producción, biblioteca local, biblioteca cloud, sincronización y funcionalidad modificada. No publicar antes de validar la APK instalada.
-
-## 20. Publicación
-
-Usar exactamente el fichero probado; no regenerarlo. Renombrar como `orangefamily-<versionName>.apk`, sin cambiar bytes, copiarlo al almacenamiento HTTPS y registrar nombre, URL y SHA-256.
-
-## 21. Verificación remota
-
-Descargar la APK publicada y comparar su `Get-FileHash <apk-descargada> -Algorithm SHA256` con el hash local. Si difiere, no registrar la release.
-
-## 22. application_releases
-
-Solo después de build, firma, instalación, pruebas, publicación y hash remoto, registrar en Ajustes > Descargas: `version_code`, `version_name`, `file_name`, `download_url` y `release_notes`.
-
-## 23. Comprobación final
-
-En Ajustes > Descargas verificar versiones, nombre, notas y enlace; descargar desde la URL publicada y confirmar que es el mismo APK.
-
-## 24. Trazabilidad
-
-Conservar fecha, SHA de `main`, versiones, nombre, SHA-256, URL, dispositivo, versión previa, tests, build, instalación y pruebas manuales. Debe poder responderse de qué commit exacto salió cada APK.
-
-## 25. Flujo resumido obligatorio
+### APK de prueba
 
 ```text
-main limpio → rama → desarrollo → tests → commit + push → revisión → versión
-→ versionCode/versionName → commit release → integrar main → main limpio + SHA
-→ tests → assembleRelease → package/version/firma/hash → adb install -r
-→ pruebas → publicar EL MISMO APK → hash remoto → application_releases
-→ comprobación final → release cerrada
+SHA funcional probado:
+Version instalada antes:
+Version de la APK de prueba:
+Package:
+Firma:
+SHA-256:
+adb install -r:
+Pruebas físicas pendientes:
+Publicada: no
+application_releases: sin modificar
 ```
 
-## 26. Detener la release si
-
-El working tree está sucio, `main` desactualizado, hay código sin commit, las fuentes de versión discrepan, `versionCode` es inválido, package/versión/firma son incorrectos, ADB está `unauthorized`/`offline`, se requiere desinstalar, el hash remoto difiere, el registro es incoherente, fallan tests/build, hay mojibake/UTF-8 corrupto o aparecen secretos.
-
-## 27. Discrepancia observada el 12/08/2026
-
-Sin modificar estos estados en esta tarea:
+### APK definitiva publicada
 
 ```text
-Git main: 1.3.0 / versionCode 6
-APK instalada por ADB: 1.3.0 / versionCode 6
-Ajustes > Descargas: 1.4.0 / versionCode 7
+SHA main:
+Version:
+VersionCode:
+Package:
+APK local:
+SHA-256 local:
+SHA-256 /tmp:
+SHA-256 servidor:
+SHA-256 HTTPS:
+Firma:
+adb install -r:
+Servidor: ubuntu@141.95.179.205
+Ruta: /var/www/family.orangedesk.net/downloads/android/<file>
+URL: https://family.orangedesk.net/downloads/android/<file>
+application_releases: registrada / pendiente
 ```
 
-Las fuentes están desalineadas. No generar APK nueva, cambiar versiones a ciegas ni sobrescribir `application_releases`; verificar el APK publicado, identificar su código de origen y alinear Git/documentación antes de la próxima release. No se afirma qué estado debe corregirse: requiere tarea separada.
+## 26. Condiciones de parada
+
+Detenerse si:
+
+- el SHA que se construye no es el aprobado;
+- hay cambios tracked no committeados;
+- aparece trabajo ajeno que sería sobrescrito;
+- falla cualquier test/build;
+- falta el JBR, SDK o keystore esperado;
+- package/version/firma de la APK no coinciden;
+- ADB muestra `unauthorized` u `offline`;
+- la instalación exige `-d` o desinstalar;
+- hay firma incompatible;
+- la versión embebida en la APK es distinta de la esperada;
+- cualquiera de los cuatro hashes no coincide;
+- el fichero HTTPS no es accesible;
+- se requiere cambiar ownership/permisos del servidor sin confirmar la convención;
+- la release que se intenta registrar no coincide con el binario publicado.
+
+Nunca arreglar una condición de parada con force push, downgrade, uninstall, regeneración de keystore, recompilación silenciosa o edición manual de PostgreSQL.
+
+## 27. Incidente de proceso del 27/09/2026
+
+Durante la preparación de la 1.8.2 se adelantó el bump de `versionCode/versionName` antes de completar la primera prueba física.
+
+No hubo publicación pública antes de validar, pero el orden no era el flujo establecido.
+
+Regla preventiva incorporada al harness:
+
+**la APK de prueba firmada se genera e instala manteniendo la versión publicada actual; el bump solo se realiza después del OK físico humano.**
