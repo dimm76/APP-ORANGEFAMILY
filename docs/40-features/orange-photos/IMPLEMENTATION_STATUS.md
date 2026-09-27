@@ -1250,3 +1250,9 @@ independientes:
   Álbumes.
 
 No realizar ninguna de esas refactorizaciones como parte de esta documentación.
+## Estado Android actualizado
+
+La política de red considera apta para transferencia ilimitada una Wi-Fi o una
+red no medida. Los vídeos de más de 500 MB siguen usando multipart. Las
+descargas cloud muestran progreso por streaming, posición dentro del lote y
+eliminan el elemento MediaStore parcial si fallan.

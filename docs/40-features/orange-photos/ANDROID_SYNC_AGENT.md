@@ -1047,3 +1047,18 @@ Objetivo:
 - mantener completamente separadas las pruebas locales y producción.
 
 Este cambio no está implementado en esta tarea.
+## Comportamiento final de red y descargas Android
+
+`WIFI_ONLY` transfiere cuando existe Wi-Fi o una red identificada como no
+medida. `MOBILE_UP_TO_800_MB` permite hasta 800 MB en redes medidas no Wi-Fi y
+cualquier tamaño admitido cuando existe Wi-Fi o una red no medida. Una Wi-Fi
+marcada como medida sigue contando como Wi-Fi; los elementos aplazados siguen
+en `pending` y la aparición de una red apta reactiva la cola sin duplicados.
+
+Los vídeos de más de 500 MB no son incompatibles: el umbral de 500 MB solo
+separa subida simple y multipart, que sigue siendo reanudable.
+
+Las descargas cloud escriben mediante streaming a MediaStore, mantienen
+`IS_PENDING` hasta completar, muestran progreso y posición de lote, usan
+progreso indeterminado sin Content-Length y eliminan el elemento parcial si
+fallan.

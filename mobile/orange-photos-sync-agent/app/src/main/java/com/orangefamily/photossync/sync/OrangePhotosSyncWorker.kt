@@ -96,7 +96,9 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
 
             repository.recoverUploading(accountUserId)
             val connectivity=applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            val isUnmetered=connectivity.getNetworkCapabilities(connectivity.activeNetwork)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)==true
+            val capabilities = connectivity.getNetworkCapabilities(connectivity.activeNetwork)
+            val isWifi = capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+            val isUnmetered = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) == true
             val networkPolicy=UploadNetworkPolicyStore(applicationContext).get(accountUserId)
             var transientFailure = false
             var uploadedThisRun = 0
@@ -118,7 +120,7 @@ class OrangePhotosSyncWorker(appContext: Context, params: WorkerParameters) : Co
             afterId = item.id
             OrangePhotosUploadProgress.update(OrangePhotosUploadProgress.state.value.copy(pendingThisRun=(totalThisRun-visitedThisRun).coerceAtLeast(0)))
             if (item.failureCode in NON_RETRYABLE_CODES) continue
-            if(!UploadNetworkRules.canUpload(networkPolicy,isUnmetered,item.sizeBytes)){OrangePhotosUploadProgress.update(OrangePhotosUploadProgress.state.value.copy(deferredByNetwork=OrangePhotosUploadProgress.state.value.deferredByNetwork+1));continue}
+            if(!UploadNetworkRules.canUpload(networkPolicy,isWifi,isUnmetered,item.sizeBytes)){OrangePhotosUploadProgress.update(OrangePhotosUploadProgress.state.value.copy(deferredByNetwork=OrangePhotosUploadProgress.state.value.deferredByNetwork+1));continue}
             OrangePhotosUploadProgress.update(OrangePhotosUploadProgress.state.value.copy(running=true,itemId=item.id,displayName=item.displayName,bytesSent=0,totalBytes=item.sizeBytes))
             Log.d(TAG, "Processing item=${item.id} name=${item.displayName}")
             val attemptedAt = System.currentTimeMillis()

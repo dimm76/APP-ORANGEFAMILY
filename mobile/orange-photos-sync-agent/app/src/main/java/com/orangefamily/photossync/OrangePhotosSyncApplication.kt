@@ -23,7 +23,7 @@ class OrangePhotosSyncApplication : Application() {
     private var observedAccountUserId: String? = null
     private var registered = false
     private var networkCallbackRegistered = false
-    private val unmeteredNetworks = mutableSetOf<Network>()
+    private val transferNetworks = mutableSetOf<Network>()
     private val scheduleChange = Runnable {
         observedAccountUserId?.let(scheduler::scheduleMediaChangeSync)
     }
@@ -35,17 +35,19 @@ class OrangePhotosSyncApplication : Application() {
     }
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+            val isWifi = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
             val isUnmetered = capabilities.hasCapability(
                 NetworkCapabilities.NET_CAPABILITY_NOT_METERED,
             )
-            val becameAvailable = synchronized(unmeteredNetworks) {
-                val hadUnmeteredNetwork = unmeteredNetworks.isNotEmpty()
-                if (isUnmetered) {
-                    unmeteredNetworks.add(network)
+            val isTransferNetwork = com.orangefamily.photossync.sync.UploadNetworkRules.isTransferNetwork(isWifi, isUnmetered)
+            val becameAvailable = synchronized(transferNetworks) {
+                val hadTransferNetwork = transferNetworks.isNotEmpty()
+                if (isTransferNetwork) {
+                    transferNetworks.add(network)
                 } else {
-                    unmeteredNetworks.remove(network)
+                    transferNetworks.remove(network)
                 }
-                !hadUnmeteredNetwork && unmeteredNetworks.isNotEmpty()
+                !hadTransferNetwork && transferNetworks.isNotEmpty()
             }
             if (!becameAvailable) return
             val accountUserId = observedAccountUserId ?: return
@@ -56,8 +58,8 @@ class OrangePhotosSyncApplication : Application() {
         }
 
         override fun onLost(network: Network) {
-            synchronized(unmeteredNetworks) {
-                unmeteredNetworks.remove(network)
+            synchronized(transferNetworks) {
+                transferNetworks.remove(network)
             }
         }
     }

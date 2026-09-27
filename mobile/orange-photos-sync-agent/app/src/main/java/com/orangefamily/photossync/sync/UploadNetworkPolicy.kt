@@ -9,7 +9,8 @@ class UploadNetworkPolicyStore(context:Context){private val preferences=context.
 object UploadNetworkRules{
     const val MOBILE_SIZE_LIMIT_BYTES=800L*1024L*1024L
     const val NON_RESUMABLE_RETRY_LIMIT_BYTES=MOBILE_SIZE_LIMIT_BYTES
-    fun canUpload(policy:UploadNetworkPolicy,isUnmetered:Boolean,sizeBytes:Long)=when(policy){UploadNetworkPolicy.MANUAL_ONLY->true;UploadNetworkPolicy.WIFI_ONLY->isUnmetered;UploadNetworkPolicy.MOBILE_UP_TO_800_MB->isUnmetered||sizeBytes<=MOBILE_SIZE_LIMIT_BYTES;UploadNetworkPolicy.ANY_NETWORK->true}
+    fun isTransferNetwork(isWifi:Boolean,isUnmetered:Boolean)=isWifi||isUnmetered
+    fun canUpload(policy:UploadNetworkPolicy,isWifi:Boolean,isUnmetered:Boolean,sizeBytes:Long)=when(policy){UploadNetworkPolicy.MANUAL_ONLY->true;UploadNetworkPolicy.WIFI_ONLY->isTransferNetwork(isWifi,isUnmetered);UploadNetworkPolicy.MOBILE_UP_TO_800_MB->isTransferNetwork(isWifi,isUnmetered)||sizeBytes<=MOBILE_SIZE_LIMIT_BYTES;UploadNetworkPolicy.ANY_NETWORK->true}
     fun interruptedFailureCode(uploadMode:String?,sizeBytes:Long,bytesSent:Long)=if(uploadMode=="direct_backend"&&sizeBytes>NON_RESUMABLE_RETRY_LIMIT_BYTES&&bytesSent>0)"LARGE_UPLOAD_INTERRUPTED" else "NETWORK_ERROR"
     fun reconciledRemoteId(decision:String,photoId:String?)=photoId?.takeIf{decision=="already_owned"&&it.isNotBlank()}
 }

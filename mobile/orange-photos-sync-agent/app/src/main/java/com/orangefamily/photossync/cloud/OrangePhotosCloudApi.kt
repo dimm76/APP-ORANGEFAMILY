@@ -300,6 +300,34 @@ class OrangePhotosCloudApi(apiBaseUrl: String, private val sessionToken: String)
     }
     private suspend fun <T> request(url:String,fallback:String,parse:(JSONObject)->T):T=request(url,fallback,"GET",null,parse)
 
+    suspend fun downloadOriginalTo(photoId: String, output: OutputStream, onProgress: (Long, Long?) -> Unit) = withContext(Dispatchers.IO) {
+        val connection = URL("${baseUrl}api/orange-photos/${encode(photoId)}/download").openConnection() as HttpURLConnection
+        try {
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 15_000
+            connection.readTimeout = 30_000
+            connection.setRequestProperty("Accept", "application/octet-stream")
+            connection.setRequestProperty("Cookie", "of_session=$sessionToken")
+            val status = connection.responseCode
+            if (status !in 200..299) throw CloudApiException(status, "No se pudo descargar el original.")
+            val total = connection.contentLengthLong.takeIf { it >= 0L }
+            var downloaded = 0L
+            onProgress(downloaded, total)
+            connection.inputStream.use { input ->
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    output.write(buffer, 0, read)
+                    downloaded += read
+                    onProgress(downloaded, total)
+                }
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
     suspend fun downloadOriginalTo(photoId:String,output:OutputStream)=withContext(Dispatchers.IO){val connection=URL("${baseUrl}api/orange-photos/${encode(photoId)}/download").openConnection() as HttpURLConnection;try{connection.requestMethod="GET";connection.connectTimeout=15_000;connection.readTimeout=30_000;connection.setRequestProperty("Accept","application/octet-stream");connection.setRequestProperty("Cookie","of_session=$sessionToken");val status=connection.responseCode;if(status !in 200..299){val body=connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use{it.readText()}.orEmpty();val message=runCatching{JSONObject(body).optString("message").takeIf{it.isNotBlank()}}.getOrNull()?:"No se pudo descargar el original.";throw CloudApiException(status,message)};connection.inputStream.use{input->input.copyTo(output,8192)}}finally{connection.disconnect()}}
     private fun JSONObject.optionalString(name: String): String? = if (isNull(name)) null else optString(name).trim().takeIf { it.isNotBlank() }

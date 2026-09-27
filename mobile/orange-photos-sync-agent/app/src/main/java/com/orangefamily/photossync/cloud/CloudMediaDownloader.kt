@@ -15,7 +15,7 @@ import java.time.Instant
 class CloudMediaDownloader(context: Context, private val repository: CameraBackupRepository, private val api: OrangePhotosCloudApi, private val accountUserId: String) {
     private val resolver = context.applicationContext.contentResolver
 
-    suspend fun download(photo: CloudPhoto): LocalMediaItem = withContext(Dispatchers.IO) {
+    suspend fun download(photo: CloudPhoto, onProgress: (Long, Long?) -> Unit = { _, _ -> }): LocalMediaItem = withContext(Dispatchers.IO) {
         check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { "Descargar a la biblioteca del dispositivo requiere Android 10 o superior." }
         val video = photo.mediaType == LocalMediaItem.TYPE_VIDEO
         val collection = if (video) MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) else MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
@@ -26,7 +26,7 @@ class CloudMediaDownloader(context: Context, private val repository: CameraBacku
         val values = ContentValues().apply { put(MediaStore.MediaColumns.DISPLAY_NAME, displayName); put(MediaStore.MediaColumns.MIME_TYPE, mimeType); put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath); put(MediaStore.MediaColumns.IS_PENDING, 1); photo.capturedAt?.let { runCatching { put(MediaStore.MediaColumns.DATE_TAKEN, Instant.parse(it).toEpochMilli()) } } }
         val uri = resolver.insert(collection, values) ?: error("No se pudo crear el elemento en la biblioteca del dispositivo.")
         try {
-            resolver.openOutputStream(uri, "w")?.use { api.downloadOriginalTo(photo.id, it) } ?: error("No se pudo abrir el destino de descarga.")
+            resolver.openOutputStream(uri, "w")?.use { api.downloadOriginalTo(photo.id, it, onProgress) } ?: error("No se pudo abrir el destino de descarga.")
             val updated = resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
             if (updated <= 0) error("No se pudo publicar el elemento descargado.")
             var size = 0L; var dateAdded = now / 1000; var dateModified = now / 1000
