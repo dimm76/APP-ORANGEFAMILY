@@ -3,6 +3,7 @@ package com.orangefamily.photossync.cloud
 import com.orangefamily.photossync.data.LocalMediaItem
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -10,8 +11,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 enum class CloudDownloadStatus {
     IDLE,
@@ -36,7 +35,7 @@ data class CloudDownloadState(
 
 object OrangePhotosDownloadManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val mutex = Mutex()
+    private val stateLock = Any()
     private val mutableState = MutableStateFlow(CloudDownloadState())
     private var activeJob: Job? = null
     private var generation = 0L
@@ -48,74 +47,105 @@ object OrangePhotosDownloadManager {
         photos: List<CloudPhoto>,
         downloader: CloudMediaDownloader,
     ) {
-        if (photos.isEmpty() || mutableState.value.status == CloudDownloadStatus.RUNNING) return
-        val runGeneration = ++generation
-        mutableState.value = CloudDownloadState(
-            accountUserId = accountUserId,
-            status = CloudDownloadStatus.RUNNING,
-            totalItems = photos.size,
-        )
-        activeJob = scope.launch {
+        if (photos.isEmpty()) return
+        val job: Job
+        val runGeneration: Long
+        synchronized(stateLock) {
+            if (mutableState.value.status == CloudDownloadStatus.RUNNING) return
+            runGeneration = ++generation
+            mutableState.value = CloudDownloadState(
+                accountUserId = accountUserId,
+                status = CloudDownloadStatus.RUNNING,
+                totalItems = photos.size,
+            )
+            job = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 val completed = mutableListOf<LocalMediaItem>()
                 photos.forEachIndexed { index, photo ->
-                    ensureCurrent(runGeneration)
-                    mutableState.value = mutableState.value.copy(
+                    updateCurrent(runGeneration) {
+                        it.copy(
                         currentIndex = index + 1,
                         displayName = photo.originalFilename ?: photo.id,
                         bytesDownloaded = 0L,
                         totalBytes = null,
-                    )
+                        )
+                    }
                     val item = downloader.download(photo) { downloaded, total ->
-                        ensureCurrent(runGeneration)
-                        mutableState.value = mutableState.value.copy(
+                        updateCurrent(runGeneration) {
+                            it.copy(
                             currentIndex = index + 1,
                             displayName = photo.originalFilename ?: photo.id,
                             bytesDownloaded = downloaded,
                             totalBytes = total,
                             completedItems = completed.size,
-                        )
+                            )
+                        }
                     }
                     completed += item
-                    mutableState.value = mutableState.value.copy(
+                    updateCurrent(runGeneration) {
+                        it.copy(
                         completedItems = completed.size,
                         completedMedia = completed.toList(),
-                    )
+                        )
+                    }
                 }
-                if (generation == runGeneration) {
-                    mutableState.value = mutableState.value.copy(status = CloudDownloadStatus.COMPLETED)
+                synchronized(stateLock) {
+                    if (generation == runGeneration) {
+                        mutableState.value = mutableState.value.copy(status = CloudDownloadStatus.COMPLETED)
+                        activeJob = null
+                    }
                 }
             } catch (_: CancellationException) {
-                if (generation == runGeneration) {
-                    mutableState.value = mutableState.value.copy(status = CloudDownloadStatus.CANCELLED)
+                synchronized(stateLock) {
+                    if (generation == runGeneration) {
+                        mutableState.value = mutableState.value.copy(status = CloudDownloadStatus.CANCELLED)
+                        activeJob = null
+                    }
                 }
             } catch (error: Throwable) {
-                if (generation == runGeneration) {
-                    mutableState.value = mutableState.value.copy(
-                        status = CloudDownloadStatus.FAILED,
-                        error = error.message ?: "No se pudo descargar el contenido.",
-                    )
+                synchronized(stateLock) {
+                    if (generation == runGeneration) {
+                        mutableState.value = mutableState.value.copy(
+                            status = CloudDownloadStatus.FAILED,
+                            error = error.message ?: "No se pudo descargar el contenido.",
+                        )
+                        activeJob = null
+                    }
                 }
             }
+            }
+            activeJob = job
         }
+        job.start()
     }
 
     fun cancel() {
-        if (mutableState.value.status == CloudDownloadStatus.RUNNING) {
-            activeJob?.cancel()
+        val job = synchronized(stateLock) {
+            if (mutableState.value.status == CloudDownloadStatus.RUNNING) activeJob else null
         }
+        job?.cancel()
     }
 
     fun reset() {
-        generation += 1
-        activeJob?.cancel()
-        activeJob = null
-        mutableState.value = CloudDownloadState()
+        val job = synchronized(stateLock) {
+            generation += 1
+            val currentJob = activeJob
+            activeJob = null
+            mutableState.value = CloudDownloadState()
+            currentJob
+        }
+        job?.cancel()
     }
 
-    private suspend fun ensureCurrent(runGeneration: Long) {
-        mutex.withLock {
-            if (generation != runGeneration) throw CancellationException("Descarga cancelada.")
+    private fun updateCurrent(
+        runGeneration: Long,
+        transform: (CloudDownloadState) -> CloudDownloadState,
+    ) {
+        synchronized(stateLock) {
+            if (generation != runGeneration) {
+                throw CancellationException("Descarga cancelada.")
+            }
+            mutableState.value = transform(mutableState.value)
         }
     }
 }
