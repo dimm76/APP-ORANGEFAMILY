@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { compareResults, stableFailures } from './baseline-delta.mjs';
-import { classifyChangedFiles, inAllowedPaths, securityRisk, selectChecks, semanticBoundaryEvidence } from './harness-lib.mjs';
+import { classifyChangedFiles, documentationCandidates, inAllowedPaths, securityRisk, selectChecks, semanticBoundaryEvidence } from './harness-lib.mjs';
 
 test('allowed paths and outside scope', () => { assert.equal(inAllowedPaths('scripts/ai/verify.mjs', ['scripts/ai/**']), true); assert.equal(inAllowedPaths('src/App.jsx', ['scripts/ai/**']), false); });
 test('security secrets and dangerous Android files', () => { assert.equal(securityRisk(['AndroidManifest.xml']).significant, true); assert.equal(securityRisk(['auth-service.js']).level, 'review'); });
@@ -22,6 +23,8 @@ test('API/backend and Android remain separate checks', () => { const checks = cl
 test('public/auth changes select security', () => { assert.ok(classifyChangedFiles(['backend/src/auth.js']).includes('security')); assert.ok(classifyChangedFiles(['backend/src/publicRoutes.js']).includes('security')); });
 test('UI style guide selects UI and documentation', () => { const checks = classifyChangedFiles(['docs/10-architecture/UI-STYLE-GUIDE.md']); assert.ok(checks.includes('ui')); assert.ok(checks.includes('documentation')); });
 test('sensitive filenames are classified without reading content', () => { assert.ok(securityRisk(['.env.production']).significant); assert.ok(securityRisk(['id_ed25519']).significant); });
+test('documentation candidates follow semantic surfaces', () => { assert.ok(documentationCandidates(['backend/src/routes.js']).includes('docs/10-architecture/API.md')); assert.ok(documentationCandidates(['mobile/orange-photos-sync-agent/app/build.gradle.kts']).includes('docs/40-features/orange-photos/ANDROID_SYNC_AGENT.md')); });
+test('Android release publication requires explicit authorization', () => { const result = spawnSync(process.execPath, ['scripts/ai/android-release-check.mjs', 'publish_android_release'], { encoding: 'utf8' }); assert.notEqual(result.status, 0); assert.match(`${result.stdout}\n${result.stderr}`, /unauthorized operation/); });
 test('task schema declares completion evidence fields', () => { const schema = JSON.parse(fs.readFileSync('.codex/task-contract.schema.json', 'utf8')); assert.deepEqual(schema.properties.state.enum, ['AUTO_CONTINUE', 'BLOCKED', 'HARD_STOP', 'COMPLETE']); assert.ok(schema.properties.blockers); assert.ok(schema.properties.recovery_attempts); assert.ok(schema.properties.check_results); });
 test('baseline identical failures are accepted', () => { assert.equal(compareResults({ status: 'fail', failed: ['A', 'B'] }, { status: 'fail', failed: ['B', 'A'] }).status, 'PASS_WITH_BASELINE'); });
 test('baseline new failure is rejected', () => { const result = compareResults({ status: 'fail', failed: ['A'] }, { status: 'fail', failed: ['A', 'B'] }); assert.equal(result.status, 'FAIL_NEW'); assert.deepEqual(result.added, ['B']); });

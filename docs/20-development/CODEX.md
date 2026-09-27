@@ -87,3 +87,9 @@ Codex deberá informar:
 - commit, push correcto o fallido y estado Git final cuando se hayan ejecutado;
 - migración ejecutada o no ejecutada;
 - entorno donde se ejecutó y si producción fue tocada.
+
+Cuando una tarea tenga impacto documental, el contrato debe declarar sus áreas,
+documentos canónicos, razón y resolución. El gate rechaza documentación faltante
+o una resolución sin evidencia. Para releases Android, `android-release-check`
+valida preflight y las operaciones de build, ADB, publicación y registro se
+autorizan por separado.

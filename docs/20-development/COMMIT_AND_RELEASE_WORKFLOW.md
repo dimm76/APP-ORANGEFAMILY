@@ -54,6 +54,12 @@ un proceso explícito distinto.
 
 Release
 
+El flujo genérico de commit/release de este documento no sustituye el proceso
+específico de Android. Para una APK, `docs/40-features/orange-photos/ANDROID_RELEASE_WORKFLOW.md`
+es la fuente canónica: usa `build.gradle.kts`, `versionCode`, `versionName`,
+la APK firmada y `application_releases`. No se modifica `package.json`, no se
+crea tag ni se actualiza `CHANGELOG.md` por una APK salvo decisión independiente.
+
 Solo se preparará una release cuando se solicite expresamente.
 
 Antes de preparar una release deben revisarse los cambios desde la última versión:

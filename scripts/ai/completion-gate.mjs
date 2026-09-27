@@ -11,5 +11,11 @@ if (contract.visual_validation?.required === true && !(contract.visual_validatio
 if ((contract.blockers ?? []).some(blocker => blocker.resolved !== true)) fail('unresolved blockers');
 const accepted = new Set(['PASS', 'PASS_WITH_BASELINE', 'PASS_IMPROVED']);
 for (const check of contract.required_checks ?? []) { const result = (contract.check_results ?? []).find(item => item.check === check); if (!result || !accepted.has(result.status) || !result.evidence) fail(`required check lacks acceptable evidence: ${check}`); }
+if (contract.documentation_impact?.required === true) {
+  const impact = contract.documentation_impact;
+  if (!impact.resolution) fail('documentation impact requires UPDATED or NO_CHANGE_REQUIRED');
+  if (!impact.evidence) fail('documentation impact requires evidence');
+  if (impact.resolution === 'UPDATED' && !(impact.canonical_docs?.length > 0)) fail('UPDATED requires canonical_docs');
+}
 if (process.exitCode) process.exit(process.exitCode);
 console.log(`PASS: ${contract.state}`);

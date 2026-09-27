@@ -225,3 +225,9 @@ afecten a Android deben revisar ambos consumidores.
 
 El usuario no es el operador de terminal por defecto. Codex o Cursor ejecutan
 PowerShell, shell y Git autorizado cuando disponen de acceso.
+
+La documentación se mantiene viva mediante `documentation_impact`, candidatos
+canónicos y resolución explícita `UPDATED` o `NO_CHANGE_REQUIRED` con evidencia.
+La matriz mantenible está en `HARNESS_COVERAGE.md`. Las releases Android siguen
+exclusivamente `ANDROID_RELEASE_WORKFLOW.md` y la skill `android-release`; el
+flujo genérico de commits no autoriza ADB, publicación ni registro productivo.

@@ -32,6 +32,19 @@ export function classifyChangedFiles(files) {
   return [...checks];
 }
 
+export function documentationCandidates(files) {
+  const candidates = new Set();
+  for (const file of files.map(normalize)) {
+    if (file.startsWith('backend/')) candidates.add('docs/10-architecture/API.md');
+    if (file.startsWith('docs/30-database/migration/') || file.startsWith('database/')) candidates.add('docs/10-architecture/DATABASE.md');
+    if (/auth|permission|ownership|membership|module_access|session|cookie|cors|secret|upload|download|public|share|token|Wasabi/i.test(file)) candidates.add('docs/20-development/SECURITY_AND_DATA_PROTECTION.md');
+    if (file.startsWith('mobile/orange-photos-sync-agent/')) candidates.add('docs/40-features/orange-photos/ANDROID_SYNC_AGENT.md');
+    if (file.startsWith('src/') && /\.(css|jsx|tsx)$/.test(file)) candidates.add('docs/10-architecture/UI-STYLE-GUIDE.md');
+    if (/deploy|workflow|systemd|production|release/i.test(file)) candidates.add('docs/50-operations/PRODUCTION_DEPLOYMENT.md');
+  }
+  return [...candidates];
+}
+
 export function selectChecks(files, contract = {}) {
   const checks = new Set(classifyChangedFiles(files));
   for (const check of contract.required_checks ?? []) checks.add(check);
