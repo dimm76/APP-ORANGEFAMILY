@@ -96,6 +96,19 @@ export function validateHeadingSequence(markdown = '') {
   return { valid: errors.length === 0, numbers, errors };
 }
 
+export function resolveHarnessBaseRef({ override = '', eventName = '', payload = {} } = {}) {
+  if (override.trim()) return override;
+  if (eventName === 'pull_request') {
+    const sha = payload.pull_request?.base?.sha;
+    if (typeof sha === 'string' && /^[0-9a-f]{40}$/i.test(sha)) return sha;
+  }
+  if (eventName === 'push') {
+    const before = payload.before;
+    if (typeof before === 'string' && /^[0-9a-f]{40}$/i.test(before) && !/^0{40}$/.test(before)) return before;
+  }
+  return 'origin/main';
+}
+
 export function taskFiles({ base = 'origin/main', includeWorkingTree = true } = {}) {
   const names = new Set();
   const add = output => output.split(/\r?\n/).map(normalize).filter(Boolean).forEach(file => names.add(file));

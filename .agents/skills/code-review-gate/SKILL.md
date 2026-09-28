@@ -3,9 +3,16 @@
 Review the diff independently for scope, architecture, duplication, regressions, API compatibility, ownership, privacy, and semantic-boundary evidence. Check React -> Node, Android -> Node, Node -> PostgreSQL/Wasabi where applicable.
 
 Classify findings as `IN_SCOPE_FIX`, `SCOPE_EXPANSION`, `HUMAN_DECISION`, or
-`HARD_STOP`. For `IN_SCOPE_FIX`, correct within `allowed_paths`, verify, and
-review again, for at most two cycles per finding. Stop only for real scope or
-architecture expansion, a missing human decision, or a hard stop.
+`HARD_STOP`.
+
+For `IN_SCOPE_FIX`, the read-only reviewer identifies and documents the finding
+→ the executor corrects within `allowed_paths`
+→ the verifier runs checks
+→ the reviewer reviews again.
+
+Allow at most two cycles for the same finding. The reviewer never modifies
+source; it returns `IN_SCOPE_FIX` findings to the executor. Stop only for real
+scope or architecture expansion, a missing human decision, or a hard stop.
 
 When persisted discriminators change (`status`, `source`, `type`, `kind`, enum,
 or equivalent), inspect writers, readers, database constraints/enums,

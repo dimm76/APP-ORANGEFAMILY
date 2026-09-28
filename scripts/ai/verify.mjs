@@ -2,10 +2,15 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { selectChecks, taskFiles } from './harness-lib.mjs';
+import { resolveHarnessBaseRef, selectChecks, taskFiles } from './harness-lib.mjs';
 import { compareResults, runCheck } from './baseline-delta.mjs';
 const args = process.argv.slice(2);
-const base = process.env.HARNESS_BASE_REF ?? 'origin/main';
+const eventPath = process.env.GITHUB_EVENT_PATH;
+let payload = {};
+if (eventPath && fs.existsSync(eventPath) && fs.statSync(eventPath).isFile()) {
+  try { payload = JSON.parse(fs.readFileSync(eventPath, 'utf8')); } catch { payload = {}; }
+}
+const base = resolveHarnessBaseRef({ override: process.env.HARNESS_BASE_REF ?? '', eventName: process.env.GITHUB_EVENT_NAME ?? '', payload });
 const files = taskFiles({ base });
 const contractFile = process.env.HARNESS_TASK_CONTRACT;
 const contract = contractFile && fs.existsSync(contractFile) ? JSON.parse(fs.readFileSync(contractFile, 'utf8')) : {};

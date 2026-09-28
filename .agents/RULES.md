@@ -5,7 +5,7 @@
 - Reuse existing components, helpers, hooks, services, endpoints, middleware, and utilities before creating new ones.
 - React and Android are untrusted clients. Node validates input, authentication, authorization, family membership, module access, ownership, resource access, and response fields.
 - Full technical access is not authority. Authority is `Task Contract -> allowed_paths -> authorized_operations -> gates`.
-- The agent runs Git, tests, lint, builds, local HTTP checks, and diff inspection itself. Human intervention is reserved for decisions, secrets, MFA/OAuth/captcha, non-automatable visual checks, hardware, production, and destructive actions.
+- The agent runs Git, tests, lint, builds, local HTTP checks, and diff inspection itself. Human intervention is reserved for decisions, secrets, MFA/OAuth/captcha, non-automatable visual checks, hardware interaction, production authorization when it has not already been granted, and destructive actions requiring explicit confirmation.
 - Changes under `mobile/orange-photos-sync-agent/**` activate Android rules. API contract changes review both React and Android consumers.
 
 Un milestone técnico exitoso no constituye un handoff. Si la siguiente acción
