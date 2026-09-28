@@ -457,7 +457,7 @@ versión final correcta.
 
 # PUBLICACIÓN EN EL VPS
 
-## 18. Infraestructura real
+## 19. Infraestructura real
 
 - Servidor: `ubuntu@141.95.179.205`
 - Alias operativo conocido: `orangekode-prod-01m`
@@ -469,7 +469,7 @@ versión final correcta.
 
 La publicación del APK es independiente del workflow normal de deploy de frontend/backend.
 
-## 19. Preparar variables de publicación
+## 20. Preparar variables de publicación
 
 ```powershell
 cd C:\Users\dimm7\local-sites\APP-ORANGEFAMILY\mobile\orange-photos-sync-agent
@@ -487,7 +487,7 @@ $localHash=(Get-FileHash $apk -Algorithm SHA256).Hash
 $localHash
 ```
 
-## 20. Subir primero a /tmp
+## 21. Subir primero a /tmp
 
 ```powershell
 scp -i $key $apk "$server`:$remoteTmp"
@@ -498,7 +498,7 @@ El hash temporal debe coincidir con `$localHash`.
 
 No publicar si no coincide.
 
-## 21. Instalar en el directorio público
+## 22. Instalar en el directorio público
 
 La convención de las publicaciones actuales es fichero legible por Nginx con permisos `0644`.
 
@@ -522,7 +522,7 @@ ssh -i $key $server "stat -c '%U:%G %a %s %n' '$remoteFinal' && sha256sum '$remo
 
 Si la instalación existente del servidor no usa `root:root 0644`, detenerse y preservar la convención existente en lugar de modificarla silenciosamente.
 
-## 22. Verificar el mismo binario por HTTPS
+## 23. Verificar el mismo binario por HTTPS
 
 ```powershell
 $httpsCopy=Join-Path $env:TEMP $file
@@ -548,7 +548,7 @@ Después puede eliminarse la copia temporal local y el fichero de `/tmp`.
 
 # REGISTRO DE LA RELEASE
 
-## 23. application_releases
+## 24. application_releases
 
 El registro normal no se hace mediante SQL manual.
 
@@ -590,7 +590,7 @@ release_notes: <cambios validados>
 
 No registrar hasta que la URL HTTPS y los cuatro hashes estén verificados.
 
-## 24. Verificación después del registro
+## 25. Verificación después del registro
 
 En Ajustes → Descargas comprobar:
 
@@ -604,7 +604,7 @@ Abrir/descargar el enlace y confirmar que sigue correspondiendo al mismo APK.
 
 Los clientes Android comparan el `versionCode` instalado con la release publicada. Solo después de registrar un código superior debe aparecer la actualización a usuarios con una versión anterior.
 
-## 25. Qué debe devolver el agente al cerrar
+## 26. Qué debe devolver el agente al cerrar
 
 ### APK de prueba
 
@@ -641,7 +641,7 @@ URL: https://family.orangedesk.net/downloads/android/<file>
 application_releases: registrada / pendiente
 ```
 
-## 26. Condiciones de parada
+## 27. Condiciones de parada
 
 Detenerse si:
 
@@ -662,7 +662,7 @@ Detenerse si:
 
 Nunca arreglar una condición de parada con force push, downgrade, uninstall, regeneración de keystore, recompilación silenciosa o edición manual de PostgreSQL.
 
-## 27. Incidente de proceso del 27/09/2026
+## 28. Incidente de proceso del 27/09/2026
 
 Durante la preparación de la 1.8.2 se adelantó el bump de `versionCode/versionName` antes de completar la primera prueba física.
 
