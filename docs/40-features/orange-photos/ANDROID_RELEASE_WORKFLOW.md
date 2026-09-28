@@ -46,10 +46,21 @@ rama funcional
 → commit de versión
 → fast-forward a main
 → APK definitiva desde main limpio
+→ elegir Ruta A o Ruta B
+
+Ruta A:
 → adb install -r + smoke final
 → publicar EXACTAMENTE ese binario
 → cuatro hashes iguales
 → registrar application_releases
+
+Ruta B:
+→ NO adb install sobre la APK final
+→ publicar EXACTAMENTE ese binario
+→ cuatro hashes iguales
+→ registrar application_releases
+→ actualizar desde la versión anterior
+→ validar persistencia, versión y que no vuelva a ofrecerse
 ```
 
 Está prohibido hacer el bump de versión para poder realizar la primera prueba física.
@@ -324,7 +335,11 @@ Ejecutar nuevamente:
 
 Repetir las verificaciones de package, `versionCode`, `versionName`, firma y SHA-256.
 
-## 17. Instalar la APK definitiva antes de publicar
+## 17. Ruta A — instalar la APK definitiva antes de publicar
+
+Esta sección corresponde a la smoke final estándar. En la Ruta B no se instala
+la APK definitiva mediante ADB antes de publicarla; se sigue la sección de
+validación end-to-end del actualizador.
 
 ```powershell
 & $adb shell dumpsys package com.orangefamily.photossync |
@@ -339,6 +354,106 @@ Repetir las verificaciones de package, `versionCode`, `versionName`, firma y SHA
 Realizar un smoke final de inicio, sesión, conectividad y funcionalidad modificada.
 
 Una vez validada, **no volver a compilar**. El fichero probado es el que se publica.
+
+## 18. Validación end-to-end del actualizador
+
+La Ruta B valida conjuntamente la consulta de `application_releases`, la
+comparación de `versionCode`, la modal, `download_url`, el servidor HTTPS, el
+mismo `applicationId` y firma, el instalador Android, la persistencia de datos,
+el arranque posterior y el estado final de versión.
+
+Precondición: la funcionalidad ya fue validada físicamente en Fase A con una
+APK release firmada usando la versión publicada existente. El dispositivo debe
+permanecer en esa versión anterior.
+
+El flujo es:
+
+```text
+versión anterior instalada
+→ nueva release registrada
+→ abrir app
+→ detectar versionCode superior
+→ mostrar modal
+→ Descargar actualización
+→ descargar por HTTPS
+→ Android actualiza la aplicación existente
+→ abrir la app actualizada
+→ validar persistencia y versión
+```
+
+Si la modal no aparece, entrar en Ajustes para forzar la consulta actual de la
+release. Si tampoco aparece allí, detenerse y diagnosticar. No descargar
+manualmente el APK como sustitución de esta comprobación.
+
+En esta ruta no debe ejecutarse `adb install -r` sobre la APK final antes de
+publicarla. Tras la instalación realizada por Android, ADB solo puede usarse
+para lectura, por ejemplo:
+
+```powershell
+$adb="$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
+& $adb shell dumpsys package com.orangefamily.photossync |
+  Select-String "versionCode|versionName"
+```
+
+Antes de iniciar la actualización tomar referencias de sesión autenticada,
+política de red, estado del agente y estado Room reconocible. Deben cumplirse
+todos estos checks después:
+
+```text
+[ ] no solicita login y mantiene la sesión
+[ ] biblioteca local accesible
+[ ] política de red conservada
+[ ] agente de copia conservado
+[ ] configuración/estado Room no reiniciado
+[ ] aplicación operativa
+[ ] versión y versionCode coinciden con la release registrada
+[ ] la app indica que está actualizada
+[ ] la misma release ya no vuelve a ofrecerse
+```
+
+La persistencia relevante es `SecureSessionStore` (SharedPreferences cifradas
+con AndroidKeyStore), `UploadNetworkPolicyStore` (SharedPreferences) y
+`OrangePhotosLocalDatabase` (Room: configuración, baselines, inventario local,
+estados de sincronización, sesiones multipart y demás estado persistente). Una
+actualización normal del mismo `applicationId` y firma no debe borrar estos
+datos. Siguen prohibidos `uninstall`, `pm clear`, borrar datos, `-d`, regenerar
+el keystore o cambiar el `applicationId`.
+
+En Ajustes, la versión instalada debe mostrarse como `<versionName> ·
+<versionCode>` y la app debe indicar que está actualizada. La comprobación ADB
+anterior es opcional y debe coincidir con `application_releases`.
+
+La Ruta B registra la nueva release antes de terminar la prueba, por lo que
+otros clientes con un `versionCode` inferior pueden recibirla desde ese
+momento. Solo se permite tras validar Fase A y con autorización explícita para
+publicar. Si falla después del registro, no se deben reemplazar silenciosamente
+los bytes publicados, recompilar con el mismo `versionCode` ni hacer downgrade
+de `application_releases`; hay que corregir, validar y publicar con un código
+superior, preservando la trazabilidad.
+
+### Gate de cierre de Ruta B
+
+```text
+[ ] APK construida desde SHA main aprobado
+[ ] package y firma correctos
+[ ] versionCode superior
+[ ] cuatro hashes idénticos
+[ ] release registrada
+[ ] versión anterior detectó automáticamente la release
+[ ] modal mostrada y descarga HTTPS iniciada desde la app
+[ ] Android actualizó la aplicación existente
+[ ] sesión, preferencias y configuración Room conservadas
+[ ] versión instalada coincide con la release registrada
+[ ] app indica que está actualizada
+[ ] la misma release ya no vuelve a ofrecerse
+```
+
+La release no está cerrada mientras falte cualquiera de estos checks.
+
+Validación 28/09/2026: la actualización 1.8.2/14 → 1.8.3/15 fue validada
+mediante el flujo end-to-end. Se confirmó detección, descarga, instalación
+sobre el mismo paquete, conservación de sesión/preferencias/estado local y
+versión final correcta.
 
 # PUBLICACIÓN EN EL VPS
 
@@ -448,6 +563,12 @@ La interfaz llama:
 `PUT /api/settings/app-releases/android/latest`
 
 Node valida y actualiza `public.application_releases` y registra la acción en audit logs.
+
+La API Node sigue siendo el mecanismo normal de registro porque valida
+ownership e input, actualiza `application_releases` y crea el audit log. Una
+modificación SQL directa es excepcional, requiere autorización explícita y debe
+reproducir la transacción, el actor `updated_by` y el audit log; no es el
+procedimiento normal del harness.
 
 Campos:
 

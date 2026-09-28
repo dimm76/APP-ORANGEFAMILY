@@ -32,9 +32,68 @@ After explicit physical approval, determine the next version from the current pu
 
 Change only the Android version fields, commit the version change, review it, fast-forward the approved branch to `main`, and push `main`.
 
-Build the final APK from a clean checkout/worktree of the exact `main` SHA. Run tests, `clean assembleRelease`, verify package/version/signature/hash, install the final APK with `adb install -r`, and perform a final smoke check.
+Build the final APK from a clean checkout/worktree of the exact `main` SHA. Run tests and `clean assembleRelease`, then verify package/version/signature/hash. Choose Route A for the standard final smoke or Route B when the explicit objective is end-to-end updater validation.
 
 After the final APK passes, do not rebuild it. The exact tested bytes are the publication artifact.
+
+#### Route A — standard final smoke
+
+The normal Phase B route is:
+
+```text
+build definitivo desde main limpio
+→ verificar package/version/firma/hash
+→ adb install -r
+→ smoke
+→ no recompilar
+→ publicar exactamente ese binario
+→ verificar hashes
+→ registrar la release
+```
+
+#### Route B — updater end-to-end validation
+
+Use this route only when the explicit goal is to validate the real update
+mechanism. Phase A must already have validated the functionality physically
+with a signed release APK using the currently published version.
+
+In this route, do **not** run `adb install -r` on the final APK before
+publication. Keep the device on the previous published version and:
+
+```text
+build definitivo desde main limpio
+→ verificar package/version/firma/SHA
+→ publicar exactamente ese APK
+→ verificar los cuatro hashes
+→ registrar la nueva release
+→ abrir la versión anterior
+→ comprobar versionCode superior y la modal
+→ Descargar actualización desde la app
+→ comprobar descarga HTTPS e instalación Android
+→ comprobar persistencia y versión final
+→ comprobar que la misma release ya no se ofrece
+```
+
+`adb install -r` no debe ejecutarse sobre el APK final antes de esta prueba,
+porque invalidaría la detección de actualización. Después de la instalación
+realizada por Android, ADB solo puede usarse para consultas de lectura, por
+ejemplo `dumpsys package`.
+
+La instalación correcta no basta para aprobar esta ruta. Antes de actualizar
+se deben registrar la sesión autenticada, la política de red, el estado del
+agente y algún estado Room reconocible. Después deben conservarse la sesión
+sin pedir login, la biblioteca local, la política de red, el estado del
+agente, la configuración/baselines/inventario/estados de sincronización Room,
+la operación normal, la versión registrada y el indicador de aplicación
+actualizada. Si falla cualquiera, falla la validación end-to-end.
+
+La persistencia relevante comprende `SecureSessionStore` (SharedPreferences
+cifradas + AndroidKeyStore), `UploadNetworkPolicyStore` (SharedPreferences) y
+`OrangePhotosLocalDatabase` (Room: configuración, baselines, inventario local,
+estados de sincronización, sesiones multipart y demás estado persistente). Una
+actualización del mismo `applicationId` y firma no debe borrar esos datos.
+Durante la validación siguen prohibidos `uninstall`, `pm clear`, borrar datos,
+`-d`, regenerar el keystore o cambiar el `applicationId`.
 
 ## Local environment
 
