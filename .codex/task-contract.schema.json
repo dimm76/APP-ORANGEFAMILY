@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["task_id", "objective", "base_ref", "allowed_paths", "acceptance_criteria", "out_of_scope", "required_checks", "hard_stop_conditions"],
+  "required": ["task_id", "objective", "base_ref", "allowed_paths", "acceptance_criteria", "out_of_scope", "required_checks", "hard_stop_conditions", "state"],
   "properties": {
     "task_id": {"type": "string", "minLength": 1},
     "state": {"enum": ["AUTO_CONTINUE", "BLOCKED", "HARD_STOP", "COMPLETE"]},
@@ -15,7 +15,7 @@
     "semantic_boundaries": {"type": "array", "items": {"type": "object", "required": ["boundary", "productive_entrypoint", "downstream", "evidence_required"], "properties": {"boundary": {"type": "string"}, "productive_entrypoint": {"type": "string"}, "downstream": {"type": "string"}, "evidence_required": {"type": "string"}, "required": {"type": "boolean"}, "satisfied": {"type": "boolean"}, "evidence": {"type": "array", "items": {"type": "object"}}}, "additionalProperties": false}},
     "out_of_scope": {"type": "array", "items": {"type": "string"}},
     "change_types": {"type": "array", "items": {"enum": ["frontend", "backend", "database", "android", "api-contract", "storage", "documentation", "security", "workflow"]}},
-    "required_checks": {"type": "array", "items": {"enum": ["diff", "frontend", "ui", "backend", "database", "android", "documentation", "security"]}},
+    "required_checks": {"type": "array", "items": {"enum": ["diff", "frontend", "ui", "backend", "database", "android", "documentation", "security", "harness"]}},
     "authorized_operations": {"type": "array", "items": {"type": "string"}},
     "visual_validation": {"type": "object", "required": ["required"], "properties": {"required": {"type": "boolean"}, "performed": {"type": "boolean"}, "evidence": {"type": "string"}}, "additionalProperties": false}, "hard_stop_conditions": {"type": "array", "items": {"type": "string"}},
     "interactive_human_steps": {"type": "array", "items": {"type": "string"}}, "required_docs": {"type": "array", "items": {"type": "string"}}, "notes": {"type": "string"},

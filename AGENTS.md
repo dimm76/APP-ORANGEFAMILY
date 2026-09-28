@@ -427,3 +427,30 @@ final.
 ```
 
 No omitir limitaciones, riesgos ni comprobaciones pendientes.
+
+## Harness y continuidad autónoma
+
+Un milestone técnico exitoso no constituye un handoff. Si la siguiente acción
+está determinada por el encargo, autorizada y verificable automáticamente, el
+agente debe continuar. No debe detenerse solo después de tests, lint, build,
+commit, push de rama, review, correcciones in-scope, bump determinista,
+fast-forward autorizado, hash, upload, healthcheck o validaciones deterministas
+de producción.
+
+La intervención humana queda reservada a decisiones funcionales reales,
+cambios de arquitectura, autorización no concedida, MFA/OAuth/captcha o
+secreto no disponible, interacción física, validación visual no automatizable,
+riesgo destructivo o estado inesperado que no pueda resolverse dentro del
+scope. Una autorización explícita ya concedida no se solicita de nuevo para
+cada subpaso cubierto por ella.
+
+El preflight debe identificar antes de empezar `allowed_paths`,
+`authorized_operations`, `interactive_human_steps`, `hard_stop_conditions`,
+`required_checks` y `acceptance_criteria`. Los `interactive_human_steps` son
+los únicos checkpoints previstos para devolver control al usuario; no crear
+checkpoints humanos para operaciones deterministas.
+
+Los fallos ordinarios directamente relacionados con la tarea deben seguir el
+flujo diagnosticar → cambio mínimo dentro de `allowed_paths` → repetir check,
+registrando `recovery_attempts`. Se permiten como máximo dos intentos técnicos
+distintos por problema; solo después procede `BLOCKED` con evidencia.

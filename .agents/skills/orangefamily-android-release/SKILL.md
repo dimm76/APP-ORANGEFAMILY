@@ -156,3 +156,21 @@ When the user must run a local command, never assume shell state. Start the bloc
 For physical validation, tell the user only the concrete app actions and expected results. Do not bump or publish while waiting for the user's result.
 
 If `adb install -r` reports a downgrade, signature mismatch, unauthorized/offline device, or unexpected package/version, stop. Never use a bypass flag or uninstall the app.
+
+When Git, build, ADB, and publication operations are authorized, continue
+through deterministic checks and builds without milestone handoffs. In Phase A,
+continue through package/version/signature/hash, `adb devices`, and
+`adb install -r`; then return control only for the interactive human step of
+physical functional validation. After that approval, continue through the
+authorized bump, commit, push, review, in-scope fixes, checks, fast-forward,
+clean worktree, build, and binary verification.
+
+In Route A, continue through final ADB smoke, publication, hash verification,
+and release registration when authorized. In Route B, continue through APK
+publication, four hashes, and release registration; then stop only for the
+interactive human end-to-end updater validation. After that step, continue all
+remaining deterministic checks without requesting another handoff.
+
+If `adb devices` shows no device, try once: `adb kill-server`, `adb start-server`,
+then `adb devices`. If it shows `unauthorized`, ask only for device approval.
+If no device remains, hardware interaction is the legitimate human step.

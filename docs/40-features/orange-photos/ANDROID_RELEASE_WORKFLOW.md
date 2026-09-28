@@ -450,6 +450,12 @@ superior, preservando la trazabilidad.
 
 La release no está cerrada mientras falte cualquiera de estos checks.
 
+Cuando las operaciones estén autorizadas, los checks, builds, publicación,
+hashes y registro deterministas se ejecutan de forma continua sin handoffs por
+milestones técnicos. La Ruta B devuelve el control únicamente para la
+validación física end-to-end del updater; después se continúan las
+comprobaciones deterministas pendientes.
+
 Validación 28/09/2026: la actualización 1.8.2/14 → 1.8.3/15 fue validada
 mediante el flujo end-to-end. Se confirmó detección, descarga, instalación
 sobre el mismo paquete, conservación de sesión/preferencias/estado local y

@@ -47,4 +47,5 @@ if (checks.includes('android')) {
   run(gradle, [':app:testDebugUnitTest', '--no-configuration-cache'], androidDir);
   run(gradle, [':app:assembleDebug', '--no-configuration-cache'], androidDir);
 }
+if (checks.includes('harness')) run(process.execPath, ['--test', 'scripts/ai/harness.test.mjs']);
 if (args.includes('--final')) console.log('final verification: PASS');

@@ -28,6 +28,7 @@ export function classifyChangedFiles(files) {
     if (file.startsWith('docs/') || file === 'AGENTS.md' || file.startsWith('.agents/')) checks.add('documentation');
     if (file.startsWith('docs/30-database/migration/') || file.startsWith('database/')) checks.add('database');
     if (/auth|permission|ownership|membership|module_access|session|cookie|cors|upload|download|public|share|token|password|\.sql$|workflow|package-lock|build\.gradle|AndroidManifest|network.security|MediaStore|Room|WorkManager|filesystem|Wasabi/i.test(file)) checks.add('security');
+    if (file.startsWith('scripts/ai/') || file.startsWith('.codex/') || file.startsWith('.agents/') || file === 'AGENTS.md') checks.add('harness');
   }
   return [...checks];
 }
@@ -48,6 +49,51 @@ export function securityRisk(files, contents = '') {
 
 export function semanticBoundaryEvidence(boundary, evidence = []) {
   return evidence.some(item => item.boundary === boundary && item.entrypoint && item.downstream && item.test_file && item.integration_test === true && item.observed === true);
+}
+
+export function validateCompletionContract(contract = {}) {
+  const errors = [];
+  const unresolvedBlockers = (contract.blockers ?? []).filter(blocker => blocker.resolved !== true);
+  const criteriaPending = (contract.acceptance_criteria ?? []).filter(criterion => !(criterion.satisfied === true && criterion.evidence?.length > 0));
+  const boundariesPending = (contract.semantic_boundaries ?? []).filter(boundary => boundary.required !== false && !(boundary.satisfied === true && boundary.evidence?.length > 0));
+  const accepted = new Set(['PASS', 'PASS_WITH_BASELINE', 'PASS_IMPROVED']);
+  const checksPending = (contract.required_checks ?? []).filter(check => {
+    const result = (contract.check_results ?? []).find(item => item.check === check);
+    return !result || !accepted.has(result.status) || !result.evidence;
+  });
+  const visualPending = contract.visual_validation?.required === true && !(contract.visual_validation.performed === true && contract.visual_validation.evidence);
+  if (contract.state === 'HARD_STOP') return { valid: false, errors: ['HARD_STOP: task cannot complete'] };
+  if (!['AUTO_CONTINUE', 'BLOCKED', 'COMPLETE'].includes(contract.state)) return { valid: false, errors: ['invalid state'] };
+  if (contract.state === 'AUTO_CONTINUE') {
+    if (unresolvedBlockers.length > 0) errors.push('AUTO_CONTINUE has unresolved blockers');
+    if (criteriaPending.length === 0 && boundariesPending.length === 0 && checksPending.length === 0 && !visualPending) errors.push('AUTO_CONTINUE has no pending work; use COMPLETE');
+  }
+  if (contract.state === 'COMPLETE') {
+    if (unresolvedBlockers.length > 0) errors.push('COMPLETE has unresolved blockers');
+    if (criteriaPending.length > 0) errors.push(`acceptance criteria pending: ${criteriaPending.map(item => item.id ?? 'unknown').join(', ')}`);
+    if (boundariesPending.length > 0) errors.push(`semantic boundaries pending: ${boundariesPending.map(item => item.boundary ?? 'unknown').join(', ')}`);
+    if (checksPending.length > 0) errors.push(`required checks pending: ${checksPending.join(', ')}`);
+    if (visualPending) errors.push('required visual validation pending');
+  }
+  if (contract.state === 'BLOCKED') {
+    if (unresolvedBlockers.length === 0 || !unresolvedBlockers.some(blocker => blocker.evidence)) errors.push('BLOCKED requires blocker evidence');
+    if (!(contract.recovery_attempts?.length > 0)) errors.push('BLOCKED requires recovery_attempts');
+  }
+  return { valid: errors.length === 0, errors };
+}
+
+export function extractNumberedHeadings(markdown = '') {
+  return [...markdown.matchAll(/^## (\d+)\./gm)].map(match => Number(match[1]));
+}
+
+export function validateHeadingSequence(markdown = '') {
+  const numbers = extractNumberedHeadings(markdown);
+  const errors = [];
+  for (let index = 1; index < numbers.length; index += 1) {
+    if (numbers[index] <= numbers[index - 1]) errors.push(`duplicate or descending heading: ${numbers[index]}`);
+    if (numbers[index] !== numbers[index - 1] + 1) errors.push(`non-consecutive heading: ${numbers[index - 1]} -> ${numbers[index]}`);
+  }
+  return { valid: errors.length === 0, numbers, errors };
 }
 
 export function taskFiles({ base = 'origin/main', includeWorkingTree = true } = {}) {
