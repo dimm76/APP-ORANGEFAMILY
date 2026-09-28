@@ -42,8 +42,8 @@ android {
         applicationId = "com.orangefamily.photossync"
         minSdk = 26
         targetSdk = 36
-        versionCode = 14
-        versionName = "1.8.2"
+        versionCode = 15
+        versionName = "1.8.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
