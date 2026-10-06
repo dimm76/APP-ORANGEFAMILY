@@ -189,6 +189,14 @@ Android. Android consume la misma API Node; Room y WorkManager son estado y
 trabajo local del agente, no fuentes de verdad remotas. Los contratos que
 afecten a Android deben revisar ambos consumidores.
 
+Para tareas largas puede utilizarse el supervisor externo documentado en
+`docs/50-operations/AI_AUTONOMOUS_SUPERVISOR.md`. Este proceso conserva el
+thread de Codex, reevalúa el completion report después de cada turno, reanuda
+trabajo pendiente y aplica recovery ante blockers recuperables. `CONTINUE` no
+es un handoff. `main` es la rama productiva de OrangeFamily y queda fuera del
+modo unattended junto con deploy, release/tag, operaciones destructivas y
+escrituras o migraciones de producción.
+
 1. **Solicitud**: el usuario define el objetivo funcional, bug o cambio.
 2. **Análisis por ChatGPT**: revisa documentación, código real y decisiones
    existentes; localiza archivos, relaciones, permisos, ownership, seguridad y

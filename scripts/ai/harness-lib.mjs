@@ -82,6 +82,56 @@ export function validateCompletionContract(contract = {}) {
   return { valid: errors.length === 0, errors };
 }
 
+export function completionResult(contract = {}, report = {}) {
+  if (!contract?.task_id || report?.task_id !== contract.task_id) return { status: 'CONTINUE', reason: 'task_id_mismatch' };
+
+  const expectedCriteria = contract.acceptance_criteria ?? [];
+  const actualCriteria = report.acceptance_criteria ?? [];
+  const expectedIds = expectedCriteria.map(item => item.id);
+  const actualIds = actualCriteria.map(item => item?.id);
+  if (actualIds.length !== expectedIds.length || new Set(actualIds).size !== actualIds.length || actualIds.some(id => !expectedIds.includes(id))) {
+    return { status: 'CONTINUE', reason: 'acceptance_criteria_mismatch' };
+  }
+
+  const unresolvedBlockers = (report.blockers ?? []).filter(blocker => blocker?.resolved !== true);
+  if (report.state === 'BLOCKED' || report.state === 'HARD_STOP') {
+    const hasEvidence = unresolvedBlockers.length > 0
+      && unresolvedBlockers.every(blocker => blocker?.category && blocker?.reason && blocker?.evidence);
+    const hasRecovery = Array.isArray(report.recovery_attempts) && report.recovery_attempts.length > 0;
+    if (!hasEvidence || !hasRecovery) return { status: 'CONTINUE', reason: 'invalid_blocker_evidence' };
+    return { status: 'BLOCKED', reason: 'documented_blocked' };
+  }
+
+  const criteriaPending = actualCriteria.filter(item => !(item?.satisfied === true && item.evidence?.length > 0));
+  if (criteriaPending.length > 0) return { status: 'CONTINUE', reason: 'acceptance_pending' };
+
+  const expectedBoundaries = (contract.semantic_boundaries ?? []).filter(item => item.required !== false);
+  const actualBoundaries = report.semantic_boundaries ?? [];
+  for (const boundary of expectedBoundaries) {
+    const actual = actualBoundaries.find(item => item?.boundary === boundary.boundary);
+    if (!(actual?.satisfied === true && actual.evidence?.length > 0)) {
+      return { status: 'CONTINUE', reason: 'semantic_boundary_pending' };
+    }
+  }
+
+  const accepted = new Set(['PASS', 'PASS_WITH_BASELINE', 'PASS_IMPROVED']);
+  for (const check of contract.required_checks ?? []) {
+    const result = (report.check_results ?? []).find(item => item?.check === check);
+    if (!result || !accepted.has(result.status) || !result.evidence) {
+      return { status: 'CONTINUE', reason: `required_check_pending:${check}` };
+    }
+  }
+
+  if (contract.visual_validation?.required === true) {
+    if (!(report.visual_validation?.performed === true && report.visual_validation?.evidence)) {
+      return { status: 'CONTINUE', reason: 'visual_validation_pending' };
+    }
+  }
+
+  if (unresolvedBlockers.length > 0) return { status: 'CONTINUE', reason: 'unresolved_blockers_without_blocked_state' };
+  return { status: 'COMPLETE', reason: 'all_required_evidence_present' };
+}
+
 export function extractNumberedHeadings(markdown = '') {
   return [...markdown.matchAll(/^## (\d+)\./gm)].map(match => Number(match[1]));
 }

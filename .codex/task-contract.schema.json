@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["task_id", "objective", "base_ref", "allowed_paths", "acceptance_criteria", "out_of_scope", "required_checks", "hard_stop_conditions", "state"],
+  "required": ["task_id", "objective", "base_ref", "base_sha", "working_branch", "allowed_paths", "acceptance_criteria", "out_of_scope", "required_checks", "hard_stop_conditions", "state"],
   "properties": {
     "task_id": {"type": "string", "minLength": 1},
     "state": {"enum": ["AUTO_CONTINUE", "BLOCKED", "HARD_STOP", "COMPLETE"]},
@@ -9,17 +9,25 @@
     "recovery_attempts": {"type": "array", "items": {"type": "object", "required": ["action", "result"], "properties": {"action": {"type": "string"}, "result": {"type": "string"}}, "additionalProperties": false}},
     "check_results": {"type": "array", "items": {"type": "object", "required": ["check", "status", "evidence"], "properties": {"check": {"type": "string"}, "status": {"enum": ["PASS", "PASS_WITH_BASELINE", "PASS_IMPROVED", "FAIL", "BLOCKED"]}, "evidence": {"type": "string", "minLength": 1}}, "additionalProperties": false}},
     "objective": {"type": "string", "minLength": 1},
-    "base_ref": {"type": "string"}, "base_sha": {"type": "string"}, "expected_head_sha": {"type": "string"}, "working_branch": {"type": "string"},
-    "allowed_paths": {"type": "array", "items": {"type": "string"}, "minItems": 1},
-    "acceptance_criteria": {"type": "array", "items": {"type": "object", "required": ["id", "description"], "properties": {"id": {"type": "string"}, "description": {"type": "string"}, "satisfied": {"type": "boolean"}, "evidence": {"type": "array", "items": {"type": "object"}}}, "additionalProperties": false}},
+    "base_ref": {"type": "string", "minLength": 1},
+    "base_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "expected_head_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "working_branch": {"type": "string", "minLength": 1},
+    "allowed_paths": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "authorized_repositories": {"type": "array", "items": {"type": "object", "required": ["name", "path", "base_ref", "base_sha", "working_branch", "allowed_paths"], "properties": {"name": {"type": "string", "minLength": 1}, "path": {"type": "string", "minLength": 1}, "base_ref": {"type": "string", "minLength": 1}, "base_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"}, "working_branch": {"type": "string", "minLength": 1}, "allowed_paths": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}, "role": {"enum": ["primary", "provider", "consumer", "supporting"]}}, "additionalProperties": false}},
+    "acceptance_criteria": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["id", "description"], "properties": {"id": {"type": "string"}, "description": {"type": "string"}, "satisfied": {"type": "boolean"}, "evidence": {"type": "array", "items": {"type": "object"}}}, "additionalProperties": false}},
     "semantic_boundaries": {"type": "array", "items": {"type": "object", "required": ["boundary", "productive_entrypoint", "downstream", "evidence_required"], "properties": {"boundary": {"type": "string"}, "productive_entrypoint": {"type": "string"}, "downstream": {"type": "string"}, "evidence_required": {"type": "string"}, "required": {"type": "boolean"}, "satisfied": {"type": "boolean"}, "evidence": {"type": "array", "items": {"type": "object"}}}, "additionalProperties": false}},
     "out_of_scope": {"type": "array", "items": {"type": "string"}},
     "change_types": {"type": "array", "items": {"enum": ["frontend", "backend", "database", "android", "api-contract", "storage", "documentation", "security", "workflow"]}},
     "required_checks": {"type": "array", "items": {"enum": ["diff", "frontend", "ui", "backend", "database", "android", "documentation", "security", "harness"]}},
-    "authorized_operations": {"type": "array", "items": {"type": "string"}},
-    "visual_validation": {"type": "object", "required": ["required"], "properties": {"required": {"type": "boolean"}, "performed": {"type": "boolean"}, "evidence": {"type": "string"}}, "additionalProperties": false}, "hard_stop_conditions": {"type": "array", "items": {"type": "string"}},
-    "interactive_human_steps": {"type": "array", "items": {"type": "string"}}, "required_docs": {"type": "array", "items": {"type": "string"}}, "notes": {"type": "string"},
-    "risk": {"enum": ["low", "medium", "high", "critical"]}, "requires_security_review": {"type": "boolean"}
+    "authorized_operations": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "visual_validation": {"type": "object", "required": ["required"], "properties": {"required": {"type": "boolean"}, "performed": {"type": "boolean"}, "evidence": {"type": "string"}}, "additionalProperties": false},
+    "hard_stop_conditions": {"type": "array", "items": {"type": "string"}},
+    "interactive_human_steps": {"type": "array", "items": {"type": "string"}},
+    "required_docs": {"type": "array", "items": {"type": "string"}},
+    "notes": {"type": "string"},
+    "risk": {"enum": ["low", "medium", "high", "critical"]},
+    "requires_security_review": {"type": "boolean"}
   },
   "additionalProperties": false
 }

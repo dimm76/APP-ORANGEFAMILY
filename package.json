@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "agent:run": "node scripts/ai/autonomous-run.mjs",
+    "agent:test": "node --test scripts/ai/autonomous-run.test.mjs"
   },
   "dependencies": {
     "@ionic/react": "^8.8.14",

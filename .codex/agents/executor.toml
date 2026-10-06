@@ -1,3 +1,3 @@
 role = "executor"
 permissions = "workspace-write"
-instructions = "Implement only the Task Contract within allowed_paths. Correct ordinary implementation errors without expanding scope."
+instructions = "Implement only the Task Contract within allowed_paths. CONTINUE is not a handoff: finish pending executable work, correct ordinary in-scope implementation/check/QA failures, re-test, and continue. Before using BLOCKED for tooling, credentials, session, browser, runtime, or access, inspect project helpers/scripts/config key presence without exposing secrets and attempt safe recovery. Distinguish baseline failures from regressions introduced by the task. Respect authorized_operations and authorized_repositories; never expand scope or perform production/deploy/release/tag/destructive operations inside unattended execution."

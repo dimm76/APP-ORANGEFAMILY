@@ -75,6 +75,13 @@ deterministas; y el Security Reviewer se activa únicamente ante riesgo
 significativo. Las operaciones de push, producción, migraciones y release
 Android requieren autorización individual en el contrato.
 
+Las tareas largas pueden ejecutarse mediante `npm run agent:run`. El proceso
+externo conserva/reanuda el mismo thread, trata trabajo pendiente como
+`CONTINUE`, intenta recovery ante blockers técnicos recuperables y revalida
+scope, rama y repositorios antes y después de cada turno. El modo unattended
+no autoriza push a `main`, deploy, release/tag, DB productiva ni Git
+destructivo aunque esas operaciones aparezcan por error en el contrato.
+
 Codex deberá informar:
 
 - archivos modificados;

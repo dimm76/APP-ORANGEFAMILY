@@ -444,11 +444,19 @@ riesgo destructivo o estado inesperado que no pueda resolverse dentro del
 scope. Una autorización explícita ya concedida no se solicita de nuevo para
 cada subpaso cubierto por ella.
 
-El preflight debe identificar antes de empezar `allowed_paths`,
-`authorized_operations`, `interactive_human_steps`, `hard_stop_conditions`,
-`required_checks` y `acceptance_criteria`. Los `interactive_human_steps` son
-los únicos checkpoints previstos para devolver control al usuario; no crear
-checkpoints humanos para operaciones deterministas.
+El preflight debe identificar antes de empezar `base_ref`, `base_sha`,
+`working_branch`, `allowed_paths`, `authorized_operations`, repositorios
+adicionales autorizados cuando existan, `interactive_human_steps`,
+`hard_stop_conditions`, `required_checks` y `acceptance_criteria`. Los
+`interactive_human_steps` son los únicos checkpoints previstos para devolver
+control al usuario; no crear checkpoints humanos para operaciones deterministas.
+
+Para tareas unattended, `scripts/ai/autonomous-run.mjs` es la autoridad externa
+de continuidad: conserva/reanuda el thread y reevalúa de forma determinista el
+completion report después de cada turno. `CONTINUE` nunca es terminal. El loop
+no puede trabajar sobre `main` ni ejecutar push a `main`, deploy, release/tag,
+Git destructivo o escrituras/migraciones productivas. Esas operaciones quedan
+fuera del loop y requieren el flujo interactivo autorizado.
 
 Los fallos ordinarios directamente relacionados con la tarea deben seguir el
 flujo diagnosticar → cambio mínimo dentro de `allowed_paths` → repetir check,

@@ -37,5 +37,8 @@ backend/.env.*
 # Local exports
 .exportables/
 
+# Local Codex autonomous runtime evidence
+.codex/runtime/
+
 # Local OrangePhotos import reports
 backend/tmp/
