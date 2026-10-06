@@ -14,6 +14,9 @@ const HARD_STOP_BLOCKER_CATEGORIES = new Set([
 
 const FORBIDDEN_AUTONOMOUS_OPERATION = /^(?:git\.push_main|git\.(?:force|destructive)|deploy(?:\.|$)|release(?:\.|$)|tag(?:\.|$)|vps(?:\.|$)|database\.(?:production|write|migrate))/
 const PROTECTED_BRANCHES = new Set(['main'])
+const TEST_ALLOW_PROTECTED_BRANCH = process.env.NODE_ENV === 'test'
+  && process.env.AUTONOMOUS_RUN_TEST_MODE === '1'
+  && process.env.AUTONOMOUS_RUN_TEST_ALLOW_PROTECTED_BRANCH === '1'
 const SENSITIVE_KEY = /^(?:access[_-]?token|refresh[_-]?token|auth[_-]?token|session[_-]?token|bearer[_-]?token|csrf[_-]?token|jwt|password|passwd|secret|api[_-]?key|private[_-]?key|client[_-]?secret|database[_-]?url|authorization|cookie|set-cookie)$/i
 
 function parseArgs(argv) {
@@ -192,7 +195,9 @@ function assertStringArray(value, label, { minItems = 0 } = {}) {
 }
 
 function assertWritableBranch(branch, label) {
-  if (PROTECTED_BRANCHES.has(branch)) throw new Error(`${label} uses protected branch ${branch}; unattended agent:run requires a feature/fix branch`)
+  if (PROTECTED_BRANCHES.has(branch) && !TEST_ALLOW_PROTECTED_BRANCH) {
+    throw new Error(`${label} uses protected branch ${branch}; unattended agent:run requires a feature/fix branch`)
+  }
 }
 
 function validateContractShape(contract) {

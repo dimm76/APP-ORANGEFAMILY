@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os'
 const runtimeRoot = join(tmpdir(), 'orangefamily-agent-autonomy-tests')
 mkdirSync(runtimeRoot, { recursive: true })
 
-function runSupervisor(dir, mode, extraArgs = [], extraContract = {}) {
+function runSupervisor(dir, mode, extraArgs = [], extraContract = {}, options = {}) {
   const taskId = extraContract.task_id || 'supervisor-test'
   const prompt = join(dir, 'prompt.md')
   const contract = join(dir, 'contract.json')
@@ -46,6 +46,7 @@ function runSupervisor(dir, mode, extraArgs = [], extraContract = {}) {
       ...process.env,
       NODE_ENV: 'test',
       AUTONOMOUS_RUN_TEST_MODE: '1',
+      AUTONOMOUS_RUN_TEST_ALLOW_PROTECTED_BRANCH: options.allowProtectedBranch === false ? '0' : '1',
       FAKE_MODE: mode,
       FAKE_TASK_ID: taskId,
       FAKE_STATE: state,
@@ -241,7 +242,7 @@ test('supervisor rejects protected production branches before invoking Codex', (
       const attempt = runSupervisor(dir, 'redact', ['--max-iterations', '1'], {
         task_id: `supervisor-protected-${protectedBranch}`,
         working_branch: protectedBranch,
-      })
+      }, { allowProtectedBranch: false })
       assert.notEqual(attempt.result.status, 0)
       assert.match(attempt.result.stderr, /protected branch/)
       assert.equal(existsSync(attempt.state), false)
