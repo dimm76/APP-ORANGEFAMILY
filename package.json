@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "agent:run": "node scripts/ai/autonomous-run.mjs",
-    "agent:test": "node --test scripts/ai/autonomous-run.test.mjs"
+    "agent:test": "node --test scripts/ai/autonomous-run.test.mjs scripts/ai/autonomous-bootstrap.test.mjs"
   },
   "dependencies": {
     "@ionic/react": "^8.8.14",

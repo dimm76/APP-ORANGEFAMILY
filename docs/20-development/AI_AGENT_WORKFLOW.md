@@ -197,6 +197,30 @@ es un handoff. `main` es la rama productiva de OrangeFamily y queda fuera del
 modo unattended junto con deploy, release/tag, operaciones destructivas y
 escrituras o migraciones de producción.
 
+### Entrada automática para tareas complejas
+
+La activación del workflow autónomo es semántica. Cuando una petición de
+implementación define un objetivo terminal y requiere trabajo sustancial,
+varias fases dependientes, verificación/recovery o continuidad hasta completar
+el resultado, Codex aplica `.agents/skills/autonomous-task/SKILL.md`. No se
+exigen palabras mágicas ni un envelope literal `START`/`END`.
+
+Codex actúa primero como entrypoint: revisa documentación y código, completa el
+preflight, deriva un Task Contract validable y escribe los inputs bajo
+`.codex/runtime/<task-id>/`. A continuación ejecuta el bootstrap protegido
+`.codex/autonomous-bootstrap.mjs`, que valida SHA/rama/estado Git, crea el
+worktree y la rama `agent/<task-id>` aislados y lanza el supervisor externo.
+Desde ese momento `autonomous-run.mjs` controla la continuidad del mismo thread
+hasta `COMPLETE` o un `HARD_STOP` real.
+
+El routing automático autoriza únicamente la preparación y ejecución local
+reversible necesaria para la implementación ya solicitada. No concede por sí
+mismo commit/push, integración en `main`, deploy, release/tag, operaciones de
+producción/VPS, migraciones productivas, Git destructivo, nuevas dependencias,
+cambios de arquitectura o ampliación de scope. Si el preflight demuestra que
+alguna de esas decisiones es imprescindible y no estaba ya autorizada por la
+petición, se devuelve un `HARD_STOP` concreto.
+
 1. **Solicitud**: el usuario define el objetivo funcional, bug o cambio.
 2. **Análisis por ChatGPT**: revisa documentación, código real y decisiones
    existentes; localiza archivos, relaciones, permisos, ownership, seguridad y

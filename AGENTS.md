@@ -428,6 +428,26 @@ final.
 
 No omitir limitaciones, riesgos ni comprobaciones pendientes.
 
+## Routing de tareas autónomas complejas
+
+Cuando una petición de implementación tenga un objetivo terminal claro y requiera trabajo sustancial, varias fases dependientes, verificación/recovery o continuidad hasta completar el resultado, debe tratarse como una tarea autónoma supervisada y no como un turno Codex ordinario.
+
+La clasificación es semántica. No se exigen palabras mágicas ni delimitadores `START`/`END`. Expresiones como “de principio a fin”, “hasta completar”, “no pares hasta que funcione” o una spec/plan con criterios de aceptación son señales de intención, pero no constituyen una sintaxis obligatoria.
+
+En ese caso es obligatorio leer y aplicar:
+
+```text
+.agents/skills/autonomous-task/SKILL.md
+```
+
+No activar este routing solo porque un prompt sea largo. Las preguntas, análisis sin implementación, cambios mínimos/locales, correcciones de texto/documentación, una única operación determinista o tareas bloqueadas desde el inicio por una decisión humana siguen el flujo normal.
+
+El routing autónomo autoriza únicamente la preparación local reversible necesaria para ejecutar la implementación ya solicitada: preflight, escritura de runtime bajo `.codex/runtime/`, ejecución del bootstrap protegido, worktree/rama `agent/<task-id>` aislados, checks locales y lanzamiento del supervisor. No implica por sí mismo autorización de commit/push, `main`, deploy, release/tag, producción/VPS, migraciones productivas, Git destructivo, nuevas dependencias, cambios de arquitectura ni ampliación de scope.
+
+El turno de entrada no debe implementar primero la feature ni crear worktrees con Git libre. Debe preparar el Task Contract y ejecutar `.codex/autonomous-bootstrap.mjs`; ese bootstrap valida SHA/rama/estado Git, crea el worktree aislado y entrega el control a `scripts/ai/autonomous-run.mjs`, que mantiene la continuidad hasta `COMPLETE` o un `HARD_STOP` real.
+
+La complejidad no equivale a autorización. Si durante el preflight se demuestra que el objetivo exige una decisión arquitectónica, dependencia, alcance o permiso no concedido por la petición ni por la documentación existente, debe producirse `HARD_STOP` en ese punto en lugar de inventar la decisión.
+
 ## Harness y continuidad autónoma
 
 Un milestone técnico exitoso no constituye un handoff. Si la siguiente acción

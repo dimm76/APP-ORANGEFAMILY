@@ -82,6 +82,19 @@ scope, rama y repositorios antes y después de cada turno. El modo unattended
 no autoriza push a `main`, deploy, release/tag, DB productiva ni Git
 destructivo aunque esas operaciones aparezcan por error en el contrato.
 
+Cuando una petición de implementación sea semánticamente compleja y defina un
+objetivo terminal que requiera continuidad, varias fases, verificación o
+recovery hasta completar el resultado, Codex debe aplicar
+`.agents/skills/autonomous-task/SKILL.md` en lugar de ejecutarla como un turno
+normal. No existe una sintaxis obligatoria `START`/`END`.
+
+El entrypoint realiza preflight y genera `prompt.md` y `task-contract.json`
+bajo `.codex/runtime/<task-id>/`. Después ejecuta
+`.codex/autonomous-bootstrap.mjs`; el bootstrap valida las fronteras, crea el
+worktree y la rama `agent/<task-id>` y lanza el supervisor existente. El usuario
+no debe construir el contrato, crear ramas/worktrees ni lanzar manualmente el
+supervisor.
+
 Codex deberá informar:
 
 - archivos modificados;

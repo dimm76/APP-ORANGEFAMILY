@@ -1,0 +1,23 @@
+prefix_rule(
+    pattern = ["git", "status"],
+    decision = "allow",
+    justification = "Read-only Git status required by autonomous-task preflight.",
+)
+
+prefix_rule(
+    pattern = ["git", "rev-parse"],
+    decision = "allow",
+    justification = "Read-only Git identity and immutable SHA checks required by autonomous-task preflight.",
+)
+
+prefix_rule(
+    pattern = ["git", "branch", "--show-current"],
+    decision = "allow",
+    justification = "Read-only current-branch lookup required by autonomous-task preflight.",
+)
+
+prefix_rule(
+    pattern = ["node", ".codex/autonomous-bootstrap.mjs"],
+    decision = "allow",
+    justification = "Allow only the repository-owned autonomous bootstrap. It validates task id, immutable base SHA, clean tracked state and deterministic agent worktree before launching the bounded supervisor.",
+)

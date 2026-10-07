@@ -43,3 +43,40 @@ test('harness base ref uses pull request base sha', () => { const sha = 'a'.repe
 test('harness base ref uses push before sha', () => { const sha = 'b'.repeat(40); assert.equal(resolveHarnessBaseRef({ eventName: 'push', payload: { before: sha } }), sha); });
 test('harness base ref rejects branch creation zero sha', () => { assert.equal(resolveHarnessBaseRef({ eventName: 'push', payload: { before: '0'.repeat(40) } }), 'origin/main'); });
 test('harness base ref falls back locally', () => { assert.equal(resolveHarnessBaseRef(), 'origin/main'); });
+
+test("AGENTS routes semantically complex implementation tasks to the autonomous skill", () => {
+  const agents = fs.readFileSync("AGENTS.md", "utf8");
+  assert.match(agents, /clasificación es semántica/i);
+  assert.match(agents, /No se exigen palabras mágicas/i);
+  assert.match(agents, /\.agents\/skills\/autonomous-task\/SKILL\.md/);
+  assert.match(agents, /\.codex\/autonomous-bootstrap\.mjs/);
+  assert.match(agents, /complejidad no equivale a autorización/i);
+});
+
+test("autonomous task skill materializes a complete supervisor handoff", () => {
+  const skill = fs.readFileSync(".agents/skills/autonomous-task/SKILL.md", "utf8");
+  for (const field of [
+    "task_id",
+    "objective",
+    "base_ref",
+    "base_sha",
+    "working_branch",
+    "allowed_paths",
+    "acceptance_criteria",
+    "out_of_scope",
+    "required_checks",
+    "hard_stop_conditions",
+  ]) {
+    assert.match(skill, new RegExp(field));
+  }
+  assert.match(skill, /Activation is semantic/i);
+  assert.match(skill, /Never require magic words/i);
+  assert.match(skill, /\.codex\/autonomous-bootstrap\.mjs/);
+  assert.match(skill, /agent\/<task-id>/);
+  assert.match(skill, /prompt\.md/);
+  assert.match(skill, /task-contract\.json/);
+  assert.match(skill, /Complexity is not authorization/i);
+  assert.match(skill, /Do not tell the user to manually run the bootstrap/i);
+  assert.match(fs.readFileSync(".codex/rules/default.rules", "utf8"), /pattern\s*=\s*\["node", "\.codex\/autonomous-bootstrap\.mjs"\]/);
+  assert.match(fs.readFileSync(".codex/config.toml", "utf8"), /default_permissions\s*=\s*":workspace"/);
+});
