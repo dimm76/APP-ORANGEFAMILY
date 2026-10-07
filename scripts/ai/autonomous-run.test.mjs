@@ -127,7 +127,7 @@ test('supervisor enforces isolated workspace-write and rejects approval bypass f
     assert.equal(normalArgs.includes('--approve-for-me'), false)
     assert.ok(normalArgs.includes('workspace-write'))
     assert.ok(normalArgs.includes('--ignore-user-config'))
-    assert.ok(normalArgs.includes('--ignore-rules'))
+    assert.equal(normalArgs.includes('--ignore-rules'), false)
     assert.ok(normalArgs.includes('sandbox_workspace_write.network_access=false'))
 
     const denied = runSupervisor(defaultDir, 'redact', ['--max-iterations', '1', '--approve-for-me'], { task_id: 'supervisor-autoapprove-denied' })

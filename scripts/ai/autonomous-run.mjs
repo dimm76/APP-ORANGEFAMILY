@@ -417,7 +417,7 @@ function codexArgsBase() {
   const values = [
     'exec', '--json', '-C', cwd,
     '-s', 'workspace-write',
-    '--ignore-user-config', '--ignore-rules', '--strict-config',
+    '--ignore-user-config', '--strict-config',
     '-c', 'shell_environment_policy.inherit="core"',
     '-c', 'sandbox_workspace_write.network_access=false',
   ]
@@ -469,7 +469,7 @@ for (let iteration = 1; iteration <= args.maxIterations; iteration += 1) {
       ].filter(Boolean).join('\n\n')
 
   const resumeSafetyArgs = [
-    '--json', '--ignore-user-config', '--ignore-rules', '--strict-config',
+    '--json', '--ignore-user-config', '--strict-config',
     '-c', 'shell_environment_policy.inherit="core"',
     '-c', 'sandbox_workspace_write.network_access=false',
   ]
