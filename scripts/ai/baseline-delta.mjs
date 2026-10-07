@@ -23,6 +23,11 @@ export function compareResults(baseline, current) {
 }
 
 export function runCheck(command, args, cwd) {
-  const result = spawnSync(command, args, { cwd, encoding: 'utf8', shell: process.platform === 'win32' });
+  const isWindowsCmd = process.platform === 'win32' && command.endsWith('.cmd');
+  const result = spawnSync(
+    isWindowsCmd ? 'cmd.exe' : command,
+    isWindowsCmd ? ['/d', '/s', '/c', command, ...args] : args,
+    { cwd, encoding: 'utf8' },
+  );
   return { status: result.status === 0 ? 'pass' : 'fail', failed: stableFailures(`${result.stdout ?? ''}\n${result.stderr ?? ''}`), exitCode: result.status };
 }

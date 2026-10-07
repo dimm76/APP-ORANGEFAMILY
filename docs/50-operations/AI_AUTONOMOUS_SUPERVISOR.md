@@ -139,6 +139,17 @@ Aunque aparezcan en `authorized_operations`, el supervisor rechaza dentro del lo
 
 Estas acciones se realizan fuera del loop después de COMPLETE mediante el flujo interactivo expresamente autorizado.
 
+## Economía de contexto
+
+El supervisor preserva continuidad, pero el thread no debe convertirse en un almacén de documentos y logs completos.
+
+- prompt.md debe ser un brief operativo compacto, no una copia de una spec extensa ya disponible localmente.
+- La spec original continúa siendo fuente canónica; durante ejecución se consulta mediante búsqueda y rangos dirigidos.
+- Una fuente completa ya leída no se vuelve a volcar salvo necesidad concreta demostrable.
+- Los checks deben preferir npm run agent:verify y tests dirigidos. El verificador persiste logs completos bajo .agent-runtime/<task-id>/verify/ y emite resúmenes compactos.
+- Reviewer, Verifier y Security Reviewer no deben repetir trabajo entre sí. El review se realiza sobre un diff estable y se repite solo si las correcciones cambian materialmente el área revisada.
+- No se introduce por ahora rotación automática de thread. Antes de añadir checkpoint/rollover se medirá el efecto de estas reducciones de contexto sobre tareas reales.
+
 ## Recovery
 
 Ante un blocker recuperable, el supervisor pide investigar antes de repetir ciegamente:

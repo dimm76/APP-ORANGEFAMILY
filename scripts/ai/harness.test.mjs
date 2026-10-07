@@ -105,3 +105,31 @@ test("Codex agent role files use the current role metadata format", () => {
     assert.doesNotMatch(toml, /^instructions\s*=/m);
   }
 });
+
+
+test("agent instructions enforce context economy without weakening gates", () => {
+  const agents = fs.readFileSync("AGENTS.md", "utf8");
+  const words = agents.trim().split(/\s+/).length;
+  assert.ok(words < 1200, `AGENTS.md should stay compact, got ${words} words`);
+  assert.match(agents, /Economía de contexto/i);
+  assert.match(agents, /rangos concretos/i);
+  assert.match(agents, /logs completos se guardan en \.agent-runtime/i);
+  assert.match(agents, /Task Contract -> allowed_paths -> authorized_operations -> gates/);
+});
+
+test("autonomous execution requires compact source access", () => {
+  const skill = fs.readFileSync(".agents/skills/autonomous-task/SKILL.md", "utf8");
+  const supervisor = fs.readFileSync("scripts/ai/autonomous-run.mjs", "utf8");
+  assert.match(skill, /compact execution brief/i);
+  assert.match(skill, /search\/headings\/ranges/i);
+  assert.match(supervisor, /Context economy is mandatory/i);
+  assert.match(supervisor, /do not reread full sources already inspected/i);
+});
+
+test("verification persists verbose logs and emits compact evidence", () => {
+  const verify = fs.readFileSync("scripts/ai/verify.mjs", "utf8");
+  assert.match(verify, /\.agent-runtime/);
+  assert.match(verify, /failureExcerpt/);
+  assert.match(verify, /status: 'PASS'/);
+  assert.match(verify, /excerpt: failureExcerpt/);
+});

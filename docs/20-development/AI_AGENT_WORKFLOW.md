@@ -163,6 +163,22 @@ Las instrucciones deben ser breves, pero suficientemente precisas.
 
 Las reglas estables deben referenciar esta documentación en lugar de repetirse íntegramente en cada tarea.
 
+## Economía de tokens y contexto
+
+Codex es principalmente un agente de ejecución. Debe evitar auditorías abiertas, redescubrimiento del proyecto, alternativas no solicitadas y volcados extensos de terminal, código o documentación.
+
+Reglas operativas:
+
+- usar búsqueda/índices/headings antes de abrir archivos largos;
+- leer rangos concretos y no releer fuentes completas ya inspeccionadas;
+- para specs extensas, crear en preflight un brief compacto con objetivo, invariantes, alcance, criterios y mapa de secciones; la spec original sigue siendo canónica y se consulta solo por secciones necesarias;
+- priorizar gates deterministas, análisis estático y tests dirigidos antes de subagentes o razonamiento abierto;
+- persistir stdout/stderr completos bajo .agent-runtime/ y devolver al modelo resúmenes compactos con los fallos relevantes;
+- agrupar findings por causa raíz y evitar ciclos reviewer/verifier tras microcambios;
+- ejecutar una suite global cuando sea gate final o cuando un check dirigido no baste, no como mecanismo repetitivo de diagnóstico.
+
+El objetivo no es reducir garantías: scope, autorización, ownership, seguridad y evidencia de completion se mantienen. Se elimina contexto redundante, no controles.
+
 Para cualquier tarea de reutilización desde APP-ORANGEDESK, revisar previamente:
 
 - `docs/20-development/ORANGEDESK_TO_ORANGEFAMILY_REUSE.md`

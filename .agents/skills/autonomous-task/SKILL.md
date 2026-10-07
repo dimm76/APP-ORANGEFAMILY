@@ -31,13 +31,13 @@ The entry Codex turn is bootstrap/Lead only. It must not implement the requested
 
 It must:
 
-1. review the relevant project documentation and current code;
+1. locate relevant documentation/code using search/indexes and read only targeted sections;
 2. perform task preflight and identify any real missing decision;
-3. derive the smallest safe Task Contract;
+3. derive the smallest safe Task Contract and a compact execution brief;
 4. write the bootstrap inputs under `.agent-runtime/<task-id>/` in the current checkout;
 5. invoke the protected repository bootstrap;
 6. stay attached to that process until COMPLETE or a real terminal stop;
-7. report the terminal result.
+7. report the terminal result concisely.
 
 The entry turn must not create worktrees or agent branches with free-form Git commands. `.codex/autonomous-bootstrap.mjs` owns that operation deterministically.
 
@@ -70,7 +70,7 @@ If the user explicitly requested an architecture change, dependency addition, or
 
 ## Preflight before bootstrap
 
-Apply the normal `task-preflight` skill. Review relevant `docs/` and current code first. Resolve repository facts yourself instead of asking the user for information that can be inspected safely.
+Apply the normal `task-preflight` skill. Review relevant `docs/` and current code first, but use search/headings/ranges instead of whole-file dumps whenever possible. Resolve repository facts yourself instead of asking the user for information that can be inspected safely. For a long user specification, index it once during preflight, preserve the decisive constraints and section map in the compact prompt, and consult only targeted sections afterward.
 
 Derive and record:
 
@@ -113,7 +113,7 @@ Never set `main` as `working_branch`.
 In the current checkout create only:
 
 `.agent-runtime/<task-id>/prompt.md`
-: Preserve the user's actual request as the terminal objective. Do not require or strip START/END delimiters.
+: Store a compact execution brief: terminal objective, decisive invariants, concrete scope/acceptance references, and an index/reference to any long canonical specification. Do not copy a long specification verbatim when it is already available locally. The original request remains authoritative and may be consulted by targeted section/range.
 
 `.agent-runtime/<task-id>/task-contract.json`
 : Must conform to `.codex/task-contract.schema.json` and reflect the completed preflight.

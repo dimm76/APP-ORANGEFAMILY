@@ -456,12 +456,14 @@ for (let iteration = 1; iteration <= args.maxIterations; iteration += 1) {
         `Task contract: ${contractPath}`,
         `Completion report to create/update: ${reportPath}`,
         'Read the task contract before acting and keep the completion report current with concrete evidence.',
+        'Context economy is mandatory: use the compact brief, search/index before reading, inspect targeted ranges, and do not dump or reread full specs/docs/logs unless a specific unresolved decision requires it.',
+        'Prefer repository deterministic verification and directed tests. Keep full logs in .agent-runtime and surface concise status/failure evidence.',
         prompt,
       ].join('\n\n')
     : [
         'AUTO_CONTINUE. Do not hand off or summarize as final.',
         `The deterministic completion gate returned ${lastGate.status}: ${lastGate.reason}.`,
-        'Continue from the current workspace state. Preserve already-passing work; diagnose root cause, make the minimum correction, run affected checks, and update the completion report.',
+        'Continue from the current workspace state. Preserve already-passing work; diagnose root cause, make the minimum correction, run affected checks, and update the completion report. Do not reread full sources already inspected; use targeted ranges and compact verification output.',
         lastGate.status === 'BLOCKED'
           ? recoveryGuidance({ contract, report, gateState: lastGate })
           : 'Incomplete work or pending executable verification is CONTINUE: perform it now rather than returning it to the user.',

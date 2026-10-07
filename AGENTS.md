@@ -2,483 +2,94 @@
 
 Estas reglas son obligatorias para cualquier agente que trabaje en este repositorio.
 
-## Arquitectura obligatoria
+## Invariantes
 
-- Frontend: React.
-- Backend/API: Node.js.
-- Base de datos y fuente única de verdad: PostgreSQL.
-- React consume exclusivamente la API Node.
-- React nunca accede directamente a PostgreSQL.
-- Node concentra la API, lógica de negocio, validaciones, autenticación, autorizaciones, permisos, ownership, automatizaciones, integraciones y acceso a datos.
-- PostgreSQL concentra almacenamiento, relaciones, integridad y rendimiento.
-- OrangeFamily es un producto independiente.
-- No reutilizar lógica de negocio de OrangeDesk ni de otros proyectos.
-- Solo puede reutilizarse infraestructura técnica cuando aporte valor y después de revisar el código real.
-- La futura aplicación Android utilizará la misma API Node.
-- No crear APIs específicas para Android.
+- Frontend: React/Ionic. Backend/API: Node.js. Fuente única de verdad remota: PostgreSQL.
+- React y la futura app Android consumen la misma API Node; ningún cliente accede directamente a PostgreSQL.
+- Node concentra negocio, validación, autenticación, autorización, permisos, ownership e integraciones.
+- OrangeFamily es independiente de OrangeDesk. Solo se reutiliza infraestructura técnica tras revisar el código real; nunca lógica CRM.
+- Aplicar CAMBIO MÍNIMO: reutilizar antes de crear, no refactorizar fuera de scope, no añadir dependencias ni cambiar arquitectura sin autorización.
+- Validar inputs, identidad, family membership, module access, ownership y acceso al recurso en Node. No exponer secretos ni datos sensibles.
+- Los cambios persistentes requieren migración SQL incremental/versionada. No ejecutar migraciones ni operaciones de producción sin autorización expresa.
+- Antes de modificar código: revisar docs relevantes, código real, estado Git, soluciones reutilizables y archivos afectados.
+- Si documentación y código discrepan materialmente, señalarlo y no decidir silenciosamente cuál prevalece.
+- Toda autoridad de ejecución procede de Task Contract -> allowed_paths -> authorized_operations -> gates.
 
-## Fuentes de verdad
+## Economía de contexto — obligatoria
 
-Antes de proponer o ejecutar cambios, seguir este orden:
+Codex es principalmente ejecutor. El contexto es un recurso limitado.
 
-1. Revisar la documentación relevante dentro de `docs/`.
-2. Revisar el código real actualizado del repositorio.
-3. Identificar las decisiones ya adoptadas.
-4. Localizar componentes, helpers, hooks, servicios, endpoints y utilidades reutilizables.
-5. Aplicar el cambio mínimo necesario.
+- Cargar solo documentación y código relevantes para la decisión actual.
+- Preferir rg, búsquedas, headings y rangos concretos antes que volcar archivos completos.
+- No concatenar varios documentos extensos en una misma llamada.
+- No releer una fuente completa ya inspeccionada. Volver a ella solo para una sección concreta necesaria.
+- En specs largas, el preflight crea un brief operativo compacto. La spec original sigue siendo canónica, pero durante ejecución se consulta por secciones/rangos.
+- Priorizar scripts deterministas, análisis estático y tests dirigidos antes de investigación abierta o subagentes.
+- No ejecutar suites globales repetidamente si existe un check dirigido suficiente para diagnosticar/corregir.
+- Los logs completos se guardan en .agent-runtime/; al modelo se devuelve por defecto estado, resumen y fallos relevantes.
+- No imprimir archivos generados, diffs completos, logs completos o payloads grandes salvo que sean imprescindibles para diagnosticar un fallo.
+- Agrupar correcciones por causa raíz y volver a verificar una vez; evitar ciclos de review por microcambio.
+- Los mensajes de progreso e informes deben ser concisos y basados en evidencia.
 
-La documentación del repositorio tiene prioridad sobre cualquier suposición.
+## UI
 
-Si documentación y código discrepan, señalarlo explícitamente y parar antes de decidir cuál modificar.
+Antes de tocar UI/estilos leer la sección necesaria de docs/10-architecture/UI-STYLE-GUIDE.md.
 
-No asumir comportamientos que puedan comprobarse revisando primero documentación o código.
+Reutilizar componentes, tokens, clases y patrones existentes. No inventar un segundo sistema visual ni duplicar estilos globales.
 
-## Datos y cambios SQL
+## Datos, API y seguridad
 
-- PostgreSQL es la fuente de verdad.
-- React no debe mantener una fuente de verdad paralela.
-- Todo cambio de esquema debe realizarse mediante una migración SQL incremental y versionada.
-- No inventar tablas, columnas, relaciones, restricciones ni tipos.
-- Contrastar siempre el esquema real.
-- Si el esquema no está claro, parar y pedir aclaración.
-- Diferenciar migraciones de esquema, seeds y scripts de importación o reconciliación.
-- La lógica de negocio y autorización pertenece a Node.
-- No desplazar lógica crítica al frontend.
-- No ocultar lógica de negocio innecesariamente en SQL.
-- No ejecutar cambios directamente en producción salvo instrucción explícita.
-
-## Alcance y calidad
-
-- Aplicar el cambio mínimo necesario.
-- No refactorizar, optimizar, reescribir ni limpiar fuera del scope solicitado.
-- No modificar módulos o archivos no relacionados.
-- No cambiar la arquitectura ni la estructura de carpetas sin autorización expresa.
-- No añadir librerías ni dependencias sin instrucción explícita.
-- Antes de crear código, comprobar si ya existe una solución reutilizable.
-- Evitar duplicación, sobreingeniería y abstracciones futuras no solicitadas.
-- Mantener separadas UI, lógica de negocio y acceso a datos.
-- No romper funcionalidad existente.
-- No modificar más archivos de los estrictamente necesarios.
-
-## Formato, estructura y legibilidad del código
-
-Todo código modificado o creado debe quedar estructurado, indentado y legible de forma profesional.
-
-Reglas obligatorias:
-
-- No comprimir manualmente código fuente.
-- No concatenar múltiples declaraciones, instrucciones, estados React o funciones en una sola línea.
-- No escribir árboles JSX completos en una sola línea.
-- Cada bloque debe reflejar visualmente su jerarquía mediante indentación consistente.
-- Los imports con varios elementos deben dividirse en varias líneas cuando no resulten claramente legibles.
-- Los arrays y objetos complejos deben estructurarse en varias líneas.
-- Las funciones con varias operaciones deben usar bloques multilínea.
-- Cada `useState` debe declararse de forma independiente y legible.
-- Las props JSX deben dividirse en varias líneas cuando el elemento sea largo o contenga lógica.
-- Los callbacks complejos no deben quedar incrustados en una única línea de JSX.
-- Los ternarios anidados deben evitarse o formatearse de forma que cada condición sea inequívoca.
-- No realizar minificación manual en archivos fuente.
-- No conservar código deliberadamente condensado solo porque ya existía así.
-
-Cuando un archivo autorizado esté severamente condensado y esto impida modificarlo con seguridad:
-
-1. El agente puede formatear exclusivamente ese archivo.
-2. El formateo debe conservar exactamente el comportamiento existente.
-3. No debe aprovechar el formateo para refactorizar, renombrar o alterar lógica.
-4. No debe modificar archivos fuera del scope.
-5. Debe distinguir en el informe final entre cambio funcional y cambio exclusivamente estructural.
-6. Debe comprobar que el archivo sigue guardado como UTF-8 sin BOM.
-7. Debe ejecutar ESLint, build y `git diff --check` cuando correspondan.
-
-Los comentarios deben explicar decisiones, restricciones, invariantes o comportamientos no evidentes.
-
-No añadir comentarios que se limiten a repetir literalmente lo que hace la siguiente línea.
-
-Si no existe un formateador configurado en el repositorio:
-
-- mantener manualmente un formato profesional y consistente;
-- no añadir Prettier, Biome u otra dependencia sin autorización expresa;
-- no rechazar una modificación únicamente porque el archivo esté condensado;
-- formatear primero el archivo autorizado y aplicar después el cambio solicitado.
-
-Un archivo no puede considerarse terminado si la lógica funciona pero queda comprimido, desestructurado o difícil de revisar.
-
-## Reglas visuales
-
-Antes de tocar cualquier archivo de interfaz, estilos, componentes visuales, modales, tablas, badges, botones, inputs, selects, popovers, menús contextuales o layouts, el agente debe leer y aplicar:
-
-```text
-docs/10-architecture/UI-STYLE-GUIDE.md
-```
-
-Reglas obligatorias:
-
-- Reutilizar patrones y clases globales existentes.
-- No inventar estilos si ya existe un patrón aplicable.
-- No inventar colores.
-- No inventar tamaños.
-- No inventar radios.
-- No inventar sombras.
-- No crear botones, badges, modales, inputs, selects o menús con estilos propios si ya existe un patrón global.
-- No mezclar clases específicas de una feature con otra feature.
-- El CSS de una feature solo puede contener layout y ajustes realmente específicos y mínimos.
-- Antes de crear CSS nuevo, revisar los estilos globales.
-- No duplicar ni redefinir patrones globales dentro de una feature.
-- No usar estilos nativos del navegador sin clase de la aplicación.
-- No crear modales sin el patrón global.
-- No crear popovers sin el patrón global.
-- No usar un selector como badge.
-- No añadir CSS global nuevo salvo justificación clara.
-- Si no está claro si un estilo debe ser global o específico, parar y pedir confirmación.
-
-Las clases `od-*` documentadas en la guía son provisionales hasta revisar la infraestructura real reutilizada.
-
-No realizar renombrados masivos por motivos nominales.
-
-## Seguridad
-
-- Validar y sanitizar todos los inputs en Node.
-- Nunca confiar en el frontend.
-- Comprobar identidad, permisos, ownership y acceso al recurso para cada acción protegida.
-- Devolver al frontend únicamente los datos necesarios y autorizados.
-- No exponer credenciales, secretos, hashes, tokens ni información sensible.
-- No registrar secretos ni datos sensibles en logs.
+- React/Android son clientes no confiables.
 - Usar consultas parametrizadas.
-- No interpolar valores directamente en SQL.
-- Gestionar errores sin filtrar detalles internos.
-- No exponer errores SQL, rutas internas ni trazas completas en producción.
-- Revisar especialmente el acceso a datos de menores, documentos, fotografías, vídeos, finanzas y cualquier información privada familiar.
-
-## Regla de parada
-
-No asumir ni completar huecos inventando estructuras.
-
-Si faltan contexto, esquema, permisos, ownership, documentación, código relevante o una decisión que pueda cambiar la solución, parar y pedir aclaración antes de escribir código.
-
-También debe parar si la tarea requiere:
-
-- modificar arquitectura;
-- cambiar la estructura de carpetas;
-- añadir dependencias;
-- modificar archivos fuera del scope;
-- tomar una decisión funcional no documentada;
-- reutilizar lógica de negocio de otro proyecto;
-- aplicar cambios destructivos;
-- acceder a producción sin autorización.
-
-## Contrato previo antes de modificar código
-
-Antes de escribir código, el agente debe identificar brevemente:
-
-- objetivo exacto;
-- archivos o zonas que prevé tocar;
-- si requiere cambios en React;
-- si requiere cambios en Node;
-- si requiere cambios en PostgreSQL;
-- si requiere migración SQL;
-- si afecta a permisos, ownership, autenticación o datos sensibles;
-- qué queda explícitamente fuera de scope.
-
-Si no puede determinar alguno de estos puntos con seguridad, debe parar y pedir aclaración.
-
-## Ejecución de instrucciones preparadas para Codex y Cursor
-
-Cuando el usuario entregue una instrucción preparada expresamente para Codex o Cursor, el agente debe tratarla como un encargo de ejecución dirigido.
-
-La instrucción debe definir previamente:
-
-- el objetivo funcional;
-- el alcance exacto;
-- los archivos autorizados;
-- los bloques que deben modificarse;
-- el cambio que debe aplicarse;
-- las restricciones arquitectónicas;
-- las áreas explícitamente fuera de scope;
-- los checks obligatorios;
-- si se permite o no commit y push.
+- Mantener la lógica crítica en Node salvo decisión documentada.
+- No inventar tablas, columnas, endpoints, permisos ni ownership.
+- Revisar especialmente datos familiares privados, menores, documentos, fotografías, finanzas y nutrición.
+- Rutas públicas requieren revisión expresa de autenticación, campos expuestos, expiración/revocación cuando aplique.
+- Cambios de API compartida deben revisar consumidores afectados, incluido Android cuando corresponda.
 
-El agente debe ejecutar el cambio indicado respetando la implementación real del repositorio.
-
-El agente puede:
-
-- localizar dentro del archivo autorizado el bloque descrito en la instrucción;
-- adaptar únicamente detalles sintácticos mínimos cuando el código indicado no pueda insertarse literalmente;
-- mantener imports, nombres y convenciones ya existentes;
-- corregir errores de sintaxis, ESLint, compilación o tipado causados directamente por el cambio solicitado;
-- informar de una incompatibilidad técnica real antes de alterar la solución indicada.
-
-El agente no debe:
-
-- volver a investigar el problema funcional;
-- rediseñar la solución;
-- reinterpretar el objetivo;
-- decidir un alcance diferente;
-- modificar archivos no autorizados;
-- ampliar el cambio para resolver problemas adyacentes;
-- cambiar arquitectura;
-- cambiar contratos de API;
-- añadir dependencias;
-- crear endpoints, tablas, componentes, helpers, hooks o abstracciones no indicados;
-- realizar refactorizaciones generales;
-- aplicar mejoras opcionales;
-- sustituir la solución indicada por otra diferente;
-- usar el encargo para limpiar o modernizar código no relacionado;
-- hacer commit o push salvo autorización expresa.
-
-Cuando el código indicado no coincida literalmente con el archivo actual, el agente debe:
-
-1. localizar el bloque funcional equivalente dentro del archivo autorizado;
-2. mantener exactamente el objetivo y el comportamiento solicitado;
-3. aplicar la adaptación mínima necesaria;
-4. no modificar otros bloques;
-5. explicar la adaptación en el informe final.
-
-El agente solo debe detenerse cuando:
-
-- el bloque indicado no exista;
-- el archivo real contradiga materialmente la instrucción;
-- el cambio requiera modificar un archivo no autorizado;
-- falte una decisión funcional que altere significativamente la implementación;
-- exista riesgo real de pérdida o corrupción de datos;
-- el cambio requiera una migración, dependencia o modificación arquitectónica no autorizada.
-
-En ese caso debe indicar exactamente:
-
-- archivo;
-- función o bloque;
-- contradicción o impedimento;
-- evidencia técnica;
-- cambio adicional imprescindible;
-- parte ya aplicada;
-- parte pendiente.
-
-No es válido responder únicamente que el cambio no puede realizarse “de forma segura”.
-
-No debe presentar alternativas ni recomendaciones generales salvo que la instrucción las solicite expresamente.
-
-## Funcionalidad completa frente a soporte parcial
-
-El agente no debe declarar una funcionalidad como implementada si solo ha creado una parte técnica.
-
-Ejemplos:
-
-- si crea un endpoint sin una vista React usable, debe indicar que el backend está implementado y la vista está pendiente;
-- si crea botones deshabilitados, debe indicar que la UI está preparada pero la acción real está pendiente;
-- si crea una migración pero no se ha aplicado, debe indicarlo;
-- si una acción requiere modal, confirmación, permisos o validación y no están hechos, debe señalarlo;
-- si una integración queda simulada o incompleta, debe decirlo expresamente.
-
-## Reglas de backend y API
-
-Cuando se toque backend:
-
-- validar todos los inputs en Node;
-- no confiar en valores enviados por React;
-- comprobar permisos y ownership antes de leer o modificar recursos;
-- no devolver campos internos innecesarios;
-- no exponer tokens, secretos, credenciales, hashes ni datos sensibles;
-- usar consultas parametrizadas;
-- mantener la lógica crítica en Node salvo justificación documentada;
-- no crear endpoints públicos sin revisar expresamente la autenticación;
-- mantener contratos de respuesta consistentes;
-- devolver errores controlados;
-- evitar duplicar lógica entre endpoints.
-
-Para rutas públicas:
-
-- declarar qué ruta queda pública;
-- justificar por qué no requiere sesión;
-- limitar los campos devueltos;
-- comprobar que las rutas privadas relacionadas siguen protegidas.
+## Git y producción
 
-## Reglas de base de datos
+- Revisar git status antes de modificar código.
+- No usar git add ., reset --hard, clean, rebase, force push, amend, tags o releases sin autorización explícita.
+- Commit/push, integración en main, deploy, VPS y producción son autorizaciones separadas salvo instrucción expresa.
+- El acceso técnico no implica autorización.
+- No trabajar sobre main en modo autónomo unattended.
 
-Cuando la tarea implique una entidad nueva, relación nueva o modificación de columnas:
+## Ejecución dirigida
 
-- crear una migración SQL incremental;
-- documentar el propósito;
-- aplicar solo el cambio solicitado;
-- evitar operaciones destructivas no justificadas;
-- indicar si requiere backup previo;
-- indicar si requiere ejecución manual;
-- no aplicar la migración en producción salvo instrucción explícita.
+Cuando el usuario entregue una instrucción ya analizada para Codex/Cursor:
 
-El agente debe indicar:
+- ejecutarla dentro del alcance indicado;
+- no redescubrir el problema ni rediseñar la solución salvo contradicción material con el código real;
+- adaptar solo detalles sintácticos mínimos necesarios;
+- corregir fallos directamente causados por el cambio;
+- detenerse únicamente ante una decisión funcional/arquitectónica real, permiso ausente, dependencia no autorizada, scope imprescindible adicional, riesgo destructivo o contradicción material.
 
-```text
-Migración SQL: sí/no
-Archivo de migración:
-Requiere ejecución manual: sí/no
-Requiere backup previo: sí/no
-```
+## Tareas autónomas complejas
 
-## Git y despliegue
+La clasificación es semántica. No se exigen palabras mágicas.
 
-- No hacer commit ni push automáticamente salvo instrucción explícita.
-- Cuando una instrucción autorice expresamente Git, el agente debe ejecutar él
-  mismo las operaciones rutinarias disponibles en su shell en lugar de pedir al
-  usuario que las ejecute manualmente: `git status`, creación o cambio de rama
-  autorizado, staging selectivo, commit, push de rama, `pull --ff-only`,
-  `merge --ff-only` y push de main después de autorización.
-- Antes de modificar código, revisar `git status`.
-- No usar `git add .`, `reset --hard`, `rebase`, force push, amend ni crear tags
-  o releases sin autorización.
-- Añadir únicamente los archivos validados.
-- Al terminar, mostrar o resumir el diff.
-- No cambiar de rama sin autorización.
-- No trabajar sobre una rama distinta de la indicada por el usuario.
-- No crear tags ni releases salvo instrucción explícita.
-- No modificar workflows de despliegue salvo instrucción explícita.
-- No asumir que staging o producción están configurados si la documentación no lo confirma.
-- El merge o push a main requiere autorización distinta del commit o push de una
-  rama, salvo que la instrucción incluya expresamente ambos pasos.
-- El acceso Git no implica autorización de producción. Operaciones VPS,
-  migraciones productivas o acciones destructivas requieren autorización
-  explícita aunque técnicamente puedan ejecutarse.
+Cuando una implementación tenga objetivo terminal claro y requiera varias fases, recovery o verificación hasta completar, aplicar .agents/skills/autonomous-task/SKILL.md.
 
-## Documentación
+El entrypoint hace preflight y ejecuta .codex/autonomous-bootstrap.mjs. El supervisor externo mantiene continuidad hasta COMPLETE o un HARD_STOP real.
 
-Toda decisión importante debe documentarse.
+La complejidad no equivale a autorización. El modo unattended no autoriza por sí mismo commit/push, main, deploy, release/tag, producción/VPS, migraciones productivas, Git destructivo, dependencias nuevas, cambios de arquitectura ni ampliación de scope.
 
-Especialmente:
+CONTINUE significa AUTO_CONTINUE. Bugs ordinarios, lint/build/tests afectados y QA ejecutable se diagnostican, corrigen con cambio mínimo y vuelven a verificar sin handoff intermedio.
 
-- arquitectura;
-- APIs;
-- modelo de datos;
-- convenciones;
-- seguridad;
-- permisos;
-- ownership;
-- integraciones;
-- decisiones funcionales;
-- despliegue.
+## Gates y cierre
 
-No modificar documentación ajena al scope.
+Usar las skills/gates del proyecto y los scripts deterministas existentes. Para validación integral preferir npm run agent:verify frente a ejecutar suites globales verbosas manualmente.
 
-Cuando una implementación cambie una decisión documentada, actualizar únicamente el documento afectado.
+Una tarea solo puede cerrarse con evidencia suficiente de criterios de aceptación, checks requeridos, fronteras semánticas y validación visual cuando aplique.
 
-## Checks obligatorios
+Informe final compacto:
 
-Antes de cerrar una tarea, ejecutar los checks que correspondan y estén disponibles.
+- archivos modificados/creados/eliminados;
+- hecho y pendiente real;
+- checks y evidencia;
+- migración SQL y ejecución;
+- Git/producción;
+- riesgos o límites.
 
-Frontend:
-
-```powershell
-npm.cmd run build
-```
-
-Backend:
-
-```powershell
-node --check .\backend\app.js
-node --check .\backend\src\<archivo>.js
-```
-
-Diff:
-
-```powershell
-git diff --check
-git diff --stat
-```
-
-Si un check no aplica o no puede ejecutarse, indicarlo claramente.
-
-No ocultar errores ni afirmar que una validación fue correcta sin haberla ejecutado.
-
-## Entregable al finalizar una tarea
-
-Responder siempre con esta estructura:
-
-```text
-Archivos modificados:
-- ...
-
-Archivos creados:
-- ...
-
-Archivos eliminados:
-- ...
-
-Hecho:
-- ...
-
-Pendiente:
-- ...
-
-Fuera de scope:
-- ...
-
-Checks:
-- npm.cmd run build: correcto/fallido/no ejecutado/no aplica
-- node --check ...: correcto/fallido/no ejecutado/no aplica
-- git diff --check: correcto/fallido/no ejecutado
-
-Migración SQL:
-- sí/no
-- archivo:
-- ejecución manual:
-- backup previo:
-
-Commit/push:
-- no realizado salvo instrucción explícita.
-
-Cuando se hayan ejecutado, incluir también rama, SHA, commit, push y estado
-final.
-```
-
-No omitir limitaciones, riesgos ni comprobaciones pendientes.
-
-## Routing de tareas autónomas complejas
-
-Cuando una petición de implementación tenga un objetivo terminal claro y requiera trabajo sustancial, varias fases dependientes, verificación/recovery o continuidad hasta completar el resultado, debe tratarse como una tarea autónoma supervisada y no como un turno Codex ordinario.
-
-La clasificación es semántica. No se exigen palabras mágicas ni delimitadores `START`/`END`. Expresiones como “de principio a fin”, “hasta completar”, “no pares hasta que funcione” o una spec/plan con criterios de aceptación son señales de intención, pero no constituyen una sintaxis obligatoria.
-
-En ese caso es obligatorio leer y aplicar:
-
-```text
-.agents/skills/autonomous-task/SKILL.md
-```
-
-No activar este routing solo porque un prompt sea largo. Las preguntas, análisis sin implementación, cambios mínimos/locales, correcciones de texto/documentación, una única operación determinista o tareas bloqueadas desde el inicio por una decisión humana siguen el flujo normal.
-
-El routing autónomo autoriza únicamente la preparación local reversible necesaria para ejecutar la implementación ya solicitada: preflight, escritura de runtime bajo `.agent-runtime/`, ejecución del bootstrap protegido, worktree/rama `agent/<task-id>` aislados, checks locales y lanzamiento del supervisor. No implica por sí mismo autorización de commit/push, `main`, deploy, release/tag, producción/VPS, migraciones productivas, Git destructivo, nuevas dependencias, cambios de arquitectura ni ampliación de scope.
-
-El turno de entrada no debe implementar primero la feature ni crear worktrees con Git libre. Debe preparar el Task Contract y ejecutar `.codex/autonomous-bootstrap.mjs`; ese bootstrap valida SHA/rama/estado Git, crea el worktree aislado y entrega el control a `scripts/ai/autonomous-run.mjs`, que mantiene la continuidad hasta `COMPLETE` o un `HARD_STOP` real.
-
-La complejidad no equivale a autorización. Si durante el preflight se demuestra que el objetivo exige una decisión arquitectónica, dependencia, alcance o permiso no concedido por la petición ni por la documentación existente, debe producirse `HARD_STOP` en ese punto en lugar de inventar la decisión.
-
-## Harness y continuidad autónoma
-
-Un milestone técnico exitoso no constituye un handoff. Si la siguiente acción
-está determinada por el encargo, autorizada y verificable automáticamente, el
-agente debe continuar. No debe detenerse solo después de tests, lint, build,
-commit, push de rama, review, correcciones in-scope, bump determinista,
-fast-forward autorizado, hash, upload, healthcheck o validaciones deterministas
-de producción.
-
-La intervención humana queda reservada a decisiones funcionales reales,
-cambios de arquitectura, autorización no concedida, MFA/OAuth/captcha o
-secreto no disponible, interacción física, validación visual no automatizable,
-riesgo destructivo o estado inesperado que no pueda resolverse dentro del
-scope. Una autorización explícita ya concedida no se solicita de nuevo para
-cada subpaso cubierto por ella.
-
-El preflight debe identificar antes de empezar `base_ref`, `base_sha`,
-`working_branch`, `allowed_paths`, `authorized_operations`, repositorios
-adicionales autorizados cuando existan, `interactive_human_steps`,
-`hard_stop_conditions`, `required_checks` y `acceptance_criteria`. Los
-`interactive_human_steps` son los únicos checkpoints previstos para devolver
-control al usuario; no crear checkpoints humanos para operaciones deterministas.
-
-Para tareas unattended, `scripts/ai/autonomous-run.mjs` es la autoridad externa
-de continuidad: conserva/reanuda el thread y reevalúa de forma determinista el
-completion report después de cada turno. `CONTINUE` nunca es terminal. El loop
-no puede trabajar sobre `main` ni ejecutar push a `main`, deploy, release/tag,
-Git destructivo o escrituras/migraciones productivas. Esas operaciones quedan
-fuera del loop y requieren el flujo interactivo autorizado.
-
-Los fallos ordinarios directamente relacionados con la tarea deben seguir el
-flujo diagnosticar → cambio mínimo dentro de `allowed_paths` → repetir check,
-registrando `recovery_attempts`. Se permiten como máximo dos intentos técnicos
-distintos por problema; solo después procede `BLOCKED` con evidencia.
+La explicación extensa del workflow vive en docs/20-development/AI_AGENT_WORKFLOW.md y docs/50-operations/AI_AUTONOMOUS_SUPERVISOR.md. Cargar únicamente las secciones necesarias.

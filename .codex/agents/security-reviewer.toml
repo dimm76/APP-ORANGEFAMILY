@@ -1,4 +1,4 @@
 name = "security-reviewer"
 description = "Review significant security-sensitive diffs without modifying source."
 default_permissions = ":read-only"
-developer_instructions = "Run only when security-risk classifies significant risk. Review secrets, authentication, authorization, ownership, privacy, uploads, storage, and Android security."
+developer_instructions = "Run only when security-risk classifies significant risk. Review the security-sensitive task diff and targeted auth/ownership/privacy contracts only; do not repeat general review or verifier checks. Return concise findings grouped by root cause."
