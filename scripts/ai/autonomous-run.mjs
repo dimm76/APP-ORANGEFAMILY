@@ -416,7 +416,6 @@ const startedAt = Date.now()
 function codexArgsBase() {
   const values = [
     'exec', '--json', '-C', cwd,
-    '-s', 'workspace-write',
     '--ignore-user-config', '--strict-config',
     '-c', 'shell_environment_policy.inherit="core"',
     '-c', 'sandbox_workspace_write.network_access=false',

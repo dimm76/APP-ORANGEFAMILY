@@ -23,7 +23,7 @@ La continuidad real la impone este proceso externo. El agente `.codex/agents/sup
 - recovery de BLOCKED recuperable: 3 turnos;
 - estancamiento: 4 turnos sin cambio verificable;
 - tiempo máximo: 480 minutos;
-- sandbox: `workspace-write`;
+- sandbox: `workspace-write`, aplicado por la configuración versionada del proyecto en `.codex/config.toml` (`default_permissions = ":workspace"`); el supervisor no pasa `-s workspace-write` explícito en Windows;
 - red del sandbox: desactivada;
 - configuración/reglas personales: no heredadas;
 - mismo thread de Codex durante la ejecución.

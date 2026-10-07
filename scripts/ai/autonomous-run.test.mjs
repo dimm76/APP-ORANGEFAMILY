@@ -118,15 +118,19 @@ test('authorized provider-only changes count as supervisor progress', () => {
   }
 })
 
-test('supervisor enforces isolated workspace-write and rejects approval bypass flags', () => {
+test('supervisor preserves project workspace permissions and rejects privilege escalation flags', () => {
   const defaultDir = mkdtempSync(join(runtimeRoot, 'supervisor-least-privilege-'))
   try {
     const normal = runSupervisor(defaultDir, 'redact', ['--max-iterations', '1'], { task_id: 'supervisor-least-privilege' })
     assert.equal(normal.result.status, 0, normal.result.stderr)
     const normalArgs = JSON.parse(readFileSync(normal.argvPath, 'utf8'))
     assert.equal(normalArgs.includes('--approve-for-me'), false)
-    assert.ok(normalArgs.includes('workspace-write'))
+    assert.equal(normalArgs.includes('--dangerously-bypass-approvals-and-sandbox'), false)
+    assert.equal(normalArgs.includes('danger-full-access'), false)
+    assert.equal(normalArgs.includes('-s'), false)
+    assert.equal(normalArgs.includes('workspace-write'), false)
     assert.ok(normalArgs.includes('--ignore-user-config'))
+    assert.ok(normalArgs.includes('--strict-config'))
     assert.equal(normalArgs.includes('--ignore-rules'), false)
     assert.ok(normalArgs.includes('sandbox_workspace_write.network_access=false'))
 
