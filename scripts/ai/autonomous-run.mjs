@@ -417,9 +417,11 @@ function codexArgsBase() {
   const values = [
     'exec', '--json', '-C', cwd,
     '--ignore-user-config', '--strict-config',
+    '-c', 'default_permissions=":workspace"',
     '-c', 'shell_environment_policy.inherit="core"',
     '-c', 'sandbox_workspace_write.network_access=false',
   ]
+  if (process.platform === 'win32') values.push('-c', 'windows.sandbox="elevated"')
   for (const dir of addDirs) values.push('--add-dir', dir)
   if (args.model) values.push('--model', args.model)
   return values
@@ -469,9 +471,11 @@ for (let iteration = 1; iteration <= args.maxIterations; iteration += 1) {
 
   const resumeSafetyArgs = [
     '--json', '--ignore-user-config', '--strict-config',
+    '-c', 'default_permissions=":workspace"',
     '-c', 'shell_environment_policy.inherit="core"',
     '-c', 'sandbox_workspace_write.network_access=false',
   ]
+  if (process.platform === 'win32') resumeSafetyArgs.push('-c', 'windows.sandbox="elevated"')
   const commandArgs = threadId
     ? ['exec', 'resume', ...resumeSafetyArgs, threadId, continuation]
     : [...codexArgsBase(), continuation]

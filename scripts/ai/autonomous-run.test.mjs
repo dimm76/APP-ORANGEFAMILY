@@ -132,7 +132,13 @@ test('supervisor preserves project workspace permissions and rejects privilege e
     assert.ok(normalArgs.includes('--ignore-user-config'))
     assert.ok(normalArgs.includes('--strict-config'))
     assert.equal(normalArgs.includes('--ignore-rules'), false)
+    assert.ok(normalArgs.includes('default_permissions=":workspace"'))
     assert.ok(normalArgs.includes('sandbox_workspace_write.network_access=false'))
+    if (process.platform === 'win32') {
+      assert.ok(normalArgs.includes('windows.sandbox="elevated"'))
+    } else {
+      assert.equal(normalArgs.includes('windows.sandbox="elevated"'), false)
+    }
 
     const denied = runSupervisor(defaultDir, 'redact', ['--max-iterations', '1', '--approve-for-me'], { task_id: 'supervisor-autoapprove-denied' })
     assert.notEqual(denied.result.status, 0)

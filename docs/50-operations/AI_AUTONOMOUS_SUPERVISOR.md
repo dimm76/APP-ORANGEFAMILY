@@ -23,9 +23,10 @@ La continuidad real la impone este proceso externo. El agente `.codex/agents/sup
 - recovery de BLOCKED recuperable: 3 turnos;
 - estancamiento: 4 turnos sin cambio verificable;
 - tiempo máximo: 480 minutos;
-- sandbox: `workspace-write`, aplicado por la configuración versionada del proyecto en `.codex/config.toml` (`default_permissions = ":workspace"`); el supervisor no pasa `-s workspace-write` explícito en Windows;
+- sandbox: perfil `workspace-write` fijado explícitamente por el supervisor mediante `-c default_permissions=":workspace"`; no se usa `-s workspace-write`;
 - red del sandbox: desactivada;
-- configuración/reglas personales: no heredadas;
+- configuración personal: ignorada explícitamente con `--ignore-user-config`; las reglas del proyecto sí se mantienen porque no se usa `--ignore-rules`;
+- Windows: se fija explícitamente `-c windows.sandbox="elevated"` para evitar que Codex degrade el perfil `workspace-write` a `read-only`;
 - mismo thread de Codex durante la ejecución.
 
 ## Entrada automática desde Codex
@@ -123,6 +124,8 @@ HARD_STOP se reserva a:
 ## Seguridad unattended
 
 El loop no utiliza `--approve-for-me`, `--dangerously-bypass-approvals-and-sandbox` ni ampliaciones implícitas de permisos.
+
+El supervisor mantiene `--ignore-user-config` y fija su perfil de workspace mediante argumentos `-c` en cada ejecución inicial y resume. En Windows también fija explícitamente el sandbox `elevated` para evitar el fallback `read-only`; no depende de configuración personal.
 
 Aunque aparezcan en `authorized_operations`, el supervisor rechaza dentro del loop:
 
