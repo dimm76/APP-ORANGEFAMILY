@@ -1,7 +1,7 @@
 default_permissions = ":workspace"
 
 [agents]
-max_concurrent_threads_per_session = 3
+max_concurrent_threads_per_session = 2
 
 [features]
 multi_agent = true

@@ -173,6 +173,7 @@ Reglas operativas:
 - leer rangos concretos y no releer fuentes completas ya inspeccionadas;
 - para specs extensas, crear en preflight un brief compacto con objetivo, invariantes, alcance, criterios y mapa de secciones; la spec original sigue siendo canónica y se consulta solo por secciones necesarias;
 - priorizar gates deterministas, análisis estático y tests dirigidos antes de subagentes o razonamiento abierto;
+- mantener un único executor y evitar fan-out exploratorio; el límite de concurrencia permite como máximo un subagente especializado adicional, usado de forma serial únicamente para reviewer/verifier/security cuando el gate aporte evidencia nueva sobre un diff estable;
 - persistir stdout/stderr completos bajo .agent-runtime/ y devolver al modelo resúmenes compactos con los fallos relevantes;
 - agrupar findings por causa raíz y evitar ciclos reviewer/verifier tras microcambios;
 - ejecutar una suite global cuando sea gate final o cuando un check dirigido no baste, no como mecanismo repetitivo de diagnóstico.

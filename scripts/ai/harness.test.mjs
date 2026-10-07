@@ -133,3 +133,15 @@ test("verification persists verbose logs and emits compact evidence", () => {
   assert.match(verify, /status: 'PASS'/);
   assert.match(verify, /excerpt: failureExcerpt/);
 });
+
+
+test("multi-agent concurrency stays token-economical", () => {
+  const config = fs.readFileSync(".codex/config.toml", "utf8");
+  const agents = fs.readFileSync("AGENTS.md", "utf8");
+  const match = config.match(/max_concurrent_threads_per_session\s*=\s*(\d+)/);
+  assert.ok(match, "max_concurrent_threads_per_session must be configured");
+  assert.ok(Number(match[1]) <= 2, `multi-agent concurrency must stay <= 2, got ${match[1]}`);
+  assert.match(config, /multi_agent\s*=\s*true/);
+  assert.match(agents, /No hacer fan-out exploratorio/i);
+  assert.match(agents, /como máximo un subagente especializado adicional/i);
+});

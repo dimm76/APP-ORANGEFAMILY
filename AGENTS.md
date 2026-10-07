@@ -25,6 +25,7 @@ Codex es principalmente ejecutor. El contexto es un recurso limitado.
 - No releer una fuente completa ya inspeccionada. Volver a ella solo para una sección concreta necesaria.
 - En specs largas, el preflight crea un brief operativo compacto. La spec original sigue siendo canónica, pero durante ejecución se consulta por secciones/rangos.
 - Priorizar scripts deterministas, análisis estático y tests dirigidos antes de investigación abierta o subagentes.
+- No hacer fan-out exploratorio. Mantener un único executor; como máximo un subagente especializado adicional, de forma serial, solo cuando un gate de reviewer/verifier/security aporte evidencia nueva sobre un diff estable.
 - No ejecutar suites globales repetidamente si existe un check dirigido suficiente para diagnosticar/corregir.
 - Los logs completos se guardan en .agent-runtime/; al modelo se devuelve por defecto estado, resumen y fallos relevantes.
 - No imprimir archivos generados, diffs completos, logs completos o payloads grandes salvo que sean imprescindibles para diagnosticar un fallo.
