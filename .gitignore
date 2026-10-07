@@ -43,3 +43,4 @@ backend/.env.*
 
 # Local OrangePhotos import reports
 backend/tmp/
+.agent-worktrees/

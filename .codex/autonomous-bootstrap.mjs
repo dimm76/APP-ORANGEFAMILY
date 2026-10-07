@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { basename, dirname, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
 function parseArgs(argv) {
@@ -91,7 +91,7 @@ function assertSourceState({ sourceRoot, baseRef, baseSha, workingBranch, target
 
   assertCleanTracked(sourceRoot, label)
 
-  const expectedTarget = resolve(dirname(sourceRoot), `${basename(sourceRoot)}-agent-${taskId}`)
+  const expectedTarget = resolve(sourceRoot, '.agent-worktrees', taskId)
   if (resolve(target) !== expectedTarget) throw new Error(`${label} target must be ${expectedTarget}`)
   if (existsSync(target)) throw new Error(`${label} target already exists: ${target}`)
 
@@ -134,7 +134,7 @@ try {
   }
   if (!existsSync(promptPath)) throw new Error(`prompt file not found: ${promptPath}`)
 
-  const primaryTarget = resolve(dirname(root), `${basename(root)}-agent-${contract.task_id}`)
+  const primaryTarget = resolve(root, '.agent-worktrees', contract.task_id)
   const entry = {
     label: 'primary repository',
     sourceRoot: root,

@@ -48,7 +48,7 @@ Routing a request into this autonomous workflow authorizes only the reversible l
 - read repository documentation/code and Git state;
 - write `.agent-runtime/<task-id>/prompt.md` and `task-contract.json`;
 - invoke the repository-owned bootstrap;
-- let that bootstrap create an isolated sibling worktree and `agent/<task-id>` branch;
+- let that bootstrap create an isolated `.agent-worktrees/<task-id>` worktree inside the current checkout and an `agent/<task-id>` branch;
 - execute deterministic local checks and in-scope recovery through the supervisor.
 
 It does not implicitly authorize:

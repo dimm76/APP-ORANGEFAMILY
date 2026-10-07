@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { basename, dirname, join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 
 const bootstrap = resolve('.codex/autonomous-bootstrap.mjs')
@@ -48,7 +48,7 @@ function writeInputs(root, taskId, extra = {}) {
 }
 
 function targetFor(root, taskId) {
-  return resolve(dirname(root), `${basename(root)}-agent-${taskId}`)
+  return resolve(root, '.agent-worktrees', taskId)
 }
 
 function runPrepare(root, prompt, contract) {
@@ -87,6 +87,7 @@ test('protected bootstrap creates deterministic isolated worktree', () => {
     const result = runPrepare(root, prompt, contract)
     assert.equal(result.status, 0, result.stderr)
     assert.equal(existsSync(target), true)
+    assert.equal(target.startsWith(resolve(root, '.agent-worktrees')), true)
     assert.equal(git(target, ['branch', '--show-current']), `agent/${taskId}`)
     assert.equal(git(target, ['rev-parse', 'HEAD']), baseSha)
     assert.equal(readFileSync(join(target, '.agent-runtime', taskId, 'prompt.md'), 'utf8'), readFileSync(prompt, 'utf8'))
