@@ -1,3 +1,8 @@
+---
+name: autonomous-task
+description: Route complex implementation requests into the supervised autonomous Task Contract and bootstrap workflow.
+---
+
 # Autonomous task
 
 Use this skill when the current user request clearly needs supervised end-to-end execution rather than a normal single Codex turn.
@@ -29,7 +34,7 @@ It must:
 1. review the relevant project documentation and current code;
 2. perform task preflight and identify any real missing decision;
 3. derive the smallest safe Task Contract;
-4. write the bootstrap inputs under `.codex/runtime/<task-id>/` in the current checkout;
+4. write the bootstrap inputs under `.agent-runtime/<task-id>/` in the current checkout;
 5. invoke the protected repository bootstrap;
 6. stay attached to that process until COMPLETE or a real terminal stop;
 7. report the terminal result.
@@ -41,7 +46,7 @@ The entry turn must not create worktrees or agent branches with free-form Git co
 Routing a request into this autonomous workflow authorizes only the reversible local preparation needed to execute the already-requested implementation:
 
 - read repository documentation/code and Git state;
-- write `.codex/runtime/<task-id>/prompt.md` and `task-contract.json`;
+- write `.agent-runtime/<task-id>/prompt.md` and `task-contract.json`;
 - invoke the repository-owned bootstrap;
 - let that bootstrap create an isolated sibling worktree and `agent/<task-id>` branch;
 - execute deterministic local checks and in-scope recovery through the supervisor.
@@ -107,10 +112,10 @@ Never set `main` as `working_branch`.
 
 In the current checkout create only:
 
-`.codex/runtime/<task-id>/prompt.md`
+`.agent-runtime/<task-id>/prompt.md`
 : Preserve the user's actual request as the terminal objective. Do not require or strip START/END delimiters.
 
-`.codex/runtime/<task-id>/task-contract.json`
+`.agent-runtime/<task-id>/task-contract.json`
 : Must conform to `.codex/task-contract.schema.json` and reflect the completed preflight.
 
 Do not create the target worktree manually. Do not implement the requested feature in the source checkout.
@@ -121,8 +126,8 @@ From the repository root run exactly:
 
 ```powershell
 node .codex/autonomous-bootstrap.mjs `
-  --prompt-file .codex/runtime/<task-id>/prompt.md `
-  --contract .codex/runtime/<task-id>/task-contract.json
+  --prompt-file .agent-runtime/<task-id>/prompt.md `
+  --contract .agent-runtime/<task-id>/task-contract.json
 ```
 
 The bootstrap validates repository root, immutable base SHA, clean tracked source, task id, branch name, scope prerequisites and deterministic target path. It then creates the isolated worktree/agent branch, copies runtime inputs and launches `scripts/ai/autonomous-run.mjs`.

@@ -1,3 +1,8 @@
+---
+name: orangefamily-android-release
+description: Run the documented two-phase Android APK test, approval and release workflow when an APK task is explicitly authorized.
+---
+
 # OrangeFamily Android release
 
 Use this skill for every task involving an Android APK: test build, signed build, ADB install, version bump, release build, publication, server upload, hash verification, or `application_releases`.

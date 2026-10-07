@@ -89,7 +89,7 @@ recovery hasta completar el resultado, Codex debe aplicar
 normal. No existe una sintaxis obligatoria `START`/`END`.
 
 El entrypoint realiza preflight y genera `prompt.md` y `task-contract.json`
-bajo `.codex/runtime/<task-id>/`. Después ejecuta
+bajo `.agent-runtime/<task-id>/`. Después ejecuta
 `.codex/autonomous-bootstrap.mjs`; el bootstrap valida las fronteras, crea el
 worktree y la rama `agent/<task-id>` y lanza el supervisor existente. El usuario
 no debe construir el contrato, crear ramas/worktrees ni lanzar manualmente el

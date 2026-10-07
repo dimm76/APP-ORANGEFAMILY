@@ -24,7 +24,7 @@ function initRepo(prefix) {
 }
 
 function writeInputs(root, taskId, extra = {}) {
-  const runtime = join(root, '.codex', 'runtime', taskId)
+  const runtime = join(root, '.agent-runtime', taskId)
   mkdirSync(runtime, { recursive: true })
   const prompt = join(runtime, 'prompt.md')
   const contract = join(runtime, 'task-contract.json')
@@ -89,9 +89,9 @@ test('protected bootstrap creates deterministic isolated worktree', () => {
     assert.equal(existsSync(target), true)
     assert.equal(git(target, ['branch', '--show-current']), `agent/${taskId}`)
     assert.equal(git(target, ['rev-parse', 'HEAD']), baseSha)
-    assert.equal(readFileSync(join(target, '.codex', 'runtime', taskId, 'prompt.md'), 'utf8'), readFileSync(prompt, 'utf8'))
+    assert.equal(readFileSync(join(target, '.agent-runtime', taskId, 'prompt.md'), 'utf8'), readFileSync(prompt, 'utf8'))
     assert.deepEqual(
-      JSON.parse(readFileSync(join(target, '.codex', 'runtime', taskId, 'task-contract.json'), 'utf8')),
+      JSON.parse(readFileSync(join(target, '.agent-runtime', taskId, 'task-contract.json'), 'utf8')),
       JSON.parse(readFileSync(contract, 'utf8')),
     )
     assert.match(result.stdout, /"status":"PREPARED"/)
@@ -110,8 +110,8 @@ test('protected bootstrap accepts Windows UTF-8 BOM and normalizes runtime files
     writeFileSync(contract, `\uFEFF${readFileSync(contract, 'utf8')}`, 'utf8')
     const result = runPrepare(root, prompt, contract)
     assert.equal(result.status, 0, result.stderr)
-    const targetPrompt = readFileSync(join(target, '.codex', 'runtime', taskId, 'prompt.md'), 'utf8')
-    const targetContract = readFileSync(join(target, '.codex', 'runtime', taskId, 'task-contract.json'), 'utf8')
+    const targetPrompt = readFileSync(join(target, '.agent-runtime', taskId, 'prompt.md'), 'utf8')
+    const targetContract = readFileSync(join(target, '.agent-runtime', taskId, 'task-contract.json'), 'utf8')
     assert.equal(targetPrompt.startsWith('\uFEFF'), false)
     assert.equal(targetContract.startsWith('\uFEFF'), false)
     assert.doesNotThrow(() => JSON.parse(targetContract))

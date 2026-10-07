@@ -207,7 +207,7 @@ exigen palabras mágicas ni un envelope literal `START`/`END`.
 
 Codex actúa primero como entrypoint: revisa documentación y código, completa el
 preflight, deriva un Task Contract validable y escribe los inputs bajo
-`.codex/runtime/<task-id>/`. A continuación ejecuta el bootstrap protegido
+`.agent-runtime/<task-id>/`. A continuación ejecuta el bootstrap protegido
 `.codex/autonomous-bootstrap.mjs`, que valida SHA/rama/estado Git, crea el
 worktree y la rama `agent/<task-id>` aislados y lanza el supervisor externo.
 Desde ese momento `autonomous-run.mjs` controla la continuidad del mismo thread

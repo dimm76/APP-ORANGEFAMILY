@@ -32,7 +32,7 @@ La continuidad real la impone este proceso externo. El agente `.codex/agents/sup
 
 Una petición de implementación semánticamente compleja se enruta mediante `AGENTS.md` a `.agents/skills/autonomous-task/SKILL.md`. No requiere palabras mágicas ni delimitadores `START`/`END`.
 
-El turno inicial actúa únicamente como Lead/bootstrap: revisa documentación y código, hace preflight, usa la rama fuente actual como `base_ref` y su HEAD exacto como `base_sha`, genera `prompt.md` y `task-contract.json` en `.codex/runtime/<task-id>/` y ejecuta `.codex/autonomous-bootstrap.mjs`. Ese bootstrap protegido valida repositorio, base SHA, estado tracked, task id y rama `agent/<task-id>`; después crea un worktree hermano aislado, copia los inputs runtime y lanza `scripts/ai/autonomous-run.mjs`.
+El turno inicial actúa únicamente como Lead/bootstrap: revisa documentación y código, hace preflight, usa la rama fuente actual como `base_ref` y su HEAD exacto como `base_sha`, genera `prompt.md` y `task-contract.json` en `.agent-runtime/<task-id>/` y ejecuta `.codex/autonomous-bootstrap.mjs`. Ese bootstrap protegido valida repositorio, base SHA, estado tracked, task id y rama `agent/<task-id>`; después crea un worktree hermano aislado, copia los inputs runtime y lanza `scripts/ai/autonomous-run.mjs`.
 
 La clasificación de una tarea como compleja no amplía permisos. El bootstrap automático es single-repository; una tarea que requiera otro repositorio debe detenerse para una autorización/preparación multi-repo explícita. El supervisor general conserva su soporte multi-repositorio declarado en `authorized_repositories`.
 
@@ -40,7 +40,7 @@ La clasificación de una tarea como compleja no amplía permisos. El bootstrap a
 
 ## Lanzamiento
 
-Para uso manual o diagnóstico, preparar fuera de Git, normalmente bajo `.codex/runtime/<task-id>/`:
+Para uso manual o diagnóstico, preparar fuera de Git, normalmente bajo `.agent-runtime/<task-id>/`:
 
 1. `prompt.md`;
 2. `task-contract.json`;
@@ -50,12 +50,12 @@ Ejemplo:
 
 ```powershell
 npm run agent:run -- `
-  --prompt-file .codex/runtime/mi-tarea/prompt.md `
-  --contract .codex/runtime/mi-tarea/task-contract.json `
-  --completion-report .codex/runtime/mi-tarea/completion-report.json
+  --prompt-file .agent-runtime/mi-tarea/prompt.md `
+  --contract .agent-runtime/mi-tarea/task-contract.json `
+  --completion-report .agent-runtime/mi-tarea/completion-report.json
 ```
 
-Los logs del supervisor se guardan en `.codex/runtime/<task-id>/supervisor/`, ruta ignorada por Git.
+Los logs del supervisor se guardan en `.agent-runtime/<task-id>/supervisor/`, ruta ignorada por Git.
 
 ## Contrato obligatorio
 

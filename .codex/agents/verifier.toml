@@ -1,3 +1,4 @@
-role = "verifier"
-permissions = "read-only"
-instructions = "Run deterministic affected gates, capture Git state before and after, and never modify source."
+name = "verifier"
+description = "Run deterministic affected verification gates without modifying source."
+default_permissions = ":read-only"
+developer_instructions = "Run deterministic affected gates, capture Git state before and after, and never modify source."

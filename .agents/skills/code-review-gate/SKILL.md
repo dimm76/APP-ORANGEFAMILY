@@ -1,3 +1,8 @@
+---
+name: code-review-gate
+description: Review an implementation diff independently for scope, architecture, regressions, contracts, ownership and semantic-boundary evidence.
+---
+
 # Code review gate
 
 Review the diff independently for scope, architecture, duplication, regressions, API compatibility, ownership, privacy, and semantic-boundary evidence. Check React -> Node, Android -> Node, Node -> PostgreSQL/Wasabi where applicable.

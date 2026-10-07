@@ -1,3 +1,8 @@
+---
+name: orangefamily-android
+description: Apply OrangeFamily Android architecture, privacy, API, build and device-validation rules to Android changes.
+---
+
 # OrangeFamily Android
 
 `mobile/orange-photos-sync-agent` is Kotlin/Gradle and consumes the same Node API as React. It never accesses PostgreSQL or Wasabi directly; Room is local operational state and WorkManager handles existing background work. Preserve user isolation, privacy, deduplication, tokens, MediaStore, FileProvider, exported components, network security, backups, upload hashes, and API response safety.

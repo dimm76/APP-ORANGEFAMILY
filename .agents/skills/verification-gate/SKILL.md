@@ -1,3 +1,8 @@
+---
+name: verification-gate
+description: Run deterministic affected checks and require evidence before an OrangeFamily task can complete.
+---
+
 # Verification gate
 
 Select affected deterministic checks. Always run scope and `git diff --check`; use the real frontend, backend, database, documentation, security, and Android commands. Never claim instrumented tests without a device or emulator.

@@ -80,3 +80,28 @@ test("autonomous task skill materializes a complete supervisor handoff", () => {
   assert.match(fs.readFileSync(".codex/rules/default.rules", "utf8"), /pattern\s*=\s*\["node", "\.codex\/autonomous-bootstrap\.mjs"\]/);
   assert.match(fs.readFileSync(".codex/config.toml", "utf8"), /default_permissions\s*=\s*":workspace"/);
 });
+
+
+test("all Codex skills expose valid routing frontmatter", () => {
+  const root = ".agents/skills";
+  for (const entry of fs.readdirSync(root, { withFileTypes: true }).filter(entry => entry.isDirectory())) {
+    const markdown = fs.readFileSync(`${root}/${entry.name}/SKILL.md`, "utf8");
+    assert.match(markdown, /^---\r?\n/);
+    assert.match(markdown, new RegExp(`^name:\\s*${entry.name.replace(/[.*+?^$()|[\\]{}]/g, "\\$&")}\\s*$`, "m"));
+    assert.match(markdown, /^description:\s*\S.+$/m);
+    assert.match(markdown, /\r?\n---\r?\n/);
+  }
+});
+
+test("Codex agent role files use the current role metadata format", () => {
+  for (const file of fs.readdirSync(".codex/agents").filter(file => file.endsWith(".toml"))) {
+    const toml = fs.readFileSync(`.codex/agents/${file}`, "utf8");
+    assert.match(toml, /^name\s*=\s*"[^"]+"/m);
+    assert.match(toml, /^description\s*=\s*"[^"]+"/m);
+    assert.match(toml, /^developer_instructions\s*=\s*"[^"]+"/m);
+    assert.match(toml, /^default_permissions\s*=\s*":(?:workspace|read-only)"/m);
+    assert.doesNotMatch(toml, /^role\s*=/m);
+    assert.doesNotMatch(toml, /^permissions\s*=\s*"[^"]+"/m);
+    assert.doesNotMatch(toml, /^instructions\s*=/m);
+  }
+});

@@ -394,7 +394,7 @@ validatePrimaryRepository(cwd, contract)
 validateAutonomousOperations(contract)
 const runtimeBase = testMode && process.env.AUTONOMOUS_RUN_RUNTIME_ROOT
   ? resolve(process.env.AUTONOMOUS_RUN_RUNTIME_ROOT)
-  : resolve(cwd, '.codex', 'runtime')
+  : resolve(cwd, '.agent-runtime')
 const runtimeDir = resolve(runtimeBase, contract.task_id || 'autonomous-run', 'supervisor')
 mkdirSync(runtimeDir, { recursive: true })
 const authorizedRepositories = resolveAuthorizedRepositories(contract, cwd)

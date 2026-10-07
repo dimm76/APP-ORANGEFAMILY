@@ -126,11 +126,11 @@ try {
     throw new Error('automatic autonomous bootstrap is single-repository; additional repositories require explicit multi-repository setup')
   }
 
-  const draftRoot = resolve(root, '.codex', 'runtime', contract.task_id)
+  const draftRoot = resolve(root, '.agent-runtime', contract.task_id)
   const promptPath = resolve(root, args.promptFile)
   const contractPath = resolve(root, args.contract)
   if (promptPath !== join(draftRoot, 'prompt.md') || contractPath !== join(draftRoot, 'task-contract.json')) {
-    throw new Error(`bootstrap inputs must be .codex/runtime/${contract.task_id}/prompt.md and task-contract.json`)
+    throw new Error(`bootstrap inputs must be .agent-runtime/${contract.task_id}/prompt.md and task-contract.json`)
   }
   if (!existsSync(promptPath)) throw new Error(`prompt file not found: ${promptPath}`)
 
@@ -152,7 +152,7 @@ try {
   }
   created.push(entry)
 
-  const targetRuntime = join(primaryTarget, '.codex', 'runtime', contract.task_id)
+  const targetRuntime = join(primaryTarget, '.agent-runtime', contract.task_id)
   mkdirSync(targetRuntime, { recursive: true })
   const targetPrompt = join(targetRuntime, 'prompt.md')
   const targetContract = join(targetRuntime, 'task-contract.json')

@@ -442,7 +442,7 @@ En ese caso es obligatorio leer y aplicar:
 
 No activar este routing solo porque un prompt sea largo. Las preguntas, análisis sin implementación, cambios mínimos/locales, correcciones de texto/documentación, una única operación determinista o tareas bloqueadas desde el inicio por una decisión humana siguen el flujo normal.
 
-El routing autónomo autoriza únicamente la preparación local reversible necesaria para ejecutar la implementación ya solicitada: preflight, escritura de runtime bajo `.codex/runtime/`, ejecución del bootstrap protegido, worktree/rama `agent/<task-id>` aislados, checks locales y lanzamiento del supervisor. No implica por sí mismo autorización de commit/push, `main`, deploy, release/tag, producción/VPS, migraciones productivas, Git destructivo, nuevas dependencias, cambios de arquitectura ni ampliación de scope.
+El routing autónomo autoriza únicamente la preparación local reversible necesaria para ejecutar la implementación ya solicitada: preflight, escritura de runtime bajo `.agent-runtime/`, ejecución del bootstrap protegido, worktree/rama `agent/<task-id>` aislados, checks locales y lanzamiento del supervisor. No implica por sí mismo autorización de commit/push, `main`, deploy, release/tag, producción/VPS, migraciones productivas, Git destructivo, nuevas dependencias, cambios de arquitectura ni ampliación de scope.
 
 El turno de entrada no debe implementar primero la feature ni crear worktrees con Git libre. Debe preparar el Task Contract y ejecutar `.codex/autonomous-bootstrap.mjs`; ese bootstrap valida SHA/rama/estado Git, crea el worktree aislado y entrega el control a `scripts/ai/autonomous-run.mjs`, que mantiene la continuidad hasta `COMPLETE` o un `HARD_STOP` real.
 
